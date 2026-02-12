@@ -9,3 +9,5 @@ typing-extensions==4.15.0
 gunicorn==23.0.0
 django-cors-headers==4.6.0
 
+cryptography
+
