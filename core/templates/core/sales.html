@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ventes - Blanco{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/sales.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Gestion des ventes</h1>
+            <p class="text-secondary">Créez et gérez vos ventes</p>
+        </div>
+        <button class="btn btn-primary" id="newSaleBtn">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nouvelle vente
+        </button>
+    </div>
+</div>
+
+<div class="sales-container">
+    <!-- Section Nouvelle Vente (cachée par défaut) -->
+    <div class="new-sale-section" id="newSaleSection" style="display: none;">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Nouvelle vente</h3>
+                <button class="btn btn-secondary btn-sm" id="closeSaleBtn">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Fermer
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- Recherche de produits - Section principale -->
+                <div class="product-search-section">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle; margin-right: 8px;">
+                                <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Rechercher un produit
+                        </label>
+                        <div class="product-search">
+                            <input type="text" class="form-control" id="productSearch" placeholder="Tapez le nom, code ou scannez le code-barres..." autofocus>
+                            <div class="search-results" id="searchResults"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section pliable pour les options avancées -->
+                <div class="collapsible-section">
+                    <button type="button" class="collapsible-toggle" id="toggleAdvancedOptions">
+                        <svg class="toggle-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Options avancées (Client, Type de vente)</span>
+                    </button>
+
+                    <div class="collapsible-content" id="advancedOptions">
+                        <div class="sale-form-grid">
+                            <!-- Informations client -->
+                            <div class="form-section">
+                                <h4>Informations client</h4>
+                                <div class="form-group">
+                                    <label class="form-label">Client</label>
+                                    <select class="form-control" id="clientSelect">
+                                        <option value="">Client de passage</option>
+                                        {% for client in clients %}
+                                        <option value="{{ client.id }}">{{ client.firstname }} {{ client.lastname }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Type de vente -->
+                            <div class="form-section">
+                                <h4>Type de vente</h4>
+                                <div class="form-group">
+                                    <div class="radio-group">
+                                        <label class="radio-label">
+                                            <input type="radio" name="saleType" value="cash" checked>
+                                            <span>Comptant</span>
+                                        </label>
+                                        <label class="radio-label">
+                                            <input type="radio" name="saleType" value="credit">
+                                            <span>Crédit</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group" id="creditDateGroup" style="display: none;">
+                                    <label class="form-label">Date d'échéance</label>
+                                    <input type="date" class="form-control" id="dueDate">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panier -->
+                <div class="cart-section">
+                    <h4>Panier</h4>
+
+                    <!-- Zone de notification -->
+                    <div id="saleNotification" class="sale-notification" style="display: none;">
+                        <div class="notification-content">
+                            <span class="notification-icon"></span>
+                            <span class="notification-message"></span>
+                            <button class="notification-close" onclick="closeSaleNotification()">×</button>
+                        </div>
+                    </div>
+
+                    <div class="cart-table-container">
+                        <table class="table cart-table">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Prix unitaire</th>
+                                    <th>Quantité</th>
+                                    <th>Sous-total</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartItems">
+                                <tr class="empty-cart">
+                                    <td colspan="5" class="text-center">Le panier est vide</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Totaux -->
+                    <div class="cart-totals">
+                        <!-- <div class="total-row">
+                            <span>Sous-total:</span>
+                            <span id="subtotal">0 FCFA</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Réduction totale:</span>
+                            <span id="totalDiscount">0 FCFA</span>
+                        </div> -->
+                        <div class="total-row total-final">
+                            <span>Total:</span>
+                            <span id="grandTotal">0 FCFA</span>
+                        </div>
+                    </div>
+
+                    <!-- Boutons d'action -->
+                    <div class="cart-actions">
+                        <button class="btn btn-secondary" id="clearCartBtn">Vider le panier</button>
+                        <button class="btn btn-success" id="completeSaleBtn" disabled>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16 6L7.5 14.5L4 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Valider la vente
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Liste des ventes -->
+    <div class="sales-list-section">
+        <!-- Recette totale du jour -->
+        <div class="daily-revenue-card">
+            <div class="revenue-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="revenue-info">
+                <div class="revenue-label">Recette totale du jour</div>
+                <div class="revenue-amount">{{ total_revenue|floatformat:0 }} FCFA</div>
+                {% if current_daily %}
+                    <div class="revenue-date">{{ current_daily.start_date|date:"d/m/Y" }}</div>
+                {% else %}
+                    <div class="revenue-date text-danger">Aucun Daily actif</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Ventes du jour</h3>
+                <div class="header-actions">
+                    <div class="search-group">
+                        <input type="text" class="form-control form-control-sm" id="searchSales" placeholder="Rechercher par client, vendeur, produit, montant...">
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>#ID</th>
+                                <th>Date</th>
+                                <th>Client</th>
+                                <th>Vendeur</th>
+                                <th>Montant</th>
+                                <th>Type</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesTableBody">
+                            {% for sale in sales %}
+                            <tr>
+                                <td>#{{ sale.id }}</td>
+                                <td>{{ sale.create_at|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    {% if sale.client %}
+                                        {{ sale.client }}
+                                    {% else %}
+                                        <span class="text-secondary">Client de passage</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ sale.staff }}</td>
+                                <td class="font-weight-bold">{{ sale.total|floatformat:0 }} FCFA</td>
+                                <td>
+                                    {% if sale.is_credit %}
+                                        <span class="badge badge-warning">Crédit</span>
+                                    {% else %}
+                                        <span class="badge badge-success">Comptant</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if sale.is_paid %}
+                                        <span class="badge badge-success">Payé</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Non payé</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-icon" onclick="viewSale({{ sale.id }})" title="Voir détails">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                                <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.5"/>
+                                                <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
+                                            </svg>
+                                        </button>
+                                        <button class="btn-icon" onclick="printSale({{ sale.id }})" title="Imprimer">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                                <path d="M4 5V2h8v3M4 11H2V7h12v4h-2" stroke="currentColor" stroke-width="1.5"/>
+                                                <rect x="4" y="9" width="8" height="5" stroke="currentColor" stroke-width="1.5"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center">Aucune vente trouvée</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Affichage de {{ sales|length }} vente(s)
+                    </div>
+                    <div class="pagination">
+                        <!-- Pagination à implémenter -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de détails de vente -->
+<div class="modal" id="saleDetailsModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Détails de la vente</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="saleDetailsContent">
+            <!-- Contenu chargé dynamiquement -->
+        </div>
+    </div>
+</div>
+
+<!-- Modal de détails du produit -->
+<div class="modal" id="productDetailsModal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Détails du produit</h3>
+            <button class="modal-close" onclick="closeProductModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="productDetailsContent">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>Chargement des détails...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/sales.js' %}"></script>
+{% endblock %}

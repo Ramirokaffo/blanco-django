@@ -1,0 +1,62 @@
+# Django specific
+*.log
+*.pot
+*.pyc
+__pycache__/
+*/migrations/*.py
+!*/migrations/__init__.py
+# /migrations/
+
+db.sqlite3
+media/
+.idea/
+.vscode/
+
+# Environments
+*.env
+*.conf
+.env
+venv/
+env/
+ENV/
+.venv/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Code analysis
+.bandit
+.mypy_cache/
+.ruff_cache/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Docker
+*.env.local
+.env.production.local
+docker-compose.override.yml
+
+# Static and media files (collected by Docker)
+staticfiles/
+mediafiles/
+
+# SSL certificates
+ssl/
+*.pem
+*.key
+*.crt
+
+# Backups
+*.sql
+*.tar.gz
+backup/

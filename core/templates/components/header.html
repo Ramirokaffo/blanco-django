@@ -1,0 +1,41 @@
+<header class="header">
+    <div class="container header-container">
+        <div class="header-left">
+            <div class="logo">
+                <h1>BLANCO</h1>
+            </div>
+        </div>
+        
+        <div class="header-center">
+            <div class="search-bar">
+                <input type="text" placeholder="Rechercher..." class="search-input">
+                <button class="search-btn">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="header-right">
+            <button class="theme-toggle" id="themeToggle" aria-label="Changer de thème">
+                <svg class="sun-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
+                    <path d="M12 1v2m0 18v2M21 12h-2M5 12H3m15.364-7.364l-1.414 1.414M7.05 16.95l-1.414 1.414m12.728 0l-1.414-1.414M7.05 7.05L5.636 5.636" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <svg class="moon-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            
+            <div class="user-menu">
+                <button class="user-btn">
+                    <div class="user-avatar">
+                        <span>{{ user.username|first|upper }}</span>
+                    </div>
+                    <span class="user-name">{{ user.username }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</header>
