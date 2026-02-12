@@ -35,7 +35,10 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - .env.docker
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
     depends_on:
       mysql:
         condition: service_healthy
@@ -47,5 +50,4 @@ volumes:
 
 networks:
   blanco-network:
-    external: true
     driver: bridge

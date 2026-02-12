@@ -100,19 +100,20 @@ MYSQL_PASSWORD = config("MYSQL_PASSWORD")
 MYSQL_HOST = config("MYSQL_HOST")
 MYSQL_PORT = config("MYSQL_PORT")
 
-if DATABASE_ENGINE == "django.db.backends.postgresql":
+if DATABASE_ENGINE == "django.db.backends.mysql":
     DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": MYSQL_DATABASE,  # Base de données existante avec les données
-        "USER": MYSQL_USER,
-        "PASSWORD": MYSQL_PASSWORD,
-        "HOST": MYSQL_HOST,
-        "PORT": MYSQL_PORT,
-        # "OPTIONS": {
-        #     "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        # },
-    }
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": MYSQL_DATABASE,
+            "USER": MYSQL_USER,
+            "PASSWORD": MYSQL_PASSWORD,
+            "HOST": MYSQL_HOST,
+            "PORT": MYSQL_PORT,
+            # "OPTIONS": {
+            #     "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            #     "charset": "utf8mb4",
+            # },
+        }
     }
 else:
     # SQLite for development
