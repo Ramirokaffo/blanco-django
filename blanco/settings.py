@@ -21,13 +21,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-n5r6cvm_*tj-!mp%-3i2r_wwc&-*)!hn$qlij!)%@z+7!t9-_m"
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+SECRET_KEY = config("SECRET_KEY")
+DEBUG = config("DEBUG", cast=bool)
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=lambda v: [s.strip() for s in v.split(',')])
 
 
 # Application definition
@@ -95,19 +91,24 @@ WSGI_APPLICATION = "blanco.wsgi.application"
 #     }
 # }
 
-# Support both PostgreSQL (production) and SQLite (development)
+# Support both MySQL (production) and SQLite (development)
 DATABASE_ENGINE = config("DATABASE_ENGINE", default="django.db.backends.sqlite3")
+
+MYSQL_DATABASE = config("MYSQL_DATABASE")
+MYSQL_USER = config("MYSQL_USER")
+MYSQL_PASSWORD = config("MYSQL_PASSWORD")
+MYSQL_HOST = config("MYSQL_HOST")
+MYSQL_PORT = config("MYSQL_PORT")
 
 if DATABASE_ENGINE == "django.db.backends.postgresql":
     DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        # "NAME": "blanco",
-        "NAME": "blanco-django",  # Base de données existante avec les données
-        "USER": "root",
-        "PASSWORD": "68153",
-        "HOST": "localhost",
-        "PORT": "3306",
+        "NAME": MYSQL_DATABASE,  # Base de données existante avec les données
+        "USER": MYSQL_USER,
+        "PASSWORD": MYSQL_PASSWORD,
+        "HOST": MYSQL_HOST,
+        "PORT": MYSQL_PORT,
         # "OPTIONS": {
         #     "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
         # },
@@ -142,6 +143,11 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+
+# CORS Configuration
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', cast=bool, default=True)
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=lambda v: [s.strip() for s in v.split(',')], default=[])
 
 
 # Internationalization
