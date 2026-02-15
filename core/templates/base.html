@@ -34,6 +34,23 @@
         </div>
     </footer>
     
+    <!-- Modal QR Code Serveur -->
+    {% if server_qr_base64 %}
+    <div class="qr-modal-overlay" id="qrModal">
+        <div class="qr-modal">
+            <div class="qr-modal-header">
+                <h3>QR Code Serveur</h3>
+                <button class="qr-modal-close" id="qrModalClose" aria-label="Fermer">&times;</button>
+            </div>
+            <div class="qr-modal-body">
+                <img src="data:image/png;base64,{{ server_qr_base64 }}" alt="QR Code serveur" class="qr-code-img">
+                <p class="qr-server-address">{{ server_address }}</p>
+                <p class="qr-hint">Scannez ce code QR pour connecter l'application mobile au serveur</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Scripts JavaScript -->
     <script src="{% static 'js/theme.js' %}"></script>
     <script src="{% static 'js/main.js' %}"></script>

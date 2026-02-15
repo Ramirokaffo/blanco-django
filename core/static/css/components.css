@@ -390,20 +390,20 @@
     .header-center {
         display: none;
     }
-    
+
     .nav-menu {
         justify-content: flex-start;
     }
-    
+
     .main-content {
         margin-top: 130px;
         padding: 20px 0;
     }
-    
+
     .page-header h1 {
         font-size: 24px;
     }
-    
+
     .dashboard-grid {
         grid-template-columns: 1fr;
     }
@@ -413,16 +413,133 @@
     .header-left .logo h1 {
         font-size: 20px;
     }
-    
+
     .user-name {
         display: none;
     }
-    
+
     .nav-link span {
         display: none;
     }
-    
+
     .nav-link {
         padding: 18px 15px;
     }
+}
+
+
+/* ── QR Code Button (Header) ──────────────────────────────────── */
+.qr-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+}
+
+.qr-toggle:hover {
+    background-color: var(--bg-secondary);
+    color: var(--primary-color);
+}
+
+/* ── QR Code Modal ────────────────────────────────────────────── */
+.qr-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+}
+
+.qr-modal-overlay.active {
+    display: flex;
+}
+
+.qr-modal {
+    background-color: var(--bg-primary);
+    border-radius: 16px;
+    padding: 30px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+    animation: qrModalIn 0.25s ease-out;
+}
+
+@keyframes qrModalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.qr-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.qr-modal-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.qr-modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0 5px;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.qr-modal-close:hover {
+    color: var(--danger-color);
+}
+
+.qr-modal-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.qr-code-img {
+    width: 280px;
+    height: 280px;
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+}
+
+.qr-server-address {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--primary-color);
+    font-family: 'Courier New', Courier, monospace;
+    margin: 0;
+}
+
+.qr-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
 }

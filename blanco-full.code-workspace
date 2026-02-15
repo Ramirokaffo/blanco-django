@@ -7,7 +7,7 @@
 			"path": "."
 		},
 		{
-			"path": "../blanco-mobile"
+			"path": "../../StudioProjects/blanco_mobile"
 		}
 	],
 	"settings": {}

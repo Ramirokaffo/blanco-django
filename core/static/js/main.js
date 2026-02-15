@@ -35,6 +35,35 @@ document.addEventListener('DOMContentLoaded', function() {
             // TODO: Afficher le menu déroulant utilisateur
         });
     }
+
+    // ── QR Code Modal ────────────────────────────────────────────
+    const qrToggle = document.getElementById('qrToggle');
+    const qrModal = document.getElementById('qrModal');
+    const qrModalClose = document.getElementById('qrModalClose');
+
+    if (qrToggle && qrModal) {
+        qrToggle.addEventListener('click', function () {
+            qrModal.classList.add('active');
+        });
+
+        qrModalClose.addEventListener('click', function () {
+            qrModal.classList.remove('active');
+        });
+
+        // Fermer en cliquant sur l'overlay
+        qrModal.addEventListener('click', function (e) {
+            if (e.target === qrModal) {
+                qrModal.classList.remove('active');
+            }
+        });
+
+        // Fermer avec Echap
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && qrModal.classList.contains('active')) {
+                qrModal.classList.remove('active');
+            }
+        });
+    }
     
     // Highlight du lien de navigation actif
     highlightActiveNavLink();
