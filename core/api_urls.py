@@ -40,6 +40,8 @@ urlpatterns = [
     path('products/by-name/<str:product_name>/', product_views.get_product_by_name, name='product_by_name'),
     # Flask: POST /create_product
     path('products/', product_views.create_product, name='create_product'),
+    # PATCH /api/products/<product_id>/update
+    path('products/<int:product_id>/update/', product_views.update_product_by_id, name='update_product_by_id'),
 
     # ── Images ─────────────────────────────────────────────────────
     # Flask: GET /image/<folder>/<image>
@@ -58,6 +60,7 @@ urlpatterns = [
     # ── Sales ──────────────────────────────────────────────────────
     # Flask: POST /sale
     path('sales/', sale_views.create_sale, name='create_sale'),
+    path('sales/create/', sale_views.create_sale, name='create_sale'),
     # Recherche de ventes
     path('sales/search/', sale_views.search_sales, name='search_sales'),
     # Détails d'une vente

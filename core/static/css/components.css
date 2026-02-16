@@ -18,6 +18,18 @@
     height: 70px;
 }
 
+.header-left .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-left .logo .logo-img {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
+}
+
 .header-left .logo h1 {
     color: var(--primary-color);
     font-size: 28px;

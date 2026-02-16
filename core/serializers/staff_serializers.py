@@ -20,7 +20,7 @@ class StaffSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'firstname', 'lastname', 'full_name',
             'phone_number', 'role', 'gender', 'profil',
-            'is_active', 'create_at',
+            'is_active',
         ]
         read_only_fields = fields
 
@@ -38,8 +38,8 @@ class StaffCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = [
-            'username', 'password', 'firstname', 'lastname',
-            'phone_number', 'role', 'gender', 'profil',
+            'username', 'firstname', 'lastname',
+            'phone_number', 'role', 'gender', "password", 'profil',
         ]
 
     def validate_username(self, value):
@@ -48,9 +48,10 @@ class StaffCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        password = validated_data.pop('password')
+        password = validated_data.pop('password', None)
         user = CustomUser(**validated_data)
-        user.set_password(password)
+        if password:
+            user.set_password(password)
         user.save()
         return user
 

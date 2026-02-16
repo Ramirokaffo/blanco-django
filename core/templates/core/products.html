@@ -1,19 +1,174 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Produits - Blanco{% endblock %}
+{% block title %}Produits - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/products.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>Gestion des produits</h1>
-    <p class="text-secondary">Gérez votre catalogue de produits</p>
+    <div class="header-content">
+        <div>
+            <h1>Gestion des produits</h1>
+            <p class="text-secondary">Gérez votre catalogue de produits ({{ total_count }} produit{{ total_count|pluralize }})</p>
+        </div>
+    </div>
 </div>
 
+<!-- Barre de filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'products' %}" class="filters-form" id="filtersForm">
+        <div class="filters-row">
+            <!-- Recherche -->
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Nom, code ou marque..." value="{{ current_search }}">
+            </div>
+
+            <!-- Catégorie -->
+            <div class="filter-group">
+                <label class="form-label">Catégorie</label>
+                <select name="category" class="form-control">
+                    <option value="">Toutes</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if current_category == cat.id|stringformat:"d" %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Gamme -->
+            <div class="filter-group">
+                <label class="form-label">Gamme</label>
+                <select name="gamme" class="form-control">
+                    <option value="">Toutes</option>
+                    {% for g in gammes %}
+                    <option value="{{ g.id }}" {% if current_gamme == g.id|stringformat:"d" %}selected{% endif %}>{{ g.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Rayon -->
+            <div class="filter-group">
+                <label class="form-label">Rayon</label>
+                <select name="rayon" class="form-control">
+                    <option value="">Tous</option>
+                    {% for r in rayons %}
+                    <option value="{{ r.id }}" {% if current_rayon == r.id|stringformat:"d" %}selected{% endif %}>{{ r.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Statut stock -->
+            <div class="filter-group">
+                <label class="form-label">Stock</label>
+                <select name="stock_status" class="form-control">
+                    <option value="">Tous</option>
+                    <option value="in" {% if current_stock_status == 'in' %}selected{% endif %}>En stock</option>
+                    <option value="low" {% if current_stock_status == 'low' %}selected{% endif %}>Stock bas</option>
+                    <option value="out" {% if current_stock_status == 'out' %}selected{% endif %}>Rupture</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Filtrer
+            </button>
+            <a href="{% url 'products' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau des produits -->
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Liste des produits</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
     </div>
     <div class="card-body">
-        <p>Contenu à venir...</p>
+        <div class="table-responsive">
+            <table class="table products-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Nom</th>
+                        <th>Marque</th>
+                        <th>Catégorie</th>
+                        <th>Rayon</th>
+                        <th>Gamme</th>
+                        <th>Stock</th>
+                        <th>Prix max</th>
+                        <th>Prix actuel</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td class="product-code">{{ product.code }}</td>
+                        <td class="product-name">{{ product.name }}</td>
+                        <td>{{ product.brand|default:"-" }}</td>
+                        <td>{{ product.category.name|default:"-" }}</td>
+                        <td>{{ product.rayon.name|default:"-" }}</td>
+                        <td>{{ product.gamme.name|default:"-" }}</td>
+                        <td>
+                            {% if product.stock == 0 %}
+                                <span class="badge badge-danger">Rupture</span>
+                            {% elif product.is_low_stock %}
+                                <span class="badge badge-warning">{{ product.stock }}</span>
+                            {% else %}
+                                <span class="badge badge-success">{{ product.stock }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{% if product.max_salable_price %}{{ product.max_salable_price|floatformat:0 }} FCFA{% else %}-{% endif %}</td>
+                        <td>{% if product.actual_price %}{{ product.actual_price|floatformat:0 }} FCFA{% else %}-{% endif %}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center">Aucun produit trouvé</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} produit{{ total_count|pluralize }}
+            </div>
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page=1{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="Première page">&laquo;</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="Page précédente">&lsaquo;</a>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="Page suivante">&rsaquo;</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="Dernière page">&raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/products.js' %}"></script>
 {% endblock %}

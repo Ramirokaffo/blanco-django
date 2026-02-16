@@ -14,7 +14,9 @@ from .models import (
     # Inventory models
     Supply, Inventory, DailyInventory,
     # Accounting models
-    Exercise, Daily, ExpenseType, RecipeType, DailyExpense, DailyRecipe, ProductExpense
+    Exercise, Daily, ExpenseType, RecipeType, DailyExpense, DailyRecipe, ProductExpense,
+    # Settings models
+    SystemSettings,
 )
 
 
@@ -232,3 +234,43 @@ class ProductExpenseAdmin(admin.ModelAdmin):
     search_fields = ('product__name', 'description')
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
+
+
+# System Settings Admin
+@admin.register(SystemSettings)
+class SystemSettingsAdmin(admin.ModelAdmin):
+    """Admin pour les paramètres système (instance unique)."""
+    list_display = ('company_name', 'company_phone', 'company_email', 'currency_symbol', 'updated_at')
+    readonly_fields = ('updated_at',)
+
+    fieldsets = (
+        ('Informations de l\'entreprise', {
+            'fields': (
+                'company_name', 'company_address', 'company_phone',
+                'company_email', 'company_website', 'company_logo',
+            )
+        }),
+        ('Informations fiscales / légales', {
+            'fields': ('tax_id', 'trade_register'),
+        }),
+        ('Paramètres monétaires', {
+            'fields': ('currency_symbol', 'currency_code'),
+        }),
+        ('Paramètres de tickets / reçus', {
+            'fields': ('receipt_header', 'receipt_footer'),
+        }),
+        ('Paramètres de stock', {
+            'fields': ('low_stock_threshold',),
+        }),
+        ('Métadonnées', {
+            'fields': ('updated_at',),
+        }),
+    )
+
+    def has_add_permission(self, request):
+        """Empêcher la création de plusieurs instances."""
+        return not SystemSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        """Empêcher la suppression de l'instance unique."""
+        return False

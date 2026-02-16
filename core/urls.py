@@ -7,10 +7,9 @@ urlpatterns = [
     path('sales/', views.sales, name='sales'),
     path('products/', views.products, name='products'),
     path('inventory/', views.inventory, name='inventory'),
-    path('clients/', views.clients, name='clients'),
-    path('suppliers/', views.suppliers, name='suppliers'),
+    path('supplies/', views.supplies, name='supplies'),
+    path('contacts/', views.contacts, name='contacts'),
     path('expenses/', views.expenses, name='expenses'),
-    path('staff/', views.staff, name='staff'),
     path('reports/', views.reports, name='reports'),
     path('settings/', views.settings, name='settings'),
 ]

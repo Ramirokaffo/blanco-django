@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Blanco - Gestion{% endblock %}</title>
+    <title>{% block title %}{{ system_settings.company_name }} - Gestion{% endblock %}</title>
     
     <!-- Styles CSS -->
     {% load static %}
@@ -30,7 +30,7 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 Blanco - Tous droits réservés</p>
+            <p>&copy; {% now "Y" %} {{ system_settings.company_name }} - Tous droits réservés</p>
         </div>
     </footer>
     

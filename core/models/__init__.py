@@ -9,6 +9,7 @@ from .product_models import *
 from .sale_models import *
 from .inventory_models import *
 from .accounting_models import *
+from .settings_models import *
 
 __all__ = [
     # Base models
@@ -47,5 +48,8 @@ __all__ = [
     'DailyExpense',
     'DailyRecipe',
     'ProductExpense',
+
+    # Settings models
+    'SystemSettings',
 ]
 

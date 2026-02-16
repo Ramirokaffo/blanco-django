@@ -2,7 +2,10 @@
     <div class="container header-container">
         <div class="header-left">
             <div class="logo">
-                <h1>BLANCO</h1>
+                {% if system_settings.company_logo %}
+                    <img src="{{ system_settings.company_logo.url }}" alt="{{ system_settings.company_name }}" class="logo-img">
+                {% endif %}
+                <h1>{{ system_settings.company_name }}</h1>
             </div>
         </div>
         

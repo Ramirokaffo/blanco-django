@@ -15,3 +15,15 @@ def qrcode_context(request):
         'server_address': QRCodeService.get_server_address(),
     }
 
+
+def system_settings_context(request):
+    """
+    Injecte les paramètres système (nom, logo, etc.) dans le contexte
+    de tous les templates.
+    """
+    from core.models import SystemSettings
+    settings = SystemSettings.get_settings()
+    return {
+        'system_settings': settings,
+    }
+

@@ -48,30 +48,31 @@
                     <span>Inventaire</span>
                 </a>
             </li>
-            
+
             <li class="nav-item">
-                <a href="{% url 'clients' %}" class="nav-link {% if request.resolver_match.url_name == 'clients' %}active{% endif %}">
+                <a href="{% url 'supplies' %}" class="nav-link {% if request.resolver_match.url_name == 'supplies' %}active{% endif %}">
+                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <rect x="1" y="6" width="15" height="13" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <path d="M16 10h4l3 4v5h-7V10z" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="5.5" cy="19" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>
+                        <circle cx="18.5" cy="19" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>
+                    </svg>
+                    <span>Approvisionnement</span>
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a href="{% url 'contacts' %}" class="nav-link {% if request.resolver_match.url_name == 'contacts' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2"/>
                         <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
                         <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" stroke-width="2"/>
                         <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    <span>Clients</span>
+                    <span>Contacts</span>
                 </a>
             </li>
-            
-            <li class="nav-item">
-                <a href="{% url 'suppliers' %}" class="nav-link {% if request.resolver_match.url_name == 'suppliers' %}active{% endif %}">
-                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2"/>
-                        <circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-                        <polyline points="17 11 19 13 23 9" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    <span>Fournisseurs</span>
-                </a>
-            </li>
-            
+
             <li class="nav-item">
                 <a href="{% url 'expenses' %}" class="nav-link {% if request.resolver_match.url_name == 'expenses' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -79,16 +80,6 @@
                         <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2"/>
                     </svg>
                     <span>Dépenses</span>
-                </a>
-            </li>
-            
-            <li class="nav-item">
-                <a href="{% url 'staff' %}" class="nav-link {% if request.resolver_match.url_name == 'staff' %}active{% endif %}">
-                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2"/>
-                        <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    <span>Personnel</span>
                 </a>
             </li>
             

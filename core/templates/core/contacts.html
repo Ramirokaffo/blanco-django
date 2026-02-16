@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Contacts - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/contacts.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Contacts</h1>
+            <p class="text-secondary">Clients, Fournisseurs et Personnel ({{ total_count }} enregistrement{{ total_count|pluralize }})</p>
+        </div>
+    </div>
+</div>
+
+<!-- Sous-onglets -->
+<div class="sub-tabs">
+    <a href="{% url 'contacts' %}?tab=clients" class="sub-tab {% if current_tab == 'clients' %}active{% endif %}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2"/>
+            <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        Clients
+    </a>
+    <a href="{% url 'contacts' %}?tab=suppliers" class="sub-tab {% if current_tab == 'suppliers' %}active{% endif %}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2"/>
+            <circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+            <polyline points="17 11 19 13 23 9" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        Fournisseurs
+    </a>
+    <a href="{% url 'contacts' %}?tab=staff" class="sub-tab {% if current_tab == 'staff' %}active{% endif %}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        Personnel
+    </a>
+</div>
+
+<!-- Barre de recherche -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'contacts' %}" class="filters-form">
+        <input type="hidden" name="tab" value="{{ current_tab }}">
+        <div class="filters-row">
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Nom, prénom, téléphone..." value="{{ current_search }}">
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Rechercher
+            </button>
+            <a href="{% url 'contacts' %}?tab={{ current_tab }}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            {% if current_tab == 'clients' %}Liste des clients
+            {% elif current_tab == 'suppliers' %}Liste des fournisseurs
+            {% else %}Liste du personnel{% endif %}
+        </h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        {% if current_tab == 'staff' %}
+                        <th>Identifiant</th>
+                        {% endif %}
+                        <th>Prénom</th>
+                        <th>Nom</th>
+                        <th>Téléphone</th>
+                        <th>Email</th>
+                        {% if current_tab == 'staff' %}
+                        <th>Rôle</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        {% if current_tab == 'staff' %}
+                        <td class="text-code">{{ item.username }}</td>
+                        {% endif %}
+                        <td>{{ item.firstname|default:"-" }}</td>
+                        <td>{{ item.lastname|default:"-" }}</td>
+                        <td>{{ item.phone_number|default:"-" }}</td>
+                        <td>{{ item.email|default:"-" }}</td>
+                        {% if current_tab == 'staff' %}
+                        <td>{{ item.role|default:"-" }}</td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if current_tab == 'staff' %}6{% else %}4{% endif %}" class="text-center">Aucun enregistrement trouvé</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+            </div>
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?tab={{ current_tab }}&page=1{% if current_search %}&search={{ current_search }}{% endif %}" class="pagination-btn">&laquo;</a>
+                <a href="?tab={{ current_tab }}&page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}" class="pagination-btn">&lsaquo;</a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?tab={{ current_tab }}&page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?tab={{ current_tab }}&page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}" class="pagination-btn">&rsaquo;</a>
+                <a href="?tab={{ current_tab }}&page={{ page_obj.paginator.num_pages }}{% if current_search %}&search={{ current_search }}{% endif %}" class="pagination-btn">&raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

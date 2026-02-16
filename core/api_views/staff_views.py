@@ -32,7 +32,7 @@ def get_user_by_id(request, user_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_staff_by_login(request, login):
     """
     Récupérer un utilisateur par son login.
@@ -51,7 +51,7 @@ def create_user(request):
     Créer un utilisateur.
     Ancien Flask: POST /create_user
     """
-    serializer = StaffCreateSerializer(data=request.data)
+    serializer = StaffCreateSerializer(data=request.data, partial=True)
     if serializer.is_valid():
         user = serializer.save()
         return Response({

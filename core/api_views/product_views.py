@@ -22,6 +22,7 @@ from core.serializers.product_serializers import (
     ProductListSerializer,
     ProductDetailSerializer,
     ProductCreateSerializer,
+    ProductUpdateSerializer,
 )
 from core.services.product_service import ProductService
 from core.services.daily_service import DailyService
@@ -34,8 +35,9 @@ def get_product_list(request):
     Liste paginée des produits.
     Ancien Flask: GET /get_product_list/<page>/<count>
     """
-    page = int(request.GET.get('page', 1))
+    page = int(request.GET.get('page', 0))
     count = int(request.GET.get('count', 20))
+    print(f"get_product_list: page={page}, count={count}")
     products = ProductService.get_product_list(page=page, count=count)
     serializer = ProductListSerializer(products, many=True)
     return Response(serializer.data)
@@ -49,7 +51,7 @@ def search_products(request):
     Ancien Flask: GET /search_product?search_input=...&page=...&count=...
     """
     search_input = request.GET.get('search_input', request.GET.get('q', '')).strip()
-    page = int(request.GET.get('page', 1))
+    page = int(request.GET.get('page', 0))
     count = int(request.GET.get('count', 20))
 
     if len(search_input) < 2:
@@ -131,6 +133,40 @@ def create_product(request):
             'status': 1,
             'product': detail_serializer.data,
         }, status=status.HTTP_201_CREATED)
+
+    return Response({
+        'status': 0,
+        'errors': serializer.errors,
+    }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_product_by_id(request, product_id):
+    """
+    Mettre à jour un produit par son ID.
+    Nouveau endpoint: PATCH /api/products/by-id/<product_id>/update
+    """
+    product = ProductService.get_by_id(product_id)
+    if not product:
+        return Response({
+            'status': 0,
+            'error': 'Produit non trouvé',
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ProductUpdateSerializer(product, data=request.data, partial=True)
+    if serializer.is_valid():
+        images = request.FILES.getlist('images')
+        updated_product = ProductService.update_product(
+            product=product,
+            validated_data=serializer.validated_data,
+            images=images,
+        )
+        detail_serializer = ProductDetailSerializer(updated_product, context={'request': request})
+        return Response({
+            'status': 1,
+            'product': detail_serializer.data,
+        })
 
     return Response({
         'status': 0,

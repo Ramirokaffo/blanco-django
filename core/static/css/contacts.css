@@ -1,0 +1,181 @@
+/* ── Contacts Page Styles ─────────────────────────────────────── */
+
+/* Sub-tabs navigation */
+.sub-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    background-color: var(--bg-secondary);
+    padding: 4px;
+    border-radius: 10px;
+    width: fit-content;
+}
+
+.sub-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.sub-tab:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+}
+
+.sub-tab.active {
+    background-color: var(--bg-primary);
+    color: var(--primary-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-weight: 600;
+}
+
+.sub-tab svg {
+    flex-shrink: 0;
+}
+
+/* Filters Card */
+.filters-card {
+    margin-bottom: 20px;
+}
+
+.filters-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 160px;
+}
+
+.filter-search {
+    flex: 2;
+    min-width: 220px;
+}
+
+.filters-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Table */
+.text-code {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Pagination */
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.pagination-info {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.pagination-info-header {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.pagination {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.pagination-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pagination-btn:hover {
+    background-color: var(--bg-secondary);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.pagination-btn.active {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    cursor: default;
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* Header content layout */
+.page-header .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sub-tabs {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .filters-row {
+        flex-direction: column;
+    }
+
+    .filter-group {
+        min-width: 100%;
+    }
+
+    .pagination-container {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+

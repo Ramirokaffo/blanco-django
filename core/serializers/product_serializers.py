@@ -126,3 +126,37 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ce code produit existe déjà.")
         return value
 
+
+class ProductUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer pour mettre à jour un produit.
+    Nouveau endpoint: PATCH /api/products/by-code/<product_code>/update
+    """
+    code = serializers.CharField(required=False)
+    images = serializers.ListField(
+        child=serializers.ImageField(), write_only=True, required=False,
+    )
+
+    class Meta:
+        model = Product
+        fields = [
+            'code', 'name', 'description', 'brand', 'color',
+            'stock', 'stock_limit', 'max_salable_price', 'actual_price',
+            'is_price_reducible', 'grammage', 'exp_alert_period',
+            'category', 'gamme', 'rayon', 'grammage_type',
+            'images',
+        ]
+        extra_kwargs = {
+            'code': {'required': False},
+            'name': {'required': False},
+        }
+
+    def validate_code(self, value):
+        # Vérifier que le code n'existe pas déjà (sauf pour le produit actuel)
+        instance = self.instance
+        if instance and Product.objects.filter(code=value).exclude(id=instance.id).exists():
+            raise serializers.ValidationError("Ce code produit existe déjà.")
+        elif not instance and Product.objects.filter(code=value).exists():
+            raise serializers.ValidationError("Ce code produit existe déjà.")
+        return value
+

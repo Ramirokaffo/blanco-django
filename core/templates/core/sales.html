@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Ventes - Blanco{% endblock %}
+{% block title %}Ventes - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/sales.css' %}">
@@ -309,5 +309,17 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+    // Paramètres système injectés pour les factures
+    window.SYSTEM_SETTINGS = {
+        companyName: "{{ system_settings.company_name|escapejs }}",
+        companyLogo: "{% if system_settings.company_logo %}{{ system_settings.company_logo.url }}{% endif %}",
+        companyAddress: "{{ system_settings.company_address|escapejs }}",
+        companyPhone: "{{ system_settings.company_phone|escapejs }}",
+        companyEmail: "{{ system_settings.company_email|escapejs }}",
+        currencySymbol: "{{ system_settings.currency_symbol|escapejs }}",
+        receiptFooter: "{{ system_settings.receipt_footer|escapejs }}",
+    };
+</script>
 <script src="{% static 'js/sales.js' %}"></script>
 {% endblock %}

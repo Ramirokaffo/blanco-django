@@ -828,12 +828,268 @@ function closeModal() {
     modal.classList.remove('active');
 }
 
-// Imprimer une vente
+// Imprimer une facture de vente
 function printSale(saleId) {
-    // TODO: Implémenter l'impression
-    console.log('Imprimer vente:', saleId);
-    // Note: Cette fonction nécessite une zone de notification globale ou utilise console
-    console.info('Fonction d\'impression à implémenter pour la vente #' + saleId);
+    // Récupérer les détails de la vente via l'API
+    fetch(`/api/sales/${saleId}/`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Vente introuvable');
+            }
+            return response.json();
+        })
+        .then(data => {
+            openInvoicePrintWindow(data);
+        })
+        .catch(error => {
+            console.error('Erreur lors du chargement de la facture:', error);
+            alert('Impossible de charger les détails de la vente pour l\'impression.');
+        });
+}
+
+// Ouvrir une fenêtre d'impression avec la facture formatée
+function openInvoicePrintWindow(sale) {
+    const printWindow = window.open('', '_blank', 'width=400,height=700');
+    if (!printWindow) {
+        alert('Le navigateur a bloqué l\'ouverture de la fenêtre. Veuillez autoriser les popups.');
+        return;
+    }
+
+    // Récupérer les paramètres système
+    const settings = window.SYSTEM_SETTINGS || {};
+    const companyName = settings.companyName || 'BLANCO';
+    const companyLogo = settings.companyLogo || '';
+    const companyAddress = settings.companyAddress || '';
+    const companyPhone = settings.companyPhone || '';
+    const companyEmail = settings.companyEmail || '';
+    const currencySymbol = settings.currencySymbol || 'FCFA';
+    const receiptFooter = settings.receiptFooter || 'Merci pour votre achat !';
+
+    const invoiceDate = sale.create_at
+        ? new Date(sale.create_at).toLocaleDateString('fr-FR', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        })
+        : 'N/A';
+
+    // Construire les lignes des articles pour ticket thermique
+    const itemsLines = sale.items.map((item, index) => `
+        <div class="item-line">
+            <span class="item-name">${index + 1}. ${item.product_name}</span>
+            <span class="item-detail">${item.quantity} x ${formatCurrencyPlain(item.unit_price)} = ${formatCurrencyPlain(item.subtotal)} ${currencySymbol}</span>
+        </div>
+    `).join('');
+
+    // Infos de crédit si applicable
+    let creditHtml = '';
+    if (sale.is_credit && sale.credit_info) {
+        const dueDate = sale.credit_info.due_date
+            ? new Date(sale.credit_info.due_date).toLocaleDateString('fr-FR')
+            : 'N/A';
+        creditHtml = `
+            <div class="separator">=</div>
+            <div class="section-title">** CREDIT **</div>
+            <div class="info-line"><span>Payé</span><span>${formatCurrencyPlain(sale.credit_info.amount_paid)} ${currencySymbol}</span></div>
+            <div class="info-line"><span>Reste</span><span>${formatCurrencyPlain(sale.credit_info.amount_remaining)} ${currencySymbol}</span></div>
+            <div class="info-line"><span>Échéance</span><span>${dueDate}</span></div>
+        `;
+    }
+
+    const invoiceHtml = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ticket #${sale.id} - ${companyName}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', 'Lucida Console', monospace;
+            font-size: 12px;
+            color: #000;
+            width: 302px;
+            max-width: 302px;
+            margin: 0 auto;
+            padding: 8px;
+        }
+        .receipt { width: 100%; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .separator {
+            text-align: center;
+            letter-spacing: 2px;
+            margin: 4px 0;
+            overflow: hidden;
+        }
+        .separator::before {
+            content: '------------------------------------------------';
+        }
+        .separator.double::before {
+            content: '================================================';
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        .header img {
+            height: 40px;
+            width: auto;
+            object-fit: contain;
+            margin-bottom: 4px;
+        }
+        .header .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .header .company-info {
+            font-size: 10px;
+            color: #333;
+        }
+        .section-title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 13px;
+            margin: 4px 0 2px 0;
+            letter-spacing: 1px;
+        }
+        .info-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            line-height: 1.6;
+        }
+        .info-line span:first-child {
+            color: #555;
+        }
+        .item-line {
+            margin: 3px 0;
+            padding: 2px 0;
+            border-bottom: 1px dotted #ccc;
+        }
+        .item-name {
+            display: block;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .item-detail {
+            display: block;
+            font-size: 11px;
+            text-align: right;
+            color: #333;
+        }
+        .total-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+            font-weight: bold;
+            margin: 6px 0;
+            padding: 4px 0;
+        }
+        .footer {
+            text-align: center;
+            font-size: 10px;
+            color: #555;
+            margin-top: 6px;
+        }
+        .footer p { margin: 2px 0; }
+        @media print {
+            body { padding: 0; margin: 0; width: 100%; max-width: 100%; }
+            .no-print { display: none !important; }
+        }
+        @media screen {
+            body {
+                padding: 20px;
+                background: #f0f0f0;
+            }
+            .receipt {
+                background: white;
+                padding: 15px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+                border-radius: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="receipt">
+
+    <!-- EN-TÊTE -->
+    <div class="header">
+        ${companyLogo ? `<img src="${companyLogo}" alt="${companyName}">` : ''}
+        <div class="company-name">${companyName}</div>
+        ${companyAddress ? `<div class="company-info">${companyAddress}</div>` : ''}
+        ${companyPhone ? `<div class="company-info">Tél: ${companyPhone}</div>` : ''}
+        ${companyEmail ? `<div class="company-info">${companyEmail}</div>` : ''}
+    </div>
+
+    <div class="separator double"></div>
+
+    <!-- FACTURE -->
+    <div class="section-title">FACTURE N° ${sale.id}</div>
+    <div class="info-line"><span>Date</span><span>${invoiceDate}</span></div>
+    <div class="info-line"><span>Type</span><span>${sale.is_credit ? 'Crédit' : 'Comptant'}</span></div>
+    <div class="info-line"><span>Statut</span><span>${sale.is_paid ? 'Payé' : 'Non payé'}</span></div>
+
+    <div class="separator"></div>
+
+    <!-- CLIENT & VENDEUR -->
+    <div class="info-line"><span>Client</span><span class="bold">${sale.client_name || 'Passage'}</span></div>
+    <div class="info-line"><span>Vendeur</span><span class="bold">${sale.staff_name || 'N/A'}</span></div>
+
+    <div class="separator double"></div>
+
+    <!-- ARTICLES -->
+    <div class="section-title">ARTICLES</div>
+    ${itemsLines}
+
+    <div class="separator double"></div>
+
+    <!-- TOTAL -->
+    <div class="total-line">
+        <span>TOTAL</span>
+        <span>${formatCurrencyPlain(sale.total)} ${currencySymbol}</span>
+    </div>
+
+    ${creditHtml}
+
+    <div class="separator"></div>
+
+    <!-- PIED DE PAGE -->
+    <div class="footer">
+        <p class="bold">${receiptFooter}</p>
+        <p>${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+    </div>
+
+</div>
+
+    <div class="no-print" style="text-align:center; margin-top:15px;">
+        <button onclick="window.print()" style="padding:8px 20px; font-size:13px; background:#333; color:white; border:none; border-radius:4px; cursor:pointer;">
+            🖨️ Imprimer
+        </button>
+        <button onclick="window.close()" style="padding:8px 20px; font-size:13px; background:#999; color:white; border:none; border-radius:4px; cursor:pointer; margin-left:8px;">
+            Fermer
+        </button>
+    </div>
+</body>
+</html>`;
+
+    printWindow.document.write(invoiceHtml);
+    printWindow.document.close();
+
+    // Lancer l'impression automatiquement après le chargement
+    printWindow.onload = function() {
+        printWindow.print();
+    };
+}
+
+// Formater un montant sans le suffixe FCFA (pour la facture)
+function formatCurrencyPlain(amount) {
+    return new Intl.NumberFormat('fr-FR', {
+        style: 'decimal',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount);
 }
 
 // Fermer le modal en cliquant en dehors
