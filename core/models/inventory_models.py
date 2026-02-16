@@ -43,24 +43,54 @@ class Inventory(SoftDeleteModel):
     product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='inventories')
     staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='inventories')
     exercise = models.ForeignKey('Exercise', on_delete=models.CASCADE, related_name='inventories')
-    quantity_counted = models.IntegerField()
-    quantity_system = models.IntegerField()
-    difference = models.IntegerField(default=0)
+    valid_product_count = models.IntegerField(default=0)
+    invalid_product_count = models.IntegerField(default=0)
+    is_close = models.BooleanField(default=False)
     notes = models.TextField(null=True, blank=True)
-    
+
     class Meta:
         db_table = 'inventory'
         # managed = False
         verbose_name = 'Inventory'
         verbose_name_plural = 'Inventories'
         ordering = ['-create_at']
-    
+
     def __str__(self):
         return f"Inventory {self.product.name} - {self.create_at.strftime('%Y-%m-%d')}"
-    
-    def calculate_difference(self):
-        """Calculate difference between counted and system quantity."""
-        return self.quantity_counted - self.quantity_system
+
+    def total_count(self):
+        """Calculate total product count (valid + invalid)."""
+        return self.valid_product_count + self.invalid_product_count
+
+
+class InventorySnapshot(SoftDeleteModel):
+    """
+    Snapshot de l'état d'un produit au moment de la clôture d'inventaire.
+    Permet de faire un bilan de l'inventaire par la suite.
+    """
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='inventory_snapshots')
+    exercise = models.ForeignKey('Exercise', on_delete=models.CASCADE, related_name='inventory_snapshots')
+    stock_before = models.IntegerField(help_text="Stock du produit avant la clôture")
+    total_counted = models.IntegerField(help_text="Quantité totale comptée (valide + invalide) cumulée")
+    total_valid = models.IntegerField(help_text="Quantité valide cumulée")
+    total_invalid = models.IntegerField(help_text="Quantité invalide cumulée")
+    stock_after = models.IntegerField(help_text="Stock du produit après la clôture (= total_valid)")
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Prix de vente (actual_price) au moment de la clôture")
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Prix d'achat (last_purchase_price) au moment de la clôture")
+
+    class Meta:
+        db_table = 'inventory_snapshot'
+        verbose_name = 'Inventory Snapshot'
+        verbose_name_plural = 'Inventory Snapshots'
+        ordering = ['-create_at']
+        unique_together = [('product', 'exercise')]
+
+    def __str__(self):
+        return f"Snapshot {self.product.name} - Exercise {self.exercise_id}"
+
+    def stock_difference(self):
+        """Différence entre le stock avant et la quantité valide comptée."""
+        return self.total_valid - self.stock_before
 
 
 class DailyInventory(SoftDeleteModel):

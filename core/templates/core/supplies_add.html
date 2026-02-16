@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nouvel approvisionnement - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/supplies.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Nouvel approvisionnement</h1>
+            <p class="text-secondary">Enregistrer un nouvel approvisionnement de stock</p>
+        </div>
+        <a href="{% url 'supplies' %}" class="btn btn-secondary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retour à la liste
+        </a>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Formulaire -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Informations de l'approvisionnement</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'add_supply' %}" class="supply-form" id="supplyForm">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="form-errors">
+                {% for error in form.non_field_errors %}
+                <div class="alert alert-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <!-- Produit -->
+                <div class="form-group">
+                    <label class="form-label" for="id_product">{{ form.product.label }} <span class="required">*</span></label>
+                    {{ form.product }}
+                    {% if form.product.errors %}
+                    <div class="field-error">{{ form.product.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Fournisseur -->
+                <div class="form-group">
+                    <label class="form-label" for="id_supplier">{{ form.supplier.label }}</label>
+                    {{ form.supplier }}
+                    {% if form.supplier.errors %}
+                    <div class="field-error">{{ form.supplier.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Quantité -->
+                <div class="form-group">
+                    <label class="form-label" for="id_quantity">{{ form.quantity.label }} <span class="required">*</span></label>
+                    {{ form.quantity }}
+                    {% if form.quantity.errors %}
+                    <div class="field-error">{{ form.quantity.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Prix d'achat unitaire -->
+                <div class="form-group">
+                    <label class="form-label" for="id_unit_price">{{ form.unit_price.label }} <span class="required">*</span></label>
+                    {{ form.unit_price }}
+                    {% if form.unit_price.errors %}
+                    <div class="field-error">{{ form.unit_price.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Prix de vente -->
+                <div class="form-group">
+                    <label class="form-label" for="id_selling_price">{{ form.selling_price.label }}</label>
+                    {{ form.selling_price }}
+                    {% if form.selling_price.errors %}
+                    <div class="field-error">{{ form.selling_price.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Date d'expiration -->
+                <div class="form-group">
+                    <label class="form-label" for="id_expiration_date">{{ form.expiration_date.label }}</label>
+                    {{ form.expiration_date }}
+                    {% if form.expiration_date.errors %}
+                    <div class="field-error">{{ form.expiration_date.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Récapitulatif -->
+            <div class="supply-summary" id="supplySummary" style="display:none;">
+                <h4>Récapitulatif</h4>
+                <div class="summary-row">
+                    <span>Coût total :</span>
+                    <strong id="totalCost">0 FCFA</strong>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Enregistrer l'approvisionnement
+                </button>
+                <a href="{% url 'supplies' %}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const qtyInput = document.getElementById('id_quantity');
+    const priceInput = document.getElementById('id_unit_price');
+    const summary = document.getElementById('supplySummary');
+    const totalCost = document.getElementById('totalCost');
+
+    function updateSummary() {
+        const qty = parseInt(qtyInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const total = qty * price;
+        if (qty > 0 && price > 0) {
+            summary.style.display = 'block';
+            totalCost.textContent = total.toLocaleString('fr-FR') + ' FCFA';
+        } else {
+            summary.style.display = 'none';
+        }
+    }
+
+    qtyInput.addEventListener('input', updateSummary);
+    priceInput.addEventListener('input', updateSummary);
+    updateSummary();
+});
+</script>
+{% endblock %}
+

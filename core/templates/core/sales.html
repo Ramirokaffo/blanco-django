@@ -14,12 +14,21 @@
             <h1>Gestion des ventes</h1>
             <p class="text-secondary">Créez et gérez vos ventes</p>
         </div>
-        <button class="btn btn-primary" id="newSaleBtn">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            Nouvelle vente
-        </button>
+        <div class="header-buttons">
+            <a href="{% url 'sales_history' %}" class="btn btn-secondary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                    <polyline points="12 6 12 12 16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Historique
+            </a>
+            <button class="btn btn-primary" id="newSaleBtn">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Nouvelle vente
+            </button>
+        </div>
     </div>
 </div>
 

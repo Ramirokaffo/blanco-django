@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nouvelle dépense - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/expenses.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Nouvelle dépense</h1>
+            <p class="text-secondary">Enregistrer une nouvelle dépense quotidienne</p>
+        </div>
+        <a href="{% url 'expenses' %}" class="btn btn-secondary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retour à la liste
+        </a>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Formulaire -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Informations de la dépense</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'add_expense' %}" class="expense-form" id="expenseForm">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="form-errors">
+                {% for error in form.non_field_errors %}
+                <div class="alert alert-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <!-- Type de dépense -->
+                <div class="form-group">
+                    <label class="form-label" for="id_expense_type">{{ form.expense_type.label }} <span class="required">*</span></label>
+                    {{ form.expense_type }}
+                    {% if form.expense_type.errors %}
+                    <div class="field-error">{{ form.expense_type.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Montant -->
+                <div class="form-group">
+                    <label class="form-label" for="id_amount">{{ form.amount.label }} <span class="required">*</span></label>
+                    {{ form.amount }}
+                    {% if form.amount.errors %}
+                    <div class="field-error">{{ form.amount.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Description (pleine largeur) -->
+                <div class="form-group form-group-full">
+                    <label class="form-label" for="id_description">{{ form.description.label }}</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                    <div class="field-error">{{ form.description.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Enregistrer la dépense
+                </button>
+                <a href="{% url 'expenses' %}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

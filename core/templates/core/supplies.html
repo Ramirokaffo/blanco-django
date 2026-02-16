@@ -14,8 +14,25 @@
             <h1>Approvisionnement</h1>
             <p class="text-secondary">Historique des approvisionnements ({{ total_count }} enregistrement{{ total_count|pluralize }})</p>
         </div>
+        <a href="{% url 'add_supply' %}" class="btn btn-primary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nouvel approvisionnement
+        </a>
     </div>
 </div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 <!-- Barre de filtres -->
 <div class="card filters-card">

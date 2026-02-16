@@ -12,7 +12,7 @@ from .models import (
     # Sale models
     Sale, SaleProduct, CreditSale, Refund,
     # Inventory models
-    Supply, Inventory, DailyInventory,
+    Supply, Inventory, InventorySnapshot, DailyInventory,
     # Accounting models
     Exercise, Daily, ExpenseType, RecipeType, DailyExpense, DailyRecipe, ProductExpense,
     # Settings models
@@ -160,9 +160,18 @@ class SupplyAdmin(admin.ModelAdmin):
 
 @admin.register(Inventory)
 class InventoryAdmin(admin.ModelAdmin):
-    list_display = ('product', 'quantity_counted', 'quantity_system', 'difference', 'staff', 'create_at')
-    list_filter = ('create_at',)
+    list_display = ('product', 'valid_product_count', 'invalid_product_count', 'is_close', 'staff', 'exercise', 'create_at')
+    list_filter = ('create_at', 'exercise')
     search_fields = ('product__name', 'staff__username')
+    ordering = ('-create_at',)
+    readonly_fields = ('create_at', 'delete_at',)
+
+
+@admin.register(InventorySnapshot)
+class InventorySnapshotAdmin(admin.ModelAdmin):
+    list_display = ('product', 'exercise', 'stock_before', 'total_valid', 'total_invalid', 'total_counted', 'stock_after', 'selling_price', 'purchase_price', 'create_at')
+    list_filter = ('exercise', 'create_at')
+    search_fields = ('product__name', 'product__code')
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
 

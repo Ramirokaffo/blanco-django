@@ -38,6 +38,7 @@ __all__ = [
     # Inventory models
     'Supply',
     'Inventory',
+    'InventorySnapshot',
     'DailyInventory',
 
     # Accounting models

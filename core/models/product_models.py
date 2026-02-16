@@ -87,6 +87,7 @@ class Product(SoftDeleteModel):
     stock_limit = models.IntegerField(null=True, blank=True)
     max_salable_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     actual_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    last_purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     exp_alert_period = models.IntegerField(null=True, blank=True, help_text="Expiration alert period in days")
     grammage = models.FloatField(null=True, blank=True)
     is_price_reducible = models.BooleanField(default=True)

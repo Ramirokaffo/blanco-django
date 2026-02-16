@@ -21,9 +21,8 @@ class InventoryService:
             product=product,
             staff=staff,
             exercise=exercise,
-            quantity_counted=validated_data['quantity_counted'],
-            quantity_system=product.stock,
-            difference=validated_data['quantity_counted'] - product.stock,
+            valid_product_count=validated_data['valid_product_count'],
+            invalid_product_count=validated_data.get('invalid_product_count', 0),
             notes=validated_data.get('notes', ''),
         )
         return inventory

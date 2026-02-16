@@ -18,8 +18,8 @@ class InventorySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'product', 'product_name', 'product_code',
             'staff_name', 'exercise',
-            'quantity_counted', 'quantity_system', 'difference',
-            'notes', 'create_at',
+            'valid_product_count', 'invalid_product_count',
+            'is_close', 'notes', 'create_at',
         ]
 
     def get_staff_name(self, obj):
@@ -32,11 +32,12 @@ class InventoryCreateSerializer(serializers.Serializer):
     """
     Serializer pour créer un inventaire.
     Correspond à l'ancien endpoint Flask: POST /create_inventory
-    Champs attendus (compatibilité ancien JSON) :
-        { "product_id": int, "quantity_counted": int, "notes": str|null }
+    Champs attendus :
+        { "product_id": int, "valid_product_count": int, "invalid_product_count": int, "notes": str|null }
     """
     product_id = serializers.IntegerField()
-    quantity_counted = serializers.IntegerField(min_value=0)
+    valid_product_count = serializers.IntegerField(min_value=0)
+    invalid_product_count = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate_product_id(self, value):

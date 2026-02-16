@@ -108,6 +108,9 @@ class ProductService:
                 unit_price=unit_price or 0,
                 total_price=(unit_price or 0) * stock,
             )
+            # Mettre à jour le dernier prix d'achat
+            product.last_purchase_price = unit_price or 0
+            product.save(update_fields=['last_purchase_price'])
 
         return product
 

@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Historique des ventes - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/sales.css' %}">
+<link rel="stylesheet" href="{% static 'css/sales_history.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Historique des ventes</h1>
+            <p class="text-secondary">{{ total_count }} vente{{ total_count|pluralize }} — Total : {{ total_sales_amount|floatformat:0 }} FCFA</p>
+        </div>
+        <a href="{% url 'sales' %}" class="btn btn-secondary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retour aux ventes
+        </a>
+    </div>
+</div>
+
+<!-- Barre de filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'sales_history' %}" class="filters-form" id="filtersForm">
+        <div class="filters-row">
+            <!-- Recherche -->
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Client, vendeur, n° vente..." value="{{ current_search }}">
+            </div>
+
+            <!-- Client -->
+            <div class="filter-group">
+                <label class="form-label">Client</label>
+                <select name="client" class="form-control" onchange="this.form.submit()">
+                    <option value="">Tous les clients</option>
+                    {% for client in clients %}
+                    <option value="{{ client.id }}" {% if current_client == client.id|stringformat:"d" %}selected{% endif %}>{{ client.firstname }} {{ client.lastname }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Vendeur -->
+            <div class="filter-group">
+                <label class="form-label">Vendeur</label>
+                <select name="staff" class="form-control" onchange="this.form.submit()">
+                    <option value="">Tous les vendeurs</option>
+                    {% for member in staff_members %}
+                    <option value="{{ member.id }}" {% if current_staff == member.id|stringformat:"d" %}selected{% endif %}>{{ member.get_full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="filters-row">
+            <!-- Type de vente -->
+            <div class="filter-group">
+                <label class="form-label">Type</label>
+                <select name="type" class="form-control" onchange="this.form.submit()">
+                    <option value="">Tous</option>
+                    <option value="cash" {% if current_type == 'cash' %}selected{% endif %}>Comptant</option>
+                    <option value="credit" {% if current_type == 'credit' %}selected{% endif %}>Crédit</option>
+                </select>
+            </div>
+
+            <!-- Statut paiement -->
+            <div class="filter-group">
+                <label class="form-label">Statut</label>
+                <select name="status" class="form-control" onchange="this.form.submit()">
+                    <option value="">Tous</option>
+                    <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>Payé</option>
+                    <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>Non payé</option>
+                </select>
+            </div>
+
+            <!-- Date début -->
+            <div class="filter-group">
+                <label class="form-label">Date début</label>
+                <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
+            </div>
+
+            <!-- Date fin -->
+            <div class="filter-group">
+                <label class="form-label">Date fin</label>
+                <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
+            </div>
+        </div>
+
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Filtrer
+            </button>
+            <a href="{% url 'sales_history' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau des ventes -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Liste des ventes</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#ID</th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Vendeur</th>
+                        <th>Montant</th>
+                        <th>Type</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in sales %}
+                    <tr>
+                        <td class="text-code">#{{ sale.id }}</td>
+                        <td>{{ sale.create_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {% if sale.client %}
+                                {{ sale.client }}
+                            {% else %}
+                                <span class="text-secondary">Client de passage</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ sale.staff.get_full_name|default:"-" }}</td>
+                        <td class="font-weight-bold">{{ sale.total|floatformat:0 }} FCFA</td>
+                        <td>
+                            {% if sale.is_credit %}
+                                <span class="badge badge-warning">Crédit</span>
+                            {% else %}
+                                <span class="badge badge-success">Comptant</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if sale.is_paid %}
+                                <span class="badge badge-success">Payé</span>
+                            {% else %}
+                                <span class="badge badge-danger">Non payé</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary" style="padding: 2rem;">Aucune vente trouvée.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="pagination-container">
+    <div class="pagination-info">
+        Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} vente{{ total_count|pluralize }}
+    </div>
+    <div class="pagination-buttons">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
+            &laquo; Précédent
+        </a>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <span class="pagination-btn active">{{ num }}</span>
+            {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                <a href="?page={{ num }}&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
+            Suivant &raquo;
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

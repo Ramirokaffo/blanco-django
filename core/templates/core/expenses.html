@@ -1,19 +1,150 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Dépenses - {{ system_settings.company_name }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/expenses.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-    <h1>Gestion des dépenses</h1>
-    <p class="text-secondary">Suivez vos dépenses quotidiennes</p>
+    <div class="header-content">
+        <div>
+            <h1>Dépenses quotidiennes</h1>
+            <p class="text-secondary">{{ total_count }} dépense{{ total_count|pluralize }} — Total : {{ total_expenses|floatformat:0 }} FCFA</p>
+        </div>
+        <a href="{% url 'add_expense' %}" class="btn btn-primary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nouvelle dépense
+        </a>
+    </div>
 </div>
 
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Barre de filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'expenses' %}" class="filters-form" id="filtersForm">
+        <div class="filters-row">
+            <!-- Recherche -->
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Description ou type de dépense..." value="{{ current_search }}">
+            </div>
+
+            <!-- Type de dépense -->
+            <div class="filter-group">
+                <label class="form-label">Type de dépense</label>
+                <select name="expense_type" class="form-control">
+                    <option value="">Tous</option>
+                    {% for et in expense_types %}
+                    <option value="{{ et.id }}" {% if current_expense_type == et.id|stringformat:"d" %}selected{% endif %}>{{ et.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Date début -->
+            <div class="filter-group">
+                <label class="form-label">Date début</label>
+                <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
+            </div>
+
+            <!-- Date fin -->
+            <div class="filter-group">
+                <label class="form-label">Date fin</label>
+                <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
+            </div>
+        </div>
+
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Filtrer
+            </button>
+            <a href="{% url 'expenses' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau des dépenses -->
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Liste des dépenses</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
     </div>
     <div class="card-body">
-        <p>Contenu à venir...</p>
+        <div class="table-responsive">
+            <table class="table expenses-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Montant</th>
+                        <th>Personnel</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for expense in expenses %}
+                    <tr>
+                        <td class="expense-date">{{ expense.create_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ expense.expense_type.name|default:"-" }}</td>
+                        <td class="expense-description">{{ expense.description|default:"-"|truncatewords:12 }}</td>
+                        <td class="text-right expense-amount">{{ expense.amount|floatformat:0 }} FCFA</td>
+                        <td>{{ expense.staff.get_full_name|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">Aucune dépense trouvée</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} dépense{{ total_count|pluralize }}
+            </div>
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page=1{% if current_search %}&search={{ current_search }}{% endif %}{% if current_expense_type %}&expense_type={{ current_expense_type }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn" title="Première page">&laquo;</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_expense_type %}&expense_type={{ current_expense_type }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn" title="Page précédente">&lsaquo;</a>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_expense_type %}&expense_type={{ current_expense_type }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_expense_type %}&expense_type={{ current_expense_type }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn" title="Page suivante">&rsaquo;</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_expense_type %}&expense_type={{ current_expense_type }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn" title="Dernière page">&raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

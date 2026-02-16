@@ -1,19 +1,215 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Inventaire - {{ system_settings.company_name }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-    <h1>Gestion de l'inventaire</h1>
-    <p class="text-secondary">Suivez votre stock et vos approvisionnements</p>
+    <div class="header-content">
+        <div>
+            <h1>Inventaire</h1>
+            <p class="text-secondary">Historique des inventaires ({{ total_count }} enregistrement{{ total_count|pluralize }})</p>
+        </div>
+        <div class="header-actions">
+            <a href="{% url 'close_inventory_summary' %}" class="btn btn-warning btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Clôturer l'inventaire
+            </a>
+            <a href="{% url 'add_inventory' %}" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Nouvel Enregistrement
+            </a>
+        </div>
+    </div>
 </div>
 
+<!-- Statistiques résumées -->
+<div class="inventory-stats">
+    <div class="stat-card stat-valid">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_valid }}</span>
+            <span class="stat-label">Produits valides</span>
+        </div>
+    </div>
+    <div class="stat-card stat-invalid">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_invalid }}</span>
+            <span class="stat-label">Produits invalides</span>
+        </div>
+    </div>
+    <div class="stat-card stat-total">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_count }}</span>
+            <span class="stat-label">Total inventaires</span>
+        </div>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Barre de filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'inventory' %}" class="filters-form">
+        <div class="filters-row">
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Nom ou code produit..." value="{{ current_search }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Personnel</label>
+                <select name="staff" class="form-control">
+                    <option value="">Tous</option>
+                    {% for s in staff_members %}
+                    <option value="{{ s.id }}" {% if current_staff == s.id|stringformat:"d" %}selected{% endif %}>{{ s.get_full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Exercice</label>
+                <select name="exercise" class="form-control">
+                    <option value="">Tous</option>
+                    {% for ex in exercises %}
+                    <option value="{{ ex.id }}" {% if current_exercise == ex.id|stringformat:"d" %}selected{% endif %}>
+                        {{ ex.start_date|date:"d/m/Y" }} - {% if ex.end_date %}{{ ex.end_date|date:"d/m/Y" }}{% else %}En cours{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Date début</label>
+                <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Date fin</label>
+                <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Par page</label>
+                <select name="per_page" class="form-control">
+                    {% for choice in per_page_choices %}
+                    <option value="{{ choice }}" {% if current_per_page == choice %}selected{% endif %}>{{ choice }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Filtrer
+            </button>
+            <a href="{% url 'inventory' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau des inventaires -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">État de l'inventaire</h3>
+        <h3 class="card-title">Liste des inventaires</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
     </div>
     <div class="card-body">
-        <p>Contenu à venir...</p>
+        <div class="table-responsive">
+            <table class="table inventory-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Produit</th>
+                        <th>Produits valides</th>
+                        <th>Produits invalides</th>
+                        <th>Total</th>
+                        <th>Personnel</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in inventories %}
+                    <tr>
+                        <td class="inv-date">{{ inv.create_at|date:"d/m/Y H:i" }}</td>
+                        <td class="inv-product">{{ inv.product.name }}</td>
+                        <td class="text-right inv-valid">{{ inv.valid_product_count }}</td>
+                        <td class="text-right inv-invalid">{{ inv.invalid_product_count }}</td>
+                        <td class="text-right inv-total">{{ inv.total_count }}</td>
+                        <td>{{ inv.staff.get_full_name|default:"-" }}</td>
+                        <td class="inv-notes">{{ inv.notes|default:"-"|truncatewords:8 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center">Aucun inventaire trouvé</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% comment %}Build reusable query string fragment for filter params{% endcomment %}
+        {% with qs_filters="" %}
+        {% if page_obj.paginator.num_pages > 1 or True %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} enregistrement{{ total_count|pluralize }}
+            </div>
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page=1{% if current_search %}&search={{ current_search }}{% endif %}{% if current_staff %}&staff={{ current_staff }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn" title="Première page">&laquo;</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_staff %}&staff={{ current_staff }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn" title="Page précédente">&lsaquo;</a>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_staff %}&staff={{ current_staff }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_staff %}&staff={{ current_staff }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn" title="Page suivante">&rsaquo;</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_staff %}&staff={{ current_staff }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn" title="Dernière page">&raquo;</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endwith %}
     </div>
 </div>
 {% endblock %}

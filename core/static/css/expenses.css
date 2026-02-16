@@ -1,45 +1,4 @@
-/* ── Contacts Page Styles ─────────────────────────────────────── */
-
-/* Sub-tabs navigation */
-.sub-tabs {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 20px;
-    background-color: var(--bg-secondary);
-    padding: 4px;
-    border-radius: 10px;
-    width: fit-content;
-}
-
-.sub-tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    text-decoration: none;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-}
-
-.sub-tab:hover {
-    color: var(--text-primary);
-    background-color: var(--bg-primary);
-}
-
-.sub-tab.active {
-    background-color: var(--bg-primary);
-    color: var(--primary-color);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    font-weight: 600;
-}
-
-.sub-tab svg {
-    flex-shrink: 0;
-}
+/* ── Expenses Page Styles ─────────────────────────────────────── */
 
 /* Filters Card */
 .filters-card {
@@ -75,16 +34,44 @@
     align-items: center;
 }
 
-/* Table */
-.text-code {
-    font-family: 'Courier New', Courier, monospace;
+/* Expenses Table */
+.expenses-table .expense-date {
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.expenses-table .expense-description {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.expenses-table .expense-amount {
     font-weight: 600;
-    color: var(--primary-color);
+    color: var(--danger-color, #e53e3e);
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
 }
 
 .table-responsive {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+}
+
+/* Header content layout */
+.page-header .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 /* Pagination */
@@ -147,51 +134,28 @@
     cursor: default;
 }
 
-.text-center {
-    text-align: center;
-}
+/* ── Expense Form Styles ──────────────────────────────────────── */
 
-/* Header content layout */
-.page-header .header-content {
+.expense-form {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* ── Btn Icon (edit action) ─────────────────────────────────── */
-.btn-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    color: var(--text-secondary);
-    text-decoration: none;
-    transition: all 0.2s ease;
-}
-
-.btn-icon:hover {
-    background-color: var(--bg-secondary);
-    color: var(--primary-color);
-}
-
-/* ── Form Styles ───────────────────────────────────────────── */
-.contact-form {
-    max-width: 800px;
+    flex-direction: column;
+    gap: 25px;
 }
 
 .form-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
-    margin-bottom: 24px;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
+}
+
+.form-group-full {
+    grid-column: 1 / -1;
 }
 
 .required {
@@ -201,21 +165,22 @@
 .field-error {
     color: var(--danger-color, #e53e3e);
     font-size: 12px;
-    margin-top: 2px;
+    margin-top: 4px;
 }
 
 .form-errors {
-    margin-bottom: 16px;
+    margin-bottom: 10px;
 }
 
 .form-actions {
     display: flex;
     gap: 10px;
-    padding-top: 16px;
+    padding-top: 10px;
     border-top: 1px solid var(--border-color);
 }
 
-/* ── Alert / Messages ──────────────────────────────────────── */
+/* ── Alert / Messages ───────────────────────────────────────── */
+
 .messages-container {
     margin-bottom: 20px;
     display: flex;
@@ -250,11 +215,6 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-    .sub-tabs {
-        width: 100%;
-        overflow-x: auto;
-    }
-
     .filters-row {
         flex-direction: column;
     }
@@ -263,17 +223,17 @@
         min-width: 100%;
     }
 
-    .pagination-container {
-        flex-direction: column;
-        align-items: center;
-    }
-
     .form-grid {
         grid-template-columns: 1fr;
     }
 
     .form-actions {
         flex-direction: column;
+    }
+
+    .pagination-container {
+        flex-direction: column;
+        align-items: center;
     }
 }
 

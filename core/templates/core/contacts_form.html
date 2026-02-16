@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ form_title }} - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/contacts.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>{{ form_title }}</h1>
+            <p class="text-secondary">{{ form_subtitle }}</p>
+        </div>
+        <a href="{% url back_url %}{% if back_tab %}?tab={{ back_tab }}{% endif %}" class="btn btn-secondary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retour à la liste
+        </a>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Formulaire -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Informations</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" class="contact-form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="form-errors">
+                {% for error in form.non_field_errors %}
+                <div class="alert alert-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <!-- Prénom -->
+                <div class="form-group">
+                    <label class="form-label" for="id_firstname">{{ form.firstname.label }} <span class="required">*</span></label>
+                    {{ form.firstname }}
+                    {% if form.firstname.errors %}
+                    <div class="field-error">{{ form.firstname.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Nom -->
+                <div class="form-group">
+                    <label class="form-label" for="id_lastname">{{ form.lastname.label }}</label>
+                    {{ form.lastname }}
+                    {% if form.lastname.errors %}
+                    <div class="field-error">{{ form.lastname.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Téléphone -->
+                <div class="form-group">
+                    <label class="form-label" for="id_phone_number">{{ form.phone_number.label }}</label>
+                    {{ form.phone_number }}
+                    {% if form.phone_number.errors %}
+                    <div class="field-error">{{ form.phone_number.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Email -->
+                <div class="form-group">
+                    <label class="form-label" for="id_email">{{ form.email.label }}</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                    <div class="field-error">{{ form.email.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Genre -->
+                <div class="form-group">
+                    <label class="form-label" for="id_gender">{{ form.gender.label }}</label>
+                    {{ form.gender }}
+                    {% if form.gender.errors %}
+                    <div class="field-error">{{ form.gender.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2"/>
+                        <polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2"/>
+                        <polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    Enregistrer
+                </button>
+                <a href="{% url back_url %}{% if back_tab %}?tab={{ back_tab }}{% endif %}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

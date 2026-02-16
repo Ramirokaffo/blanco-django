@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nouvel enregistrement d'inventaire - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Nouvel enregistrement d'inventaire</h1>
+            <p class="text-secondary">Enregistrer un comptage de produit</p>
+        </div>
+        <a href="{% url 'inventory' %}" class="btn btn-secondary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retour à la liste
+        </a>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Formulaire -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Informations de l'inventaire</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'add_inventory' %}" class="inventory-form" id="inventoryForm">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="form-errors">
+                {% for error in form.non_field_errors %}
+                <div class="alert alert-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <!-- Produit -->
+                <div class="form-group">
+                    <label class="form-label" for="id_product">{{ form.product.label }} <span class="required">*</span></label>
+                    {{ form.product }}
+                    {% if form.product.errors %}
+                    <div class="field-error">{{ form.product.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Produits valides -->
+                <div class="form-group">
+                    <label class="form-label" for="id_valid_product_count">{{ form.valid_product_count.label }} <span class="required">*</span></label>
+                    {{ form.valid_product_count }}
+                    {% if form.valid_product_count.errors %}
+                    <div class="field-error">{{ form.valid_product_count.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Produits invalides -->
+                <div class="form-group">
+                    <label class="form-label" for="id_invalid_product_count">{{ form.invalid_product_count.label }}</label>
+                    {{ form.invalid_product_count }}
+                    {% if form.invalid_product_count.errors %}
+                    <div class="field-error">{{ form.invalid_product_count.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Récapitulatif -->
+            <div class="inventory-summary" id="inventorySummary" style="display:none;">
+                <h4>Récapitulatif</h4>
+                <div class="summary-row">
+                    <span>Total produits comptés :</span>
+                    <strong id="totalCount">0</strong>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-group form-group-full">
+                <label class="form-label" for="id_notes">{{ form.notes.label }}</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}
+                <div class="field-error">{{ form.notes.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Enregistrer l'inventaire
+                </button>
+                <a href="{% url 'inventory' %}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const validInput = document.getElementById('id_valid_product_count');
+    const invalidInput = document.getElementById('id_invalid_product_count');
+    const summary = document.getElementById('inventorySummary');
+    const totalCount = document.getElementById('totalCount');
+
+    function updateSummary() {
+        const valid = parseInt(validInput.value) || 0;
+        const invalid = parseInt(invalidInput.value) || 0;
+        const total = valid + invalid;
+        if (total > 0) {
+            summary.style.display = 'block';
+            totalCount.textContent = total.toLocaleString('fr-FR');
+        } else {
+            summary.style.display = 'none';
+        }
+    }
+
+    validInput.addEventListener('input', updateSummary);
+    invalidInput.addEventListener('input', updateSummary);
+    updateSummary();
+});
+</script>
+{% endblock %}
+
