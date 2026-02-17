@@ -13,9 +13,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     default-libmysqlclient-dev \
+    default-mysql-client \
     pkg-config \
     netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Copier le fichier requirements.txt
 COPY requirements.txt /app/
