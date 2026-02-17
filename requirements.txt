@@ -7,3 +7,4 @@ python-decouple==3.8
 qrcode==8.2
 sqlparse==0.5.5
 typing-extensions==4.15.0
+cryptography
