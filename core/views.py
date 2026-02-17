@@ -217,6 +217,10 @@ def inventory(request):
     search = request.GET.get('search', '').strip()
     staff_id = request.GET.get('staff', '')
     exercise_id = request.GET.get('exercise', '')
+    if not exercise_id and 'exercise' not in request.GET:
+        # Par défaut, sélectionner l'exercice en cours
+        current_ex = ExerciseService.get_or_create_current_exercise()
+        exercise_id = str(current_ex.id)
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     page_number = request.GET.get('page', 1)
@@ -406,11 +410,83 @@ def close_inventory_confirm(request):
         # Marquer tous les inventaires comme clôturés
         inventories_qs.update(is_close=True)
 
+        # Fermer l'exercice courant
+        current_exercise.end_date = timezone.now()
+        current_exercise.save(update_fields=['end_date'])
+
     messages.success(
         request,
-        f'Inventaire clôturé avec succès. Stock mis à jour pour {updated_count} produit(s).'
+        f'Inventaire clôturé avec succès. Stock mis à jour pour {updated_count} produit(s). L\'exercice a été fermé.'
     )
     return redirect('inventory')
+
+
+SNAPSHOT_PER_PAGE_CHOICES = [10, 25, 50, 100]
+
+
+@login_required
+def inventory_history(request):
+    """Vue de l'historique des inventaires clôturés (InventorySnapshot)"""
+    search = request.GET.get('search', '').strip()
+    exercise_id = request.GET.get('exercise', '')
+    if not exercise_id and 'exercise' not in request.GET:
+        # Par défaut, sélectionner le dernier exercice (le plus récent)
+        last_exercise = Exercise.objects.filter(
+            delete_at__isnull=True,
+        ).order_by('-start_date').first()
+        if last_exercise:
+            exercise_id = str(last_exercise.id)
+    page_number = request.GET.get('page', 1)
+
+    try:
+        per_page = int(request.GET.get('per_page', 25))
+    except (ValueError, TypeError):
+        per_page = 25
+    if per_page not in SNAPSHOT_PER_PAGE_CHOICES:
+        per_page = 25
+
+    queryset = InventorySnapshot.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('product', 'exercise')
+
+    if search:
+        queryset = queryset.filter(
+            Q(product__name__icontains=search) | Q(product__code__icontains=search)
+        )
+    if exercise_id:
+        queryset = queryset.filter(exercise_id=exercise_id)
+
+    queryset = queryset.order_by('-create_at')
+
+    # Totaux agrégés
+    totals = queryset.aggregate(
+        sum_stock_before=Sum('stock_before'),
+        sum_total_valid=Sum('total_valid'),
+        sum_total_invalid=Sum('total_invalid'),
+        sum_stock_after=Sum('stock_after'),
+    )
+
+    paginator = Paginator(queryset, per_page)
+    page_obj = paginator.get_page(page_number)
+
+    exercises = Exercise.objects.filter(delete_at__isnull=True).order_by('-start_date')
+
+    context = {
+        'page_title': 'Historique des inventaires',
+        'page_obj': page_obj,
+        'snapshots': page_obj.object_list,
+        'exercises': exercises,
+        'current_search': search,
+        'current_exercise': exercise_id,
+        'current_per_page': per_page,
+        'per_page_choices': SNAPSHOT_PER_PAGE_CHOICES,
+        'total_count': paginator.count,
+        'sum_stock_before': totals['sum_stock_before'] or 0,
+        'sum_total_valid': totals['sum_total_valid'] or 0,
+        'sum_total_invalid': totals['sum_total_invalid'] or 0,
+        'sum_stock_after': totals['sum_stock_after'] or 0,
+    }
+    return render(request, 'core/inventory_history.html', context)
 
 
 @login_required

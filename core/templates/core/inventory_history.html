@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Historique des inventaires - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/inventory.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Historique des inventaires</h1>
+            <p class="text-secondary">Snapshots des clôtures d'inventaire ({{ total_count }} enregistrement{{ total_count|pluralize }})</p>
+        </div>
+        <a href="{% url 'inventory' %}" class="btn btn-secondary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retour à l'inventaire
+        </a>
+    </div>
+</div>
+
+<!-- Statistiques résumées -->
+<div class="inventory-stats">
+    <div class="stat-card stat-valid">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ sum_total_valid }}</span>
+            <span class="stat-label">Total valides</span>
+        </div>
+    </div>
+    <div class="stat-card stat-invalid">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ sum_total_invalid }}</span>
+            <span class="stat-label">Total invalides</span>
+        </div>
+    </div>
+    <div class="stat-card stat-total">
+        <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_count }}</span>
+            <span class="stat-label">Produits clôturés</span>
+        </div>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Barre de filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'inventory_history' %}" class="filters-form">
+        <div class="filters-row">
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Nom ou code produit..." value="{{ current_search }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Exercice</label>
+                <select name="exercise" class="form-control">
+                    <option value="">Tous</option>
+                    {% for ex in exercises %}
+                    <option value="{{ ex.id }}" {% if current_exercise == ex.id|stringformat:"d" %}selected{% endif %}>
+                        {{ ex.start_date|date:"d/m/Y" }} - {% if ex.end_date %}{{ ex.end_date|date:"d/m/Y" }}{% else %}En cours{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Par page</label>
+                <select name="per_page" class="form-control">
+                    {% for choice in per_page_choices %}
+                    <option value="{{ choice }}" {% if current_per_page == choice %}selected{% endif %}>{{ choice }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Filtrer
+            </button>
+            <a href="{% url 'inventory_history' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau des snapshots -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Liste des snapshots d'inventaire</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table inventory-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Produit</th>
+                        <th>Exercice</th>
+                        <th>Stock avant</th>
+                        <th>Valides</th>
+                        <th>Invalides</th>
+                        <th>Total comptés</th>
+                        <th>Stock après</th>
+                        <th>Différence</th>
+                        <th>Prix vente</th>
+                        <th>Prix achat</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for snap in snapshots %}
+                    <tr>
+                        <td class="inv-date">{{ snap.create_at|date:"d/m/Y H:i" }}</td>
+                        <td class="inv-product">{{ snap.product.name }}</td>
+                        <td class="inv-date">{{ snap.exercise.start_date|date:"d/m/Y" }} - {% if snap.exercise.end_date %}{{ snap.exercise.end_date|date:"d/m/Y" }}{% else %}En cours{% endif %}</td>
+                        <td class="text-right">{{ snap.stock_before }}</td>
+                        <td class="text-right inv-valid">{{ snap.total_valid }}</td>
+                        <td class="text-right inv-invalid">{{ snap.total_invalid }}</td>
+                        <td class="text-right inv-total">{{ snap.total_counted }}</td>
+                        <td class="text-right">{{ snap.stock_after }}</td>
+                        <td class="text-right {% if snap.stock_difference > 0 %}inv-valid{% elif snap.stock_difference < 0 %}inv-invalid{% endif %}">
+                            {% if snap.stock_difference > 0 %}+{% endif %}{{ snap.stock_difference }}
+                        </td>
+                        <td class="text-right">{% if snap.selling_price %}{{ snap.selling_price|floatformat:0 }}{% else %}-{% endif %}</td>
+                        <td class="text-right">{% if snap.purchase_price %}{{ snap.purchase_price|floatformat:0 }}{% else %}-{% endif %}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="text-center">Aucun historique d'inventaire trouvé</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 or True %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} enregistrement{{ total_count|pluralize }}
+            </div>
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page=1{% if current_search %}&search={{ current_search }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn" title="Première page">&laquo;</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn" title="Page précédente">&lsaquo;</a>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn" title="Page suivante">&rsaquo;</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_exercise %}&exercise={{ current_exercise }}{% endif %}&per_page={{ current_per_page }}" class="pagination-btn" title="Dernière page">&raquo;</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
