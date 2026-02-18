@@ -26,7 +26,7 @@ class QRCodeService:
     _server_address: str = None
 
     @staticmethod
-    def get_host_ip():
+    def get_local_ip():
         try:
             system = platform.system()
 
