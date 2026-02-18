@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . /app/
 
 # Créer les répertoires pour les fichiers statiques et médias
-RUN mkdir -p /app/staticfiles /app/media
+RUN mkdir -p /app/staticfiles /app/blanco
 
 # Collecter les fichiers statiques
 RUN python manage.py collectstatic --noinput || true
