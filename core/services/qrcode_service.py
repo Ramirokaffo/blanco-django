@@ -14,6 +14,10 @@ import qrcode
 from django.conf import settings
 
 
+import subprocess
+import platform
+
+
 class QRCodeService:
     """Gère la génération et le stockage du QR code serveur."""
 
@@ -22,25 +26,56 @@ class QRCodeService:
     _server_address: str = None
 
     @staticmethod
-    def get_local_ip() -> str:
-        """
-        Détecte l'adresse IP locale de la machine.
-        Reproduit WIFIService.get_local_ip() de l'ancienne application.
-        """
-        print("settings.DEBUG", settings.DEBUG)
-        if settings.DEBUG:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            try:
-                s.connect(("192.255.255.255", 1))
-                ip = s.getsockname()[0]
-            except Exception:
-                ip = "127.0.0.1"
-            finally:
-                s.close()
-        else:
-            ip = socket.gethostbyname("host.docker.internal")
-            print('socket.gethostbyname("host.docker.internal")', ip)
-        return ip
+    def get_host_ip():
+        try:
+            system = platform.system()
+
+            if system == "Linux":
+                result = subprocess.check_output(
+                    "ip route get 1 | awk '{print $7; exit}'",
+                    shell=True
+                )
+                return result.decode().strip()
+
+            elif system == "Darwin":
+                result = subprocess.check_output(
+                    "ipconfig getifaddr en0",
+                    shell=True
+                )
+                return result.decode().strip()
+
+            elif system == "Windows":
+                result = subprocess.check_output(
+                    "powershell -Command \"(Get-NetIPAddress -AddressFamily IPv4 | "
+                    "Where-Object {$_.IPAddress -notlike '169.*' -and $_.IPAddress -notlike '127.*'} | "
+                    "Select-Object -First 1 -ExpandProperty IPAddress)\"",
+                    shell=True
+                )
+                return result.decode().strip()
+
+        except Exception:
+            return "127.0.0.1"
+
+    
+    # def get_local_ip() -> str:
+    #     """
+    #     Détecte l'adresse IP locale de la machine.
+    #     Reproduit WIFIService.get_local_ip() de l'ancienne application.
+    #     """
+    #     print("settings.DEBUG", settings.DEBUG)
+    #     if settings.DEBUG:
+    #         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    #         try:
+    #             s.connect(("192.255.255.255", 1))
+    #             ip = s.getsockname()[0]
+    #         except Exception:
+    #             ip = "127.0.0.1"
+    #         finally:
+    #             s.close()
+    #     else:
+    #         ip = socket.gethostbyname("host.docker.internal")
+    #         print('socket.gethostbyname("host.docker.internal")', ip)
+    #     return ip
 
     @staticmethod
     def generate_qr_code(data: str) -> str:
