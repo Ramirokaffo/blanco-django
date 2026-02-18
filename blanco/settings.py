@@ -50,6 +50,7 @@ AUTH_USER_MODEL = 'core.CustomUser'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -84,21 +85,6 @@ WSGI_APPLICATION = "blanco.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.mysql",
-#         # "NAME": "blanco",
-#         "NAME": "blanco-django",  # Base de données existante avec les données
-#         "USER": "root",
-#         "PASSWORD": "68153",
-#         "HOST": "localhost",
-#         "PORT": "3306",
-#         # "OPTIONS": {
-#         #     "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-#         # },
-#     }
-# }
-
 # Support both MySQL (production) and SQLite (development)
 DATABASE_ENGINE = config("DATABASE_ENGINE", default="django.db.backends.sqlite3")
 
@@ -117,10 +103,6 @@ if DATABASE_ENGINE == "django.db.backends.mysql":
             "PASSWORD": MYSQL_PASSWORD,
             "HOST": MYSQL_HOST,
             "PORT": MYSQL_PORT,
-            # "OPTIONS": {
-            #     "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-            #     "charset": "utf8mb4",
-            # },
         }
     }
 else:
@@ -180,6 +162,8 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static'),
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Media files
 MEDIA_URL = '/media/'
