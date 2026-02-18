@@ -1,3 +1,62 @@
+# services:
+
+#   # MySQL Database
+#   mysql:
+#     image: mysql:8.0
+#     container_name: blanco-mysql
+#     restart: unless-stopped
+#     environment:
+#       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+#       MYSQL_DATABASE: ${MYSQL_DATABASE}
+#       MYSQL_USER: ${MYSQL_USER}
+#       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+#     env_file:
+#       - .env
+#     ports:
+#       - "${MYSQL_PORT}:3306"
+#     volumes:
+#       - mysql_data:/var/lib/mysql
+#     networks:
+#       - blanco-network
+#     healthcheck:
+#       test: ["CMD", "mysql", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}", "-e", "SELECT 1"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 10
+#       start_period: 60s
+
+#   # Django Application
+#   web:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#     container_name: blanco_web
+#     restart: unless-stopped
+#     ports:
+#       - "8000:8000"
+#     env_file:
+#       - .env
+#     volumes:
+#       - ./blanco:/app/blanco
+#       - ./staticfiles:/app/staticfiles
+#     depends_on:
+#       mysql:
+#         condition: service_healthy
+#     extra_hosts:
+#       - "host.docker.internal:host-gateway"
+#     networks:
+#       - blanco-network
+
+# volumes:
+#   mysql_data:
+
+# networks:
+#   blanco-network:
+#     driver: bridge
+
+
+
+
 services:
 
   # MySQL Database
@@ -5,6 +64,7 @@ services:
     image: mysql:8.0
     container_name: blanco-mysql
     restart: unless-stopped
+    network_mode: host
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -12,14 +72,10 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     env_file:
       - .env
-    ports:
-      - "${MYSQL_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-    networks:
-      - blanco-network
     healthcheck:
-      test: ["CMD", "mysql", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}", "-e", "SELECT 1"]
+      test: ["CMD", "mysql", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}", "-e", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -32,8 +88,7 @@ services:
       dockerfile: Dockerfile
     container_name: blanco_web
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    network_mode: host
     env_file:
       - .env
     volumes:
@@ -42,14 +97,6 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - blanco-network
 
 volumes:
   mysql_data:
-
-networks:
-  blanco-network:
-    driver: bridge
