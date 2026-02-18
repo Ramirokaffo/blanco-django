@@ -27,6 +27,7 @@ class QRCodeService:
         Détecte l'adresse IP locale de la machine.
         Reproduit WIFIService.get_local_ip() de l'ancienne application.
         """
+        print("settings.DEBUG", settings.DEBUG)
         if settings.DEBUG:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
@@ -38,6 +39,7 @@ class QRCodeService:
                 s.close()
         else:
             ip = socket.gethostbyname("host.docker.internal")
+            print('socket.gethostbyname("host.docker.internal")', ip)
         return ip
 
     @staticmethod
