@@ -6,6 +6,7 @@ from django.db.models import Q, F, Sum
 from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django.http import JsonResponse
 from core.models.sale_models import Sale
 from core.models.user_models import Client, Supplier, CustomUser
 from core.models.accounting_models import Daily, DailyExpense, ExpenseType, Exercise
@@ -697,6 +698,17 @@ def add_supply(request):
                 product.actual_price = selling_price
             product.save()
 
+            # Retourner JSON si c'est une requête AJAX
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Approvisionnement de {supply.quantity} x "{product.name}" enregistré avec succès.',
+                    'product_name': product.name,
+                    'quantity': supply.quantity,
+                    'unit_price': float(supply.unit_price),
+                    'total_price': float(supply.total_price),
+                })
+
             messages.success(request, f'Approvisionnement de {supply.quantity} x "{product.name}" enregistré avec succès.')
             return redirect('supplies')
     else:
@@ -775,7 +787,16 @@ def add_expense(request):
             messages.success(request, f'Dépense de {expense.amount:,.0f} FCFA enregistrée avec succès.')
             return redirect('expenses')
     else:
-        form = ExpenseForm()
+        # Pré-remplir les champs si des paramètres GET sont présents
+        initial_data = {}
+
+        if request.GET.get('amount'):
+            initial_data['amount'] = request.GET.get('amount')
+
+        if request.GET.get('description'):
+            initial_data['description'] = request.GET.get('description')
+
+        form = ExpenseForm(initial=initial_data)
 
     context = {
         'page_title': 'Nouvelle dépense',

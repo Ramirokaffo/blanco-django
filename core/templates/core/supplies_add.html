@@ -137,6 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const priceInput = document.getElementById('id_unit_price');
     const summary = document.getElementById('supplySummary');
     const totalCost = document.getElementById('totalCost');
+    const supplyForm = document.getElementById('supplyForm');
 
     function updateSummary() {
         const qty = parseInt(qtyInput.value) || 0;
@@ -153,6 +154,63 @@ document.addEventListener('DOMContentLoaded', function() {
     qtyInput.addEventListener('input', updateSummary);
     priceInput.addEventListener('input', updateSummary);
     updateSummary();
+
+    // Intercepter la soumission du formulaire
+    supplyForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Créer FormData à partir du formulaire
+        const formData = new FormData(supplyForm);
+
+        // Envoyer une requête AJAX
+        fetch(supplyForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Afficher un message de succès
+                const totalPrice = parseFloat(data.total_price);
+                const amount = totalPrice.toFixed(2);
+
+                // Construire l'URL pour la page d'ajout de dépenses avec paramètres pré-remplis
+                const expenseUrl = new URL("{% url 'add_expense' %}", window.location.origin);
+                expenseUrl.searchParams.append('amount', amount);
+                expenseUrl.searchParams.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price} FCFA)`);
+
+                // Afficher un message de succès
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'alert alert-success';
+                messageDiv.style.marginBottom = '20px';
+                messageDiv.innerHTML = `
+                    <strong>✓ Succès!</strong> ${data.message}<br>
+                    <small>Redirection vers l'ajout de dépenses dans 2 secondes...</small>
+                `;
+
+                const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
+                if (messagesContainer) {
+                    messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+                }
+
+                // Ouvrir la page d'ajout de dépenses dans un nouvel onglet après 2 secondes
+                setTimeout(() => {
+                    window.open(expenseUrl.toString(), '_blank');
+                    // Rediriger vers la liste des approvisionnements
+                    setTimeout(() => {
+                        window.location.href = "{% url 'supplies' %}";
+                    }, 500);
+                }, 2000);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Une erreur est survenue lors de l\'enregistrement.');
+        });
+    });
 });
 </script>
 {% endblock %}
