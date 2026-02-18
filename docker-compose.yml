@@ -6,7 +6,7 @@ services:
     container_name: blanco-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
@@ -19,7 +19,7 @@ services:
     networks:
       - blanco-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_PASSWORD}"]
+      test: ["CMD", "mysql", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}", "-e", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -37,7 +37,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./media:/app/media
+      - ./blanco:/app/blanco
       - ./staticfiles:/app/staticfiles
     depends_on:
       mysql:
