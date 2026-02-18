@@ -19,12 +19,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ──── QR Code serveur ───────────────────────────────────────────────
 from core.services.qrcode_service import QRCodeService
-local_ip = QRCodeService.get_local_ip()
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", cast=bool)
+
+local_ip = QRCodeService.get_local_ip()
+
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=lambda v: [s.strip() for s in v.split(',')])
 ALLOWED_HOSTS.append(local_ip)  # Autoriser l'accès via l'IP locale détectée
 
