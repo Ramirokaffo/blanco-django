@@ -169,7 +169,7 @@ class InventoryForm(forms.ModelForm):
         queryset=Product.objects.filter(delete_at__isnull=True).order_by('name'),
         label='Produit',
         empty_label='-- Sélectionner un produit --',
-        widget=forms.Select(attrs={'class': 'form-control'}),
+        widget=forms.HiddenInput(attrs={'id': 'id_product'}),
     )
 
     valid_product_count = forms.IntegerField(
@@ -200,6 +200,95 @@ class InventoryForm(forms.ModelForm):
     class Meta:
         model = Inventory
         fields = ['product', 'valid_product_count', 'invalid_product_count', 'notes']
+
+
+MIGRATION_TEXTAREA_ATTRS = {
+    'class': 'form-control',
+    'rows': 6,
+    'style': 'font-family: monospace; font-size: 12px;',
+}
+
+
+class DataMigrationForm(forms.Form):
+    """Formulaire de migration des données depuis l'ancien système SQL."""
+
+    categories_sql = forms.CharField(
+        label='Catégories (SQL VALUES)',
+        required=False,
+        help_text='Colonnes: id, name, description, create_at, delete_at',
+        widget=forms.Textarea(attrs={
+            **MIGRATION_TEXTAREA_ATTRS,
+            'placeholder': "(1,'VIN',NULL,'2024-03-06 10:05:31',NULL),(2,'WHISKY',NULL,...)",
+        }),
+    )
+
+    gammes_sql = forms.CharField(
+        label='Gammes (SQL VALUES)',
+        required=False,
+        help_text='Colonnes: id, name, description, create_at, delete_at',
+        widget=forms.Textarea(attrs={
+            **MIGRATION_TEXTAREA_ATTRS,
+            'placeholder': "(1,'350g',NULL,'2024-03-13 11:25:23',NULL),...",
+        }),
+    )
+
+    rayons_sql = forms.CharField(
+        label='Rayons (SQL VALUES)',
+        required=False,
+        help_text='Colonnes: id, name, description, create_at, delete_at',
+        widget=forms.Textarea(attrs={
+            **MIGRATION_TEXTAREA_ATTRS,
+            'placeholder': "(1,'A',NULL,'2024-03-06 10:05:59',NULL),...",
+        }),
+    )
+
+    grammage_types_sql = forms.CharField(
+        label='Types de grammage (SQL VALUES)',
+        required=False,
+        help_text='Colonnes: id, name, description, create_at, delete_at',
+        widget=forms.Textarea(attrs={
+            **MIGRATION_TEXTAREA_ATTRS,
+            'placeholder': "(1,'LITRE',NULL,'2024-03-06 10:11:35',NULL),...",
+        }),
+    )
+
+    products_sql = forms.CharField(
+        label='Produits (SQL VALUES)',
+        required=False,
+        help_text='Colonnes: id, code, name, description, brand, color, stock_limit, grammage, exp_alert_period, is_price_reducible, grammage_type_id, gamme_id, category_id, rayon_id, create_at, delete_at, max_salable_price',
+        widget=forms.Textarea(attrs={
+            **MIGRATION_TEXTAREA_ATTRS,
+            'rows': 10,
+            'placeholder': "(3,'6171100130059','huile oleo 5l','','',NULL,NULL,NULL,NULL,0,NULL,NULL,7,1,'2024-03-06 10:27:39',NULL,NULL),...",
+        }),
+    )
+
+    images_sql = forms.CharField(
+        label='Images produits (SQL VALUES)',
+        required=False,
+        help_text='Colonnes: id, path, description, product_id, create_at, delete_at',
+        widget=forms.Textarea(attrs={
+            **MIGRATION_TEXTAREA_ATTRS,
+            'rows': 8,
+            'placeholder': "(3,'b8480c8d-f477...8921310146555742365.jpg','',3,'2024-03-06 10:27:40',NULL),...",
+        }),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Au moins un champ doit être rempli
+        has_data = any(
+            cleaned_data.get(field, '').strip()
+            for field in [
+                'categories_sql', 'gammes_sql', 'rayons_sql',
+                'grammage_types_sql', 'products_sql', 'images_sql',
+            ]
+        )
+        if not has_data:
+            raise forms.ValidationError(
+                "Veuillez remplir au moins un champ avec des données à migrer."
+            )
+        return cleaned_data
 
 
 class SupplierForm(forms.ModelForm):

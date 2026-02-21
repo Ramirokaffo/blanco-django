@@ -22,6 +22,12 @@
                 </svg>
                 Historique
             </a>
+            <button class="btn btn-danger" id="closeDailyBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Clôturer la journée
+            </button>
             <button class="btn btn-primary" id="newSaleBtn">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                     <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -92,7 +98,7 @@
                                 <h4>Type de vente</h4>
                                 <div class="form-group">
                                     <div class="radio-group">
-                                        <label class="radio-label">
+                                        <label class="radio-7">
                                             <input type="radio" name="saleType" value="cash" checked>
                                             <span>Comptant</span>
                                         </label>
@@ -315,6 +321,97 @@
     </div>
 </div>
 
+<!-- Modal de clôture de journée -->
+<div class="modal" id="closeDailyModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Clôturer la journée</h3>
+            <button class="modal-close" onclick="closeCloseDailyModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Chargement -->
+            <div id="closeDailyLoading" class="loading-spinner">
+                <div class="spinner"></div>
+                <p>Chargement des données de la journée...</p>
+            </div>
+
+            <!-- Contenu du formulaire -->
+            <div id="closeDailyContent" style="display: none;">
+                <!-- Résumé de la journée -->
+                <div class="daily-summary-section">
+                    <h4 class="summary-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        Résumé de la journée — <span id="closeDailyDate"></span>
+                    </h4>
+                    <div class="summary-grid">
+                        <div class="summary-item summary-cashfloat">
+                            <span class="summary-label">Fond de caisse précédent</span>
+                            <span class="summary-value" id="summaryPrevCashFloat">0 FCFA</span>
+                        </div>
+                        <div class="summary-item summary-sales">
+                            <span class="summary-label">Total Ventes</span>
+                            <span class="summary-value" id="summaryTotalSales">0 FCFA</span>
+                        </div>
+                        <div class="summary-item summary-expenses">
+                            <span class="summary-label">Total Dépenses</span>
+                            <span class="summary-value" id="summaryTotalExpenses">0 FCFA</span>
+                        </div>
+                        <div class="summary-item summary-expected">
+                            <span class="summary-label">Cash attendu</span>
+                            <span class="summary-value" id="summaryExpectedCash">0 FCFA</span>
+                        </div>
+                        <div class="summary-item summary-balance">
+                            <span class="summary-label">Solde net (écart)</span>
+                            <span class="summary-value" id="summaryNetBalance">— FCFA</span>
+                            <span class="summary-hint" id="summaryBalanceHint"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulaire de clôture -->
+                <form id="closeDailyForm">
+                    <div class="close-daily-form-grid">
+                        <div class="form-group">
+                            <label class="form-label" for="cashInHand">
+                                Montant du cash en main (FCFA) <span class="required">*</span>
+                            </label>
+                            <input type="number" class="form-control" id="cashInHand"
+                                   placeholder="Ex: 150000" step="1" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="cashFloat">
+                                Nouveau fond de caisse (FCFA)
+                            </label>
+                            <input type="number" class="form-control" id="cashFloat"
+                                   placeholder="Ex: 50000" step="1" min="0">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label class="form-label" for="closeDailyNotes">Notes (optionnel)</label>
+                            <textarea class="form-control" id="closeDailyNotes" rows="3"
+                                      placeholder="Observations ou notes sur la journée..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="close-daily-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeCloseDailyModal()">
+                            Annuler
+                        </button>
+                        <button type="submit" class="btn btn-danger" id="confirmCloseDaily">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Confirmer la clôture
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -331,4 +428,145 @@
     };
 </script>
 <script src="{% static 'js/sales.js' %}"></script>
+<script>
+    // ═══════════ Clôture de journée ═══════════
+    let _expectedCash = 0; // Stocke le cash attendu pour le calcul en temps réel
+
+    function formatMoney(amount) {
+        return Number(amount).toLocaleString('fr-FR') + ' FCFA';
+    }
+
+    function updateNetBalance() {
+        const cashInHandVal = parseFloat(document.getElementById('cashInHand').value) || 0;
+        const netBalance = cashInHandVal - _expectedCash;
+        const balanceEl = document.getElementById('summaryNetBalance');
+        const hintEl = document.getElementById('summaryBalanceHint');
+
+        balanceEl.textContent = formatMoney(netBalance);
+
+        if (cashInHandVal === 0 && document.getElementById('cashInHand').value === '') {
+            balanceEl.textContent = '— FCFA';
+            balanceEl.className = 'summary-value';
+            hintEl.textContent = 'Saisissez le montant en caisse';
+        } else if (netBalance > 0) {
+            balanceEl.className = 'summary-value text-positive';
+            hintEl.textContent = 'Surplus de ' + formatMoney(netBalance);
+        } else if (netBalance < 0) {
+            balanceEl.className = 'summary-value text-negative';
+            hintEl.textContent = 'Manquant de ' + formatMoney(Math.abs(netBalance));
+        } else {
+            balanceEl.className = 'summary-value text-positive';
+            hintEl.textContent = 'Caisse équilibrée';
+        }
+    }
+
+    // Mise à jour en temps réel du solde net
+    document.getElementById('cashInHand').addEventListener('input', updateNetBalance);
+
+    // Ouvrir la modale
+    document.getElementById('closeDailyBtn').addEventListener('click', function() {
+        const modal = document.getElementById('closeDailyModal');
+        const loading = document.getElementById('closeDailyLoading');
+        const content = document.getElementById('closeDailyContent');
+
+        modal.classList.add('active');
+        loading.style.display = 'flex';
+        content.style.display = 'none';
+
+        // Charger le résumé de la journée
+        fetch("{% url 'get_daily_summary' %}", {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            loading.style.display = 'none';
+            if (data.success) {
+                document.getElementById('closeDailyDate').textContent = data.daily_date;
+                document.getElementById('summaryPrevCashFloat').textContent = formatMoney(data.previous_cash_float);
+                document.getElementById('summaryTotalSales').textContent = formatMoney(data.total_sales);
+                document.getElementById('summaryTotalExpenses').textContent = formatMoney(data.total_expenses);
+                document.getElementById('summaryExpectedCash').textContent = formatMoney(data.expected_cash);
+
+                // Stocker le cash attendu pour le calcul en temps réel
+                _expectedCash = data.expected_cash;
+
+                // Initialiser le solde net
+                updateNetBalance();
+
+                content.style.display = 'block';
+            } else {
+                content.innerHTML = '<div class="error-message"><p>' + data.message + '</p></div>';
+                content.style.display = 'block';
+            }
+        })
+        .catch(err => {
+            loading.style.display = 'none';
+            content.innerHTML = '<div class="error-message"><p>Erreur de connexion au serveur.</p></div>';
+            content.style.display = 'block';
+        });
+    });
+
+    // Fermer la modale
+    function closeCloseDailyModal() {
+        document.getElementById('closeDailyModal').classList.remove('active');
+        // Réinitialiser le formulaire
+        document.getElementById('closeDailyForm').reset();
+        _expectedCash = 0;
+    }
+
+    // Fermer au clic sur le fond
+    document.getElementById('closeDailyModal').addEventListener('click', function(e) {
+        if (e.target === this) closeCloseDailyModal();
+    });
+
+    // Soumettre le formulaire de clôture
+    document.getElementById('closeDailyForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const cashInHand = document.getElementById('cashInHand').value;
+        const cashFloat = document.getElementById('cashFloat').value;
+        const notes = document.getElementById('closeDailyNotes').value;
+
+        if (!cashInHand) {
+            alert('Veuillez remplir le montant du cash en main.');
+            return;
+        }
+
+        const confirmBtn = document.getElementById('confirmCloseDaily');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> Clôture en cours...';
+
+        fetch("{% url 'close_daily' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({
+                cash_in_hand: parseFloat(cashInHand),
+                cash_float: cashFloat ? parseFloat(cashFloat) : 0,
+                notes: notes,
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                closeCloseDailyModal();
+                // Afficher un message de succès et recharger la page
+                alert(data.message);
+                window.location.reload();
+            } else {
+                alert(data.message || 'Une erreur est survenue.');
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Confirmer la clôture';
+            }
+        })
+        .catch(err => {
+            alert('Erreur de connexion au serveur.');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Confirmer la clôture';
+        });
+    });
+</script>
 {% endblock %}

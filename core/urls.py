@@ -21,6 +21,9 @@ urlpatterns = [
     path('contacts/suppliers/<int:pk>/edit/', views.edit_supplier, name='edit_supplier'),
     path('expenses/', views.expenses, name='expenses'),
     path('expenses/add/', views.add_expense, name='add_expense'),
+    path('daily/summary/', views.get_daily_summary, name='get_daily_summary'),
+    path('daily/close/', views.close_daily, name='close_daily'),
     path('reports/', views.reports, name='reports'),
     path('settings/', views.settings, name='settings'),
+    path('settings/migration/', views.data_migration, name='data_migration'),
 ]

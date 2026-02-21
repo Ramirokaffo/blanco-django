@@ -52,10 +52,18 @@
             {% endif %}
 
             <div class="form-grid">
-                <!-- Produit -->
+                <!-- Produit (recherche) -->
                 <div class="form-group">
-                    <label class="form-label" for="id_product">{{ form.product.label }} <span class="required">*</span></label>
-                    {{ form.product }}
+                    <label class="form-label">{{ form.product.label }} <span class="required">*</span></label>
+                    <div class="product-search-wrapper">
+                        <input type="text" id="productSearchInput" class="form-control" placeholder="Rechercher un produit par nom ou code..." autocomplete="off">
+                        {{ form.product }}
+                        <div class="product-search-results" id="productSearchResults"></div>
+                        <div class="selected-product-badge" id="selectedProductBadge" style="display:none;">
+                            <span id="selectedProductName"></span>
+                            <button type="button" class="badge-remove" id="clearProduct" title="Retirer">&times;</button>
+                        </div>
+                    </div>
                     {% if form.product.errors %}
                     <div class="field-error">{{ form.product.errors.0 }}</div>
                     {% endif %}
@@ -135,6 +143,96 @@ document.addEventListener('DOMContentLoaded', function() {
     validInput.addEventListener('input', updateSummary);
     invalidInput.addEventListener('input', updateSummary);
     updateSummary();
+
+    // ── Recherche de produit ──────────────────────────────────
+    const searchInput = document.getElementById('productSearchInput');
+    const searchResults = document.getElementById('productSearchResults');
+    const hiddenProduct = document.getElementById('id_product');
+    const badge = document.getElementById('selectedProductBadge');
+    const badgeName = document.getElementById('selectedProductName');
+    const clearBtn = document.getElementById('clearProduct');
+    let searchTimeout;
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        if (query.length < 2) {
+            searchResults.classList.remove('active');
+            searchResults.innerHTML = '';
+            return;
+        }
+        searchTimeout = setTimeout(() => fetchProducts(query), 300);
+    });
+
+    function fetchProducts(query) {
+        searchResults.innerHTML = '<div class="ps-item ps-loading">Recherche en cours...</div>';
+        searchResults.classList.add('active');
+
+        fetch(`/api/products/search/?q=${encodeURIComponent(query)}`)
+            .then(r => {
+                if (!r.ok) throw new Error('Erreur');
+                return r.json();
+            })
+            .then(products => {
+                if (!products.length) {
+                    searchResults.innerHTML = '<div class="ps-item ps-empty">Aucun produit trouvé</div>';
+                    return;
+                }
+                searchResults.innerHTML = products.map(p => `
+                    <div class="ps-item" data-id="${p.id}" data-name="${p.name}">
+                        <div class="ps-item-name">${p.name}</div>
+                        <div class="ps-item-info">
+                            <span>Code: ${p.code}</span>
+                            <span>Stock: ${p.stock}</span>
+                            <span class="ps-item-price">${Number(p.actual_price).toLocaleString('fr-FR')} FCFA</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                searchResults.querySelectorAll('.ps-item[data-id]').forEach(item => {
+                    item.addEventListener('click', function() {
+                        selectProduct(this.dataset.id, this.dataset.name);
+                    });
+                });
+            })
+            .catch(() => {
+                searchResults.innerHTML = '<div class="ps-item ps-error">Erreur lors de la recherche</div>';
+            });
+    }
+
+    function selectProduct(id, name) {
+        hiddenProduct.value = id;
+        badgeName.textContent = name;
+        badge.style.display = 'flex';
+        searchInput.value = '';
+        searchInput.style.display = 'none';
+        searchResults.classList.remove('active');
+        searchResults.innerHTML = '';
+    }
+
+    clearBtn.addEventListener('click', function() {
+        hiddenProduct.value = '';
+        badge.style.display = 'none';
+        searchInput.style.display = '';
+        searchInput.focus();
+    });
+
+    // Fermer le dropdown si on clique ailleurs
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.remove('active');
+        }
+    });
+
+    // Si le formulaire a déjà un produit sélectionné (ex: erreur de validation)
+    if (hiddenProduct.value) {
+        fetch(`/api/products/${hiddenProduct.value}/`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data) selectProduct(data.id, data.name);
+            })
+            .catch(() => {});
+    }
 });
 </script>
 {% endblock %}

@@ -181,6 +181,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const expenseUrl = new URL("{% url 'add_expense' %}", window.location.origin);
                 expenseUrl.searchParams.append('amount', amount);
                 expenseUrl.searchParams.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price} FCFA)`);
+                expenseUrl.searchParams.append('expense_type', 'approvisionnement');
+
+                // Ouvrir immédiatement la page d'ajout de dépenses dans un nouvel onglet
+                window.open(expenseUrl.toString(), '_blank');
 
                 // Afficher un message de succès
                 const messageDiv = document.createElement('div');
@@ -188,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 messageDiv.style.marginBottom = '20px';
                 messageDiv.innerHTML = `
                     <strong>✓ Succès!</strong> ${data.message}<br>
-                    <small>Redirection vers l'ajout de dépenses dans 2 secondes...</small>
+                    <small>La page d'ajout de dépenses a été ouverte dans un nouvel onglet.</small>
                 `;
 
                 const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
@@ -196,14 +200,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
                 }
 
-                // Ouvrir la page d'ajout de dépenses dans un nouvel onglet après 2 secondes
+                // Réinitialiser le formulaire
+                supplyForm.reset();
+                summary.style.display = 'none';
+
+                // Rediriger vers la liste des approvisionnements après un court délai
                 setTimeout(() => {
-                    window.open(expenseUrl.toString(), '_blank');
-                    // Rediriger vers la liste des approvisionnements
-                    setTimeout(() => {
-                        window.location.href = "{% url 'supplies' %}";
-                    }, 500);
-                }, 2000);
+                    window.location.href = "{% url 'supplies' %}";
+                }, 1500);
             }
         })
         .catch(error => {

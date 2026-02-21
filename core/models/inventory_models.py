@@ -104,6 +104,7 @@ class DailyInventory(SoftDeleteModel):
     total_expenses = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_recipes = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     cash_in_hand = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cash_float = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Fond de caisse pour le lendemain")
     notes = models.TextField(null=True, blank=True)
 
     class Meta:

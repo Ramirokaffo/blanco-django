@@ -1407,3 +1407,201 @@
         transform: rotate(360deg);
     }
 }
+
+
+/* ═══════════ Clôture de journée ═══════════ */
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--danger-color, #e74c3c), #c0392b);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #c0392b, var(--danger-color, #e74c3c));
+}
+
+/* Résumé de la journée */
+.daily-summary-section {
+    margin-bottom: 30px;
+}
+
+.summary-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 20px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.summary-item {
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 2px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.summary-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.summary-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summary-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.summary-sales {
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.08), rgba(46, 204, 113, 0.02));
+    border-color: rgba(46, 204, 113, 0.3);
+}
+
+.summary-sales .summary-value {
+    color: #2ecc71;
+}
+
+.summary-expenses {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.08), rgba(231, 76, 60, 0.02));
+    border-color: rgba(231, 76, 60, 0.3);
+}
+
+.summary-expenses .summary-value {
+    color: #e74c3c;
+}
+
+.summary-recipes {
+    background: linear-gradient(135deg, rgba(52, 152, 219, 0.08), rgba(52, 152, 219, 0.02));
+    border-color: rgba(52, 152, 219, 0.3);
+}
+
+.summary-recipes .summary-value {
+    color: #3498db;
+}
+
+.summary-cashfloat {
+    background: linear-gradient(135deg, rgba(155, 89, 182, 0.08), rgba(155, 89, 182, 0.02));
+    border-color: rgba(155, 89, 182, 0.3);
+}
+
+.summary-cashfloat .summary-value {
+    color: #9b59b6;
+}
+
+.summary-expected {
+    background: linear-gradient(135deg, rgba(255, 140, 0, 0.08), rgba(255, 140, 0, 0.02));
+    border-color: rgba(255, 140, 0, 0.3);
+}
+
+.summary-expected .summary-value {
+    color: var(--primary-color);
+}
+
+.summary-balance {
+    background: linear-gradient(135deg, rgba(44, 62, 80, 0.08), rgba(44, 62, 80, 0.02));
+    border-color: rgba(44, 62, 80, 0.3);
+    grid-column: 1 / -1;
+}
+
+.summary-balance .summary-value {
+    font-size: 26px;
+}
+
+.summary-hint {
+    font-size: 13px;
+    font-weight: 600;
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.text-positive {
+    color: #2ecc71 !important;
+}
+
+.text-negative {
+    color: #e74c3c !important;
+}
+
+/* Formulaire de clôture */
+.close-daily-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.close-daily-form-grid .form-group-full {
+    grid-column: 1 / -1;
+}
+
+.close-daily-form-grid .form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.close-daily-form-grid .form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.15);
+}
+
+.close-daily-form-grid textarea.form-control {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.required {
+    color: var(--danger-color, #e74c3c);
+}
+
+.close-daily-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 20px;
+    border-top: 2px solid var(--border-color);
+}
+
+@media (max-width: 768px) {
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .close-daily-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .close-daily-actions {
+        flex-direction: column;
+    }
+
+    .close-daily-actions .btn {
+        width: 100%;
+    }
+}

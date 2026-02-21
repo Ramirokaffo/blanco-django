@@ -175,7 +175,7 @@ def update_product_by_id(request, product_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def get_image(request, folder, image):
     """
     Servir une image depuis le dossier media.

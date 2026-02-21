@@ -13,7 +13,7 @@ from core.models.accounting_models import Daily, DailyExpense, ExpenseType, Exer
 from core.models.product_models import Product, Category, Gamme, Rayon
 from core.models.inventory_models import Supply, Inventory, InventorySnapshot
 from core.services.daily_service import DailyService
-from core.forms import SupplyForm, ExpenseForm, ClientForm, SupplierForm, InventoryForm
+from core.forms import SupplyForm, ExpenseForm, ClientForm, SupplierForm, InventoryForm, DataMigrationForm
 from core.services.excercise_service import ExerciseService
 
 # Create your views here.
@@ -796,6 +796,18 @@ def add_expense(request):
         if request.GET.get('description'):
             initial_data['description'] = request.GET.get('description')
 
+        if request.GET.get('expense_type'):
+            try:
+                from core.models.accounting_models import ExpenseType
+                expense_type = ExpenseType.objects.filter(
+                    delete_at__isnull=True,
+                    name__icontains=request.GET.get('expense_type')
+                ).first()
+                if expense_type:
+                    initial_data['expense_type'] = expense_type.pk
+            except (ValueError, ExpenseType.DoesNotExist):
+                pass
+
         form = ExpenseForm(initial=initial_data)
 
     context = {
@@ -815,9 +827,160 @@ def reports(request):
 
 
 @login_required
+def get_daily_summary(request):
+    """API pour récupérer le résumé de la journée en cours"""
+    from core.models.inventory_models import DailyInventory
+
+    current_daily = DailyService.get_or_create_active_daily()
+
+    if not current_daily:
+        return JsonResponse({'success': False, 'message': 'Aucune journée active trouvée.'}, status=404)
+
+    # Calculer les totaux
+    total_sales = Sale.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('total'))['total'] or 0
+
+    total_expenses = DailyExpense.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    from core.models.accounting_models import DailyRecipe
+    total_recipes = DailyRecipe.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    # Récupérer le fond de caisse de la journée précédente
+    previous_inventory = DailyInventory.objects.filter(
+        delete_at__isnull=True
+    ).exclude(daily=current_daily).order_by('-create_at').first()
+
+    previous_cash_float = float(previous_inventory.cash_float) if previous_inventory else 0
+
+    # Cash attendu = fond de caisse précédent + ventes - dépenses
+    expected_cash = previous_cash_float + float(total_sales) - float(total_expenses)
+
+    return JsonResponse({
+        'success': True,
+        'total_sales': float(total_sales),
+        'total_expenses': float(total_expenses),
+        'total_recipes': float(total_recipes),
+        'previous_cash_float': previous_cash_float,
+        'expected_cash': expected_cash,
+        'daily_id': current_daily.id,
+        'daily_date': current_daily.start_date.strftime('%d/%m/%Y'),
+    })
+
+
+@login_required
+@require_POST
+def close_daily(request):
+    """Vue pour clôturer la journée et créer un DailyInventory"""
+    import json
+    from core.models.inventory_models import DailyInventory
+
+    current_daily = DailyService.get_or_create_active_daily()
+
+    if not current_daily:
+        return JsonResponse({'success': False, 'message': 'Aucune journée active trouvée.'}, status=404)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Données invalides.'}, status=400)
+
+    cash_in_hand = data.get('cash_in_hand', 0)
+    cash_float = data.get('cash_float', 0)
+    notes = data.get('notes', '')
+
+    try:
+        cash_in_hand = float(cash_in_hand)
+        cash_float = float(cash_float)
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'message': 'Les montants doivent être des nombres valides.'}, status=400)
+
+    # Calculer les totaux
+    total_sales = Sale.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('total'))['total'] or 0
+
+    total_expenses = DailyExpense.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    from core.models.accounting_models import DailyRecipe
+    total_recipes = DailyRecipe.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    # Créer le DailyInventory
+    daily_inventory = DailyInventory.objects.create(
+        daily=current_daily,
+        staff=request.user,
+        exercise=current_daily.exercise,
+        total_sales=total_sales,
+        total_expenses=total_expenses,
+        total_recipes=total_recipes,
+        cash_in_hand=cash_in_hand,
+        cash_float=cash_float,
+        notes=notes,
+    )
+
+    # Fermer la journée
+    DailyService.close_current_daily()
+
+    return JsonResponse({
+        'success': True,
+        'message': 'La journée a été clôturée avec succès.',
+        'daily_inventory_id': daily_inventory.id,
+    })
+
+
+@login_required
 def settings(request):
     """Vue de la page des paramètres"""
     context = {
         'page_title': 'Paramètres'
     }
     return render(request, 'core/settings.html', context)
+
+
+@login_required
+def data_migration(request):
+    """Vue pour migrer les données de l'ancien système"""
+    from core.services.migration_service import migrate_data
+
+    migration_stats = None
+
+    if request.method == 'POST':
+        form = DataMigrationForm(request.POST)
+        if form.is_valid():
+            try:
+                stats = migrate_data(
+                    products_sql=form.cleaned_data.get('products_sql', ''),
+                    images_sql=form.cleaned_data.get('images_sql', ''),
+                    categories_sql=form.cleaned_data.get('categories_sql', ''),
+                    gammes_sql=form.cleaned_data.get('gammes_sql', ''),
+                    rayons_sql=form.cleaned_data.get('rayons_sql', ''),
+                    grammage_types_sql=form.cleaned_data.get('grammage_types_sql', ''),
+                )
+                migration_stats = stats
+                total = (
+                    stats['categories'] + stats['gammes'] + stats['rayons']
+                    + stats['grammage_types'] + stats['products'] + stats['images']
+                )
+                messages.success(
+                    request,
+                    f"Migration terminée avec succès ! {total} éléments créés."
+                )
+            except Exception as e:
+                messages.error(request, f"Erreur lors de la migration : {str(e)}")
+    else:
+        form = DataMigrationForm()
+
+    context = {
+        'page_title': 'Migration de données',
+        'form': form,
+        'migration_stats': migration_stats,
+    }
+    return render(request, 'core/data_migration.html', context)
