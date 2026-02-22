@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - {{ system_settings.company_name }}</title>
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/theme.css' %}">
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+</head>
+<body data-theme="light">
+    <div class="login-wrapper">
+        <div class="login-card">
+            <!-- Logo / initiale -->
+            {% if system_settings.company_logo %}
+                <img src="{{ system_settings.company_logo.url }}" alt="Logo" class="login-logo">
+            {% else %}
+                <div class="login-logo-placeholder">{{ system_settings.company_name|first }}</div>
+            {% endif %}
+
+            <div class="login-company">{{ system_settings.company_name }}</div>
+            <p class="login-subtitle">Connectez-vous pour continuer</p>
+
+            {% if error %}
+                <div class="login-error">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" class="login-form" action="{% url 'login' %}">
+                {% csrf_token %}
+                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+                <div class="login-field">
+                    <label for="id_username">Nom d'utilisateur</label>
+                    <input type="text" id="id_username" name="username" autofocus
+                           placeholder="Entrez votre identifiant" required>
+                </div>
+
+                <div class="login-field">
+                    <label for="id_password">Mot de passe</label>
+                    <input type="password" id="id_password" name="password"
+                           placeholder="Entrez votre mot de passe" required>
+                </div>
+
+                <button type="submit" class="login-btn">Se connecter</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{% static 'js/theme.js' %}"></script>
+</body>
+</html>
+

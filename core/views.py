@@ -1,28 +1,198 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q, F, Sum
+from django.db.models import Q, F, Sum, Count
 from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-from core.models.sale_models import Sale
+from core.models.sale_models import Sale, SaleProduct
 from core.models.user_models import Client, Supplier, CustomUser
-from core.models.accounting_models import Daily, DailyExpense, ExpenseType, Exercise
+from core.models.accounting_models import Daily, DailyExpense, DailyRecipe, ExpenseType, Exercise
 from core.models.product_models import Product, Category, Gamme, Rayon
-from core.models.inventory_models import Supply, Inventory, InventorySnapshot
+from core.models.inventory_models import Supply, Inventory, InventorySnapshot, DailyInventory
 from core.services.daily_service import DailyService
 from core.forms import SupplyForm, ExpenseForm, ClientForm, SupplierForm, InventoryForm, DataMigrationForm
 from core.services.excercise_service import ExerciseService
 
 # Create your views here.
 
+
+def login_view(request):
+    """Vue de connexion personnalisée (accessible aux non-admins)."""
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    error = None
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                auth_login(request, user)
+                next_url = request.GET.get('next') or request.POST.get('next') or '/'
+                return redirect(next_url)
+            else:
+                error = "Nom d'utilisateur ou mot de passe incorrect."
+        else:
+            error = "Veuillez remplir tous les champs."
+
+    return render(request, 'core/login.html', {
+        'error': error,
+        'next': request.GET.get('next', ''),
+    })
+
+
+def logout_view(request):
+    """Déconnexion et redirection vers la page de login."""
+    auth_logout(request)
+    return redirect('login')
+
 @login_required
 def dashboard(request):
-    """Vue du tableau de bord"""
+    """Vue du tableau de bord avec les statistiques de la journée"""
+    from core.models.settings_models import SystemSettings
+
+    current_daily = DailyService.get_or_create_active_daily()
+    settings_obj = SystemSettings.get_settings()
+
+    # ── Ventes du jour ───────────────────────────────────────────
+    today_sales = Sale.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    )
+    total_revenue = today_sales.aggregate(total=Sum('total'))['total'] or 0
+    sales_count = today_sales.count()
+
+    # Ventes annulées du jour
+    cancelled_sales_count = Sale.objects.filter(
+        daily=current_daily, delete_at__isnull=False
+    ).count()
+
+    # Produits vendus (somme des quantités)
+    products_sold_count = SaleProduct.objects.filter(
+        sale__daily=current_daily, sale__delete_at__isnull=True, delete_at__isnull=True
+    ).aggregate(total=Sum('quantity'))['total'] or 0
+
+    # ── Dépenses du jour ─────────────────────────────────────────
+    total_expenses = DailyExpense.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    # ── Recettes additionnelles du jour ──────────────────────────
+    total_recipes = DailyRecipe.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    # Solde net = ventes + recettes - dépenses
+    net_balance = float(total_revenue) + float(total_recipes) - float(total_expenses)
+
+    # ── Fond de caisse précédent ─────────────────────────────────
+    previous_inventory = DailyInventory.objects.filter(
+        delete_at__isnull=True
+    ).exclude(daily=current_daily).order_by('-create_at').first()
+    previous_cash_float = float(previous_inventory.cash_float) if previous_inventory else 0
+
+    # Cash attendu = fond de caisse + ventes + recettes - dépenses
+    expected_cash = previous_cash_float + float(total_revenue) + float(total_recipes) - float(total_expenses)
+
+    # ── Fréquence clients / heure ────────────────────────────────
+    if sales_count > 0:
+        first_sale = today_sales.order_by('create_at').first()
+        now = timezone.now()
+        if first_sale:
+            elapsed = (now - first_sale.create_at).total_seconds() / 3600
+            frequency = round(sales_count / elapsed, 1) if elapsed > 0 else sales_count
+        else:
+            frequency = 0
+    else:
+        frequency = 0
+
+    # ── Comparaison avec la veille ───────────────────────────────
+    previous_daily = Daily.objects.filter(
+        end_date__isnull=False, delete_at__isnull=True
+    ).order_by('-end_date').first()
+
+    if previous_daily:
+        yesterday_revenue = Sale.objects.filter(
+            daily=previous_daily, delete_at__isnull=True
+        ).aggregate(total=Sum('total'))['total'] or 0
+        yesterday_sales_count = Sale.objects.filter(
+            daily=previous_daily, delete_at__isnull=True
+        ).count()
+    else:
+        yesterday_revenue = 0
+        yesterday_sales_count = 0
+
+    # Taux de variation (%)
+    if yesterday_revenue and float(yesterday_revenue) > 0:
+        revenue_trend = round((float(total_revenue) - float(yesterday_revenue)) / float(yesterday_revenue) * 100, 1)
+    else:
+        revenue_trend = None  # Pas de comparaison possible
+
+    # ── Produits en alerte stock ─────────────────────────────────
+    low_stock_threshold = settings_obj.low_stock_threshold
+    low_stock_products = Product.objects.filter(
+        delete_at__isnull=True,
+        stock__lte=F('stock_limit')
+    ).exclude(stock_limit__isnull=True).order_by('stock')[:10]
+
+    out_of_stock_count = Product.objects.filter(
+        delete_at__isnull=True, stock=0
+    ).count()
+
+    low_stock_count = Product.objects.filter(
+        delete_at__isnull=True,
+        stock__lte=F('stock_limit'),
+        stock__gt=0,
+    ).exclude(stock_limit__isnull=True).count()
+
+    # ── Approvisionnements du jour ───────────────────────────────
+    today_supplies_count = Supply.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).count()
+    today_supplies_total = Supply.objects.filter(
+        daily=current_daily, delete_at__isnull=True
+    ).aggregate(total=Sum('total_price'))['total'] or 0
+
+    # ── Dernières ventes ─────────────────────────────────────────
+    recent_sales = today_sales.select_related('client', 'staff').order_by('-create_at')[:8]
+
+    # ── Total produits ───────────────────────────────────────────
+    total_products = Product.objects.filter(delete_at__isnull=True).count()
+
     context = {
-        'page_title': 'Tableau de bord'
+        'page_title': 'Tableau de bord',
+        'current_daily': current_daily,
+        # KPI principaux
+        'total_revenue': total_revenue,
+        'sales_count': sales_count,
+        'total_expenses': total_expenses,
+        'total_recipes': total_recipes,
+        'net_balance': net_balance,
+        'expected_cash': expected_cash,
+        'previous_cash_float': previous_cash_float,
+        'products_sold_count': products_sold_count,
+        'cancelled_sales_count': cancelled_sales_count,
+        'frequency': frequency,
+        # Comparaison veille
+        'yesterday_revenue': yesterday_revenue,
+        'yesterday_sales_count': yesterday_sales_count,
+        'revenue_trend': revenue_trend,
+        # Stock
+        'low_stock_products': low_stock_products,
+        'out_of_stock_count': out_of_stock_count,
+        'low_stock_count': low_stock_count,
+        'total_products': total_products,
+        # Approvisionnements
+        'today_supplies_count': today_supplies_count,
+        'today_supplies_total': today_supplies_total,
+        # Ventes récentes
+        'recent_sales': recent_sales,
+        # Devise
+        'currency': settings_obj.currency_symbol,
     }
     return render(request, 'core/dashboard.html', context)
 

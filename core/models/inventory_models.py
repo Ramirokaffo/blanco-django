@@ -24,12 +24,12 @@ class Supply(SoftDeleteModel):
     class Meta:
         db_table = 'supply'
         # managed = False
-        verbose_name = 'Supply'
-        verbose_name_plural = 'Supplies'
+        verbose_name = 'Approvisionnement'
+        verbose_name_plural = 'Approvisionnements'
         ordering = ['-create_at']
     
     def __str__(self):
-        return f"Supply {self.product.name} x{self.quantity}"
+        return f"Approvisionnement {self.product.name} x{self.quantity}"
     
     def get_total(self):
         """Calculate total price."""
@@ -51,12 +51,12 @@ class Inventory(SoftDeleteModel):
     class Meta:
         db_table = 'inventory'
         # managed = False
-        verbose_name = 'Inventory'
-        verbose_name_plural = 'Inventories'
+        verbose_name = 'Inventaire'
+        verbose_name_plural = 'Inventaires'
         ordering = ['-create_at']
 
     def __str__(self):
-        return f"Inventory {self.product.name} - {self.create_at.strftime('%Y-%m-%d')}"
+        return f"Inventaire {self.product.name} - {self.create_at.strftime('%Y-%m-%d')}"
 
     def total_count(self):
         """Calculate total product count (valid + invalid)."""
@@ -80,8 +80,8 @@ class InventorySnapshot(SoftDeleteModel):
 
     class Meta:
         db_table = 'inventory_snapshot'
-        verbose_name = 'Inventory Snapshot'
-        verbose_name_plural = 'Inventory Snapshots'
+        verbose_name = 'Resumé d\'inventaire'
+        verbose_name_plural = 'Resumés d\'inventaire'
         ordering = ['-create_at']
         unique_together = [('product', 'exercise')]
 
@@ -110,12 +110,12 @@ class DailyInventory(SoftDeleteModel):
     class Meta:
         db_table = 'daily_inventory'
         # managed = False
-        verbose_name = 'Daily Inventory'
-        verbose_name_plural = 'Daily Inventories'
+        verbose_name = 'Inventaire journalière'
+        verbose_name_plural = 'Inventaires journalière'
         ordering = ['-create_at']
     
     def __str__(self):
-        return f"Daily Inventory {self.daily}"
+        return f"Inventaire journalière {self.daily}"
     
     def get_net_balance(self):
         """Calculate net balance for the day."""

@@ -16,8 +16,8 @@ class Category(SoftDeleteModel):
     class Meta:
         db_table = 'category'
         # managed = False
-        verbose_name = 'Category'
-        verbose_name_plural = 'Categories'
+        verbose_name = 'Catégorie'
+        verbose_name_plural = 'Catégories'
     
     def __str__(self):
         return self.name
@@ -33,8 +33,8 @@ class Gamme(SoftDeleteModel):
     class Meta:
         db_table = 'gamme'
         # managed = False
-        verbose_name = 'Gamme'
-        verbose_name_plural = 'Gammes'
+        verbose_name = 'Gamme produit'
+        verbose_name_plural = 'Gammes produits'
     
     def __str__(self):
         return self.name
@@ -50,8 +50,8 @@ class Rayon(SoftDeleteModel):
     class Meta:
         db_table = 'rayon'
         # managed = False
-        verbose_name = 'Rayon'
-        verbose_name_plural = 'Rayons'
+        verbose_name = 'Rayon produit'
+        verbose_name_plural = 'Rayons produits'
     
     def __str__(self):
         return self.name
@@ -67,8 +67,8 @@ class GrammageType(SoftDeleteModel):
     class Meta:
         db_table = 'grammage_type'
         # managed = False
-        verbose_name = 'Grammage Type'
-        verbose_name_plural = 'Grammage Types'
+        verbose_name = 'Type de grammage'
+        verbose_name_plural = 'Types de grammage'
     
     def __str__(self):
         return self.name
@@ -101,8 +101,8 @@ class Product(SoftDeleteModel):
     class Meta:
         db_table = 'product'
         # managed = False
-        verbose_name = 'Product'
-        verbose_name_plural = 'Products'
+        verbose_name = 'Produit'
+        verbose_name_plural = 'Produits'
         ordering = ['name']
     
     def __str__(self):
@@ -126,9 +126,9 @@ class ProductImage(SoftDeleteModel):
     class Meta:
         db_table = 'product_image'
         # managed = False
-        verbose_name = 'Product Image'
-        verbose_name_plural = 'Product Images'
+        verbose_name = 'Image produit'
+        verbose_name_plural = 'Images produits'
     
     def __str__(self):
-        return f"Image for {self.product.name}"
+        return f"Image pour {self.product.name}"
 

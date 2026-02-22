@@ -27,12 +27,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Gestion du menu utilisateur
-    const userBtn = document.querySelector('.user-btn');
-    if (userBtn) {
-        userBtn.addEventListener('click', function() {
-            console.log('Menu utilisateur cliqué');
-            // TODO: Afficher le menu déroulant utilisateur
+    // Gestion du menu utilisateur (dropdown)
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userDropdown = document.getElementById('userDropdown');
+    if (userMenuBtn && userDropdown) {
+        userMenuBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            userDropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', function () {
+            userDropdown.classList.remove('open');
         });
     }
 

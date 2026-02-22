@@ -65,9 +65,9 @@ class Supplier(BaseUser):
     class Meta:
         db_table = 'supplier'
         # managed = False
-        verbose_name = 'Supplier'
-        verbose_name_plural = 'Suppliers'
+        verbose_name = 'Fournisseur'
+        verbose_name_plural = 'Fournisseurs'
     
     def __str__(self):
-        return self.get_full_name() or f"Supplier #{self.id}"
+        return self.get_full_name() or f"Fournisseur #{self.id}"
 

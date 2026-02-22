@@ -18,12 +18,12 @@ class Exercise(SoftDeleteModel):
     class Meta:
         db_table = 'exercise'
         # managed = False
-        verbose_name = 'Exercise'
-        verbose_name_plural = 'Exercises'
+        verbose_name = 'Exercice'
+        verbose_name_plural = 'Exercices'
         ordering = ['-start_date']
     
     def __str__(self):
-        return f"Exercise {self.start_date.year if self.start_date else self.id}"
+        return f"Exercice {self.start_date.year if self.start_date else self.id}"
     
     def is_active(self):
         """Check if the exercise is currently active."""
@@ -41,12 +41,12 @@ class Daily(SoftDeleteModel):
     class Meta:
         db_table = 'daily'
         # managed = False
-        verbose_name = 'Daily'
-        verbose_name_plural = 'Dailies'
+        verbose_name = 'Journée'
+        verbose_name_plural = 'Journées'
         ordering = ['-start_date']
     
     def __str__(self):
-        return f"Daily {self.start_date.strftime('%Y-%m-%d') if self.start_date else self.id}"
+        return f"Journée {self.start_date.strftime('%Y-%m-%d') if self.start_date else self.id}"
     
     def is_open(self):
         """Check if the daily session is still open."""
@@ -63,8 +63,8 @@ class ExpenseType(SoftDeleteModel):
     class Meta:
         db_table = 'expense_type'
         # managed = False
-        verbose_name = 'Expense Type'
-        verbose_name_plural = 'Expense Types'
+        verbose_name = 'Type de dépense'
+        verbose_name_plural = 'Types de dépenses'
     
     def __str__(self):
         return self.name
@@ -80,8 +80,8 @@ class RecipeType(SoftDeleteModel):
     class Meta:
         db_table = 'recipe_type'
         # managed = False
-        verbose_name = 'Recipe Type'
-        verbose_name_plural = 'Recipe Types'
+        verbose_name = 'Type de recette'
+        verbose_name_plural = 'Types de recettes'
     
     def __str__(self):
         return self.name
@@ -101,12 +101,12 @@ class DailyExpense(SoftDeleteModel):
     class Meta:
         db_table = 'daily_expense'
         # managed = False
-        verbose_name = 'Daily Expense'
-        verbose_name_plural = 'Daily Expenses'
+        verbose_name = 'Dépense quotidienne'
+        verbose_name_plural = 'Dépenses quotidiennes'
         ordering = ['-create_at']
     
     def __str__(self):
-        return f"Expense {self.amount} - {self.expense_type}"
+        return f"Dépense {self.amount} - {self.expense_type}"
 
 
 class DailyRecipe(SoftDeleteModel):
@@ -123,12 +123,12 @@ class DailyRecipe(SoftDeleteModel):
     class Meta:
         db_table = 'daily_recipe'
         # managed = False
-        verbose_name = 'Daily Recipe'
-        verbose_name_plural = 'Daily Recipes'
+        verbose_name = 'Recette quotidienne'
+        verbose_name_plural = 'Recettes quotidiennes'
         ordering = ['-create_at']
     
     def __str__(self):
-        return f"Recipe {self.amount} - {self.recipe_type}"
+        return f"Recette {self.amount} - {self.recipe_type}"
 
 
 class ProductExpense(SoftDeleteModel):
@@ -142,9 +142,9 @@ class ProductExpense(SoftDeleteModel):
     class Meta:
         db_table = 'product_expense'
         # managed = False
-        verbose_name = 'Product Expense'
-        verbose_name_plural = 'Product Expenses'
+        verbose_name = 'Dépense produit'
+        verbose_name_plural = 'Dépenses produits'
     
     def __str__(self):
-        return f"Expense {self.amount} for {self.product.name}"
+        return f"Dépense {self.amount} pour {self.product.name}"
 

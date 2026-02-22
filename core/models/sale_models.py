@@ -22,12 +22,12 @@ class Sale(SoftDeleteModel):
     class Meta:
         db_table = 'sale'
         # managed = False
-        verbose_name = 'Sale'
-        verbose_name_plural = 'Sales'
+        verbose_name = 'Vente'
+        verbose_name_plural = 'Ventes'
         ordering = ['-create_at']
     
     def __str__(self):
-        return f"Sale #{self.id} - {self.total} FCFA"
+        return f"Vente #{self.id} - {self.total} FCFA"
     
     def get_total(self):
         """Calculate total from sale products."""
@@ -53,8 +53,8 @@ class SaleProduct(SoftDeleteModel):
     class Meta:
         db_table = 'sale_product'
         # managed = False
-        verbose_name = 'Sale Product'
-        verbose_name_plural = 'Sale Products'
+        verbose_name = 'Produit vendu'
+        verbose_name_plural = 'Produits vendus'
     
     def __str__(self):
         return f"{self.product.name} x{self.quantity}"
@@ -78,11 +78,11 @@ class CreditSale(SoftDeleteModel):
     class Meta:
         db_table = 'credit_sale'
         # managed = False
-        verbose_name = 'Credit Sale'
-        verbose_name_plural = 'Credit Sales'
+        verbose_name = 'Vente crédit'
+        verbose_name_plural = 'Ventes crédit'
     
     def __str__(self):
-        return f"Credit for Sale #{self.sale.id}"
+        return f"Vente crédit #{self.sale.id}"
     
     def get_remaining_balance(self):
         """Calculate remaining balance."""
@@ -100,9 +100,9 @@ class Refund(SoftDeleteModel):
     class Meta:
         db_table = 'refund'
         # managed = False
-        verbose_name = 'Refund'
-        verbose_name_plural = 'Refunds'
+        verbose_name = 'Remboursement'
+        verbose_name_plural = 'Remboursements'
     
     def __str__(self):
-        return f"Refund {self.value} for Sale #{self.sale.id}"
+        return f"Remboursement {self.value} pour Vente #{self.sale.id}"
 

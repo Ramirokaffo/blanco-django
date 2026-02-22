@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Tableau de bord - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -8,14 +13,188 @@
     <p class="text-secondary">Vue d'ensemble de votre activité</p>
 </div>
 
-<div class="dashboard-grid">
-    <!-- Contenu du tableau de bord à implémenter -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Statistiques du jour</h3>
+<!-- Barre info journée -->
+{% if current_daily %}
+<div class="daily-info-bar">
+    <span class="daily-status"><span class="dot"></span> Journée ouverte</span>
+    <span class="daily-separator"></span>
+    <span class="daily-date">{{ current_daily.start_date|date:"l d F Y" }}</span>
+</div>
+{% endif %}
+
+<!-- ═══════ KPI Cards ═══════ -->
+<div class="kpi-grid">
+    <!-- Recette totale -->
+    <div class="kpi-card">
+        <div class="kpi-icon revenue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-linecap="round"/></svg>
         </div>
-        <div class="card-body">
-            <p>Contenu à venir...</p>
+        <div class="kpi-info">
+            <div class="kpi-label">Recette du jour</div>
+            <div class="kpi-value">{{ total_revenue|floatformat:0 }} {{ currency }}</div>
+            {% if revenue_trend is not None %}
+            <div class="kpi-sub">
+                <span class="kpi-trend {% if revenue_trend > 0 %}up{% elif revenue_trend < 0 %}down{% else %}neutral{% endif %}">
+                    {% if revenue_trend > 0 %}▲{% elif revenue_trend < 0 %}▼{% else %}={% endif %} {{ revenue_trend }}%
+                </span>
+                vs veille
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Nombre de ventes -->
+    <div class="kpi-card">
+        <div class="kpi-icon sales">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-label">Ventes</div>
+            <div class="kpi-value">{{ sales_count }}</div>
+            <div class="kpi-sub">{{ products_sold_count }} produit{{ products_sold_count|pluralize:"s" }} vendu{{ products_sold_count|pluralize:"s" }}</div>
+        </div>
+    </div>
+
+    <!-- Dépenses -->
+    <div class="kpi-card">
+        <div class="kpi-icon expenses">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-linecap="round"/><line x1="4" y1="4" x2="20" y2="20" stroke-linecap="round"/></svg>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-label">Dépenses</div>
+            <div class="kpi-value">{{ total_expenses|floatformat:0 }} {{ currency }}</div>
+        </div>
+    </div>
+
+    <!-- Solde net -->
+    <div class="kpi-card">
+        <div class="kpi-icon balance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-label">Solde net</div>
+            <div class="kpi-value">{{ net_balance|floatformat:0 }} {{ currency }}</div>
+            <div class="kpi-sub">Recettes additionnelles: {{ total_recipes|floatformat:0 }} {{ currency }}</div>
+        </div>
+    </div>
+
+    <!-- Fréquence client -->
+    <div class="kpi-card">
+        <div class="kpi-icon frequency">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-label">Fréquence</div>
+            <div class="kpi-value">{{ frequency }} <small>ventes/h</small></div>
+        </div>
+    </div>
+
+    <!-- Ventes annulées -->
+    <div class="kpi-card">
+        <div class="kpi-icon cancelled">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="9" y1="9" x2="15" y2="15" stroke-linecap="round"/></svg>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-label">Ventes annulées</div>
+            <div class="kpi-value">{{ cancelled_sales_count }}</div>
+        </div>
+    </div>
+
+    <!-- Approvisionnements -->
+    <div class="kpi-card">
+        <div class="kpi-icon supply">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke-linejoin="round"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="22.08" x2="12" y2="12" stroke-linecap="round"/></svg>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-label">Approvisionnements</div>
+            <div class="kpi-value">{{ today_supplies_count }}</div>
+            <div class="kpi-sub">{{ today_supplies_total|floatformat:0 }} {{ currency }}</div>
+        </div>
+    </div>
+
+    <!-- Alerte stock -->
+    <div class="kpi-card">
+        <div class="kpi-icon products">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke-linecap="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round"/></svg>
+        </div>
+        <div class="kpi-info">
+            <div class="kpi-label">Alertes stock</div>
+            <div class="kpi-value">{{ low_stock_count }}</div>
+            <div class="kpi-sub">{{ out_of_stock_count }} en rupture</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ Sections : Ventes récentes + Alertes stock ═══════ -->
+<div class="dashboard-sections">
+    <!-- Dernières ventes -->
+    <div class="dashboard-card">
+        <div class="dashboard-card-header">
+            <h3>Dernières ventes</h3>
+            <a href="{% url 'sales' %}" class="card-link">Voir tout →</a>
+        </div>
+        <div class="dashboard-card-body">
+            {% if recent_sales %}
+            <table class="dashboard-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Client</th>
+                        <th>Montant</th>
+                        <th>Heure</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for sale in recent_sales %}
+                    <tr>
+                        <td>{{ sale.id }}</td>
+                        <td>{{ sale.client|default:"Anonyme" }}</td>
+                        <td class="sale-amount">{{ sale.total|floatformat:0 }} {{ currency }}</td>
+                        <td class="sale-time">{{ sale.create_at|date:"H:i" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <p>Aucune vente aujourd'hui</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Produits en alerte stock -->
+    <div class="dashboard-card">
+        <div class="dashboard-card-header">
+            <h3>Alertes stock</h3>
+            <a href="{% url 'products' %}" class="card-link">Voir tout →</a>
+        </div>
+        <div class="dashboard-card-body">
+            {% if low_stock_products %}
+            <ul class="stock-alert-list">
+            {% for product in low_stock_products %}
+                <li class="stock-alert-item">
+                    <div class="stock-product-info">
+                        <div class="stock-product-name">{{ product.name }}</div>
+                        <div class="stock-product-code">{{ product.code }}</div>
+                    </div>
+                    <div class="stock-badge">
+                        {% if product.stock == 0 %}
+                        <span class="badge badge-danger">Rupture</span>
+                        {% else %}
+                        <span class="badge badge-warning">{{ product.stock }} / {{ product.stock_limit }}</span>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke-linecap="round" stroke-linejoin="round"/><polyline points="22 4 12 14.01 9 11.01" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <p>Tous les produits sont en stock</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
