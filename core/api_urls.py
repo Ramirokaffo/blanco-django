@@ -73,6 +73,8 @@ urlpatterns = [
     # ── Utils ──────────────────────────────────────────────────────
     # Flask: GET /test_connexion
     path('test-connection/', utils_views.test_connection, name='test_connection'),
+    # Rafraîchir le QR code serveur (vérifie si l'IP a changé)
+    path('qr/refresh/', utils_views.refresh_qr, name='refresh_qr'),
 
 ]
 

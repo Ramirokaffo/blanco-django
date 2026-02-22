@@ -43,7 +43,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (qrToggle && qrModal) {
         qrToggle.addEventListener('click', function () {
+            // 1. Afficher d'abord le modal avec le QR existant
             qrModal.classList.add('active');
+
+            // 2. Lancer une requête pour vérifier si l'IP a changé
+            fetch('/api/qr/refresh/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.changed) {
+                        // 3. Mettre à jour furtivement l'image et l'adresse
+                        const qrImg = document.getElementById('qrCodeImg');
+                        const qrAddr = document.getElementById('qrServerAddress');
+                        if (qrImg && data.qr_base64) {
+                            qrImg.src = 'data:image/png;base64,' + data.qr_base64;
+                        }
+                        if (qrAddr && data.server_address) {
+                            qrAddr.textContent = data.server_address;
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.warn('Impossible de rafraîchir le QR code :', err);
+                });
         });
 
         qrModalClose.addEventListener('click', function () {

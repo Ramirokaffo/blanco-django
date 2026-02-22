@@ -43,8 +43,8 @@
                 <button class="qr-modal-close" id="qrModalClose" aria-label="Fermer">&times;</button>
             </div>
             <div class="qr-modal-body">
-                <img src="data:image/png;base64,{{ server_qr_base64 }}" alt="QR Code serveur" class="qr-code-img">
-                <p class="qr-server-address">{{ server_address }}</p>
+                <img id="qrCodeImg" src="data:image/png;base64,{{ server_qr_base64 }}" alt="QR Code serveur" class="qr-code-img">
+                <p id="qrServerAddress" class="qr-server-address">{{ server_address }}</p>
                 <p class="qr-hint">Scannez ce code QR pour connecter l'application mobile au serveur</p>
             </div>
         </div>

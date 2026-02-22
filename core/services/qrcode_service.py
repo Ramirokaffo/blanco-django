@@ -78,6 +78,45 @@ class QRCodeService:
         return cls._qr_base64
 
     @classmethod
+    def refresh_server_qr(cls) -> dict:
+        """
+        Vérifie si l'IP locale a changé. Si oui, régénère le QR code,
+        met à jour ALLOWED_HOSTS et CORS_ALLOWED_ORIGINS dynamiquement.
+        Retourne un dict avec le QR base64, l'adresse et un flag 'changed'.
+        """
+        current_ip = cls.get_local_ip()
+
+        # Extraire l'IP stockée (sans le port)
+        old_ip = None
+        port = 8000
+        if cls._server_address:
+            parts = cls._server_address.split(":")
+            old_ip = parts[0]
+            if len(parts) == 2 and parts[1].isdigit():
+                port = int(parts[1])
+
+        changed = current_ip != old_ip
+
+        if changed:
+            # Régénérer le QR code avec la nouvelle IP
+            cls.generate_server_qr(port=port)
+
+            # Mettre à jour ALLOWED_HOSTS dynamiquement
+            if current_ip not in settings.ALLOWED_HOSTS:
+                settings.ALLOWED_HOSTS.append(current_ip)
+
+            # Mettre à jour CORS_ALLOWED_ORIGINS si configuré
+            cors_origins = getattr(settings, "CORS_ALLOWED_ORIGINS", None)
+            if cors_origins is not None and current_ip not in cors_origins:
+                cors_origins.append(current_ip)
+
+        return {
+            "qr_base64": cls._qr_base64,
+            "server_address": cls._server_address,
+            "changed": changed,
+        }
+
+    @classmethod
     def get_qr_base64(cls) -> str:
         """Retourne le QR code en base64 (ou None si pas encore généré)."""
         return cls._qr_base64
