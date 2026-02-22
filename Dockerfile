@@ -52,6 +52,60 @@
 # ==============================
 # Stage 1 : Builder
 # ==============================
+# FROM python:3.11-slim AS builder
+
+# ENV PYTHONDONTWRITEBYTECODE=1 \
+#     PYTHONUNBUFFERED=1
+
+# WORKDIR /app
+
+# # Dépendances build uniquement
+# RUN apt-get update && apt-get install -y \
+#     gcc \
+#     default-libmysqlclient-dev \
+#     pkg-config \
+#     && rm -rf /var/lib/apt/lists/*
+
+# COPY requirements.txt .
+
+# RUN pip install --upgrade pip
+# RUN pip wheel --no-cache-dir --no-deps -r requirements.txt
+
+# # ==============================
+# # Stage 2 : Runtime (image finale)
+# # ==============================
+# FROM python:3.11-slim
+
+# ENV PYTHONDONTWRITEBYTECODE=1 \
+#     PYTHONUNBUFFERED=1
+
+# WORKDIR /app
+
+# # Seulement les libs runtime
+# RUN apt-get update && apt-get install -y \
+#     default-libmysqlclient-dev \
+#     netcat-traditional \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Copier les wheels compilés
+# COPY --from=builder /app /wheels
+
+# RUN pip install --no-cache /wheels/*
+
+# # Copier le projet
+# COPY . .
+
+# EXPOSE 8000
+
+# ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "blanco.wsgi:application"]
+
+
+
+
+# ==============================
+# Stage 1 : Builder
+# ==============================
 FROM python:3.11-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -59,7 +113,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dépendances build uniquement
 RUN apt-get update && apt-get install -y \
     gcc \
     default-libmysqlclient-dev \
@@ -69,10 +122,15 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 RUN pip install --upgrade pip
-RUN pip wheel --no-cache-dir --no-deps -r requirements.txt
+
+# Créer un dossier wheels propre
+RUN mkdir /wheels
+
+# Build uniquement les wheels
+RUN pip wheel --no-cache-dir --wheel-dir=/wheels -r requirements.txt
 
 # ==============================
-# Stage 2 : Runtime (image finale)
+# Stage 2 : Runtime
 # ==============================
 FROM python:3.11-slim
 
@@ -81,16 +139,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Seulement les libs runtime
 RUN apt-get update && apt-get install -y \
     default-libmysqlclient-dev \
     netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
-# Copier les wheels compilés
-COPY --from=builder /app /wheels
+# Copier uniquement les wheels
+COPY --from=builder /wheels /wheels
 
-RUN pip install --no-cache /wheels/*
+# Installer uniquement les wheels
+RUN pip install --no-cache-dir /wheels/*
 
 # Copier le projet
 COPY . .
