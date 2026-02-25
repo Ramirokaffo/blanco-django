@@ -54,10 +54,11 @@ class ClientAdmin(admin.ModelAdmin):
 
 @admin.register(Supplier)
 class SupplierAdmin(admin.ModelAdmin):
-    list_display = ('get_full_name', 'phone_number', 'email', 'gender', 'create_at')
-    list_filter = ('gender', 'create_at')
-    search_fields = ('firstname', 'lastname', 'phone_number', 'email')
-    ordering = ('-create_at',)
+    list_display = ('name', 'contact_phone', 'contact_email', 'niu', 'create_at')
+    list_filter = ('create_at',)
+    search_fields = ('name', 'contact_phone', 'contact_email', 'niu')
+    ordering = ('name',)
+    readonly_fields = ('create_at', 'delete_at',)
 
 
 # Product Models Admin
@@ -154,7 +155,7 @@ class RefundAdmin(admin.ModelAdmin):
 class SupplyAdmin(admin.ModelAdmin):
     list_display = ('product', 'supplier', 'quantity', 'unit_price', 'total_price', 'expiration_date', 'create_at')
     list_filter = ('expiration_date', 'create_at')
-    search_fields = ('product__name', 'supplier__firstname', 'supplier__lastname')
+    search_fields = ('product__name', 'supplier__name')
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
 

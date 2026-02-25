@@ -21,7 +21,7 @@ class SupplyForm(forms.ModelForm):
     )
 
     supplier = forms.ModelChoiceField(
-        queryset=Supplier.objects.filter(delete_at__isnull=True).order_by('firstname'),
+        queryset=Supplier.objects.filter(delete_at__isnull=True).order_by('name'),
         label='Fournisseur',
         required=False,
         empty_label='-- Aucun fournisseur --',
@@ -292,42 +292,53 @@ class DataMigrationForm(forms.Form):
 
 
 class SupplierForm(forms.ModelForm):
-    """Formulaire de création/modification de fournisseur."""
+    """Formulaire de création/modification de fournisseur (entreprise)."""
 
-    firstname = forms.CharField(
-        label='Prénom',
+    name = forms.CharField(
+        label="Nom de l'entreprise",
         max_length=255,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Prénom du fournisseur'}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': "Nom de l'entreprise"}),
     )
 
-    lastname = forms.CharField(
-        label='Nom',
-        max_length=255,
+    address = forms.CharField(
+        label='Adresse',
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nom du fournisseur'}),
+        widget=forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Adresse du fournisseur', 'rows': 2}),
     )
 
-    phone_number = forms.CharField(
+    niu = forms.CharField(
+        label='NIU',
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Numéro d\'Identifiant Unique'}),
+    )
+
+    contact_phone = forms.CharField(
         label='Téléphone',
         max_length=50,
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 6XXXXXXXX'}),
     )
 
-    email = forms.EmailField(
+    contact_email = forms.EmailField(
         label='Email',
         required=False,
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@exemple.com'}),
     )
 
-    gender = forms.ChoiceField(
-        label='Genre',
-        choices=GENDER_CHOICES,
+    website = forms.URLField(
+        label='Site web',
         required=False,
-        widget=forms.Select(attrs={'class': 'form-control'}),
+        widget=forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://www.exemple.com'}),
+    )
+
+    description = forms.CharField(
+        label='Description',
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Description du fournisseur', 'rows': 3}),
     )
 
     class Meta:
         model = Supplier
-        fields = ['firstname', 'lastname', 'phone_number', 'email', 'gender']
+        fields = ['name', 'address', 'niu', 'contact_phone', 'contact_email', 'website', 'description']
 

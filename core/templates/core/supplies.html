@@ -50,7 +50,7 @@
                 <select name="supplier" class="form-control">
                     <option value="">Tous</option>
                     {% for s in suppliers %}
-                    <option value="{{ s.id }}" {% if current_supplier == s.id|stringformat:"d" %}selected{% endif %}>{{ s.get_full_name }}</option>
+                    <option value="{{ s.id }}" {% if current_supplier == s.id|stringformat:"d" %}selected{% endif %}>{{ s.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -108,7 +108,7 @@
                     <tr>
                         <td class="supply-date">{{ supply.create_at|date:"d/m/Y H:i" }}</td>
                         <td class="supply-product">{{ supply.product.name }}</td>
-                        <td>{{ supply.supplier.get_full_name|default:"-" }}</td>
+                        <td>{{ supply.supplier.name|default:"-" }}</td>
                         <td class="text-right">{{ supply.quantity }}</td>
                         <td class="text-right">{{ supply.unit_price|floatformat:0 }} FCFA</td>
                         <td class="text-right supply-total">{{ supply.total_price|floatformat:0 }} FCFA</td>

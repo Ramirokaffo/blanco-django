@@ -662,19 +662,12 @@ def inventory_history(request):
 
 @login_required
 def contacts(request):
-    """Vue combinée : Clients, Fournisseurs, Personnel avec sous-onglets"""
+    """Vue combinée : Clients et Personnel avec sous-onglets"""
     tab = request.GET.get('tab', 'clients')
     search = request.GET.get('search', '').strip()
     page_number = request.GET.get('page', 1)
 
-    if tab == 'suppliers':
-        queryset = Supplier.objects.filter(delete_at__isnull=True)
-        if search:
-            queryset = queryset.filter(
-                Q(firstname__icontains=search) | Q(lastname__icontains=search) | Q(phone_number__icontains=search)
-            )
-        queryset = queryset.order_by('firstname', 'lastname')
-    elif tab == 'staff':
+    if tab == 'staff':
         queryset = CustomUser.objects.filter(delete_at__isnull=True, is_active=True)
         if search:
             queryset = queryset.filter(
@@ -702,6 +695,32 @@ def contacts(request):
         'total_count': paginator.count,
     }
     return render(request, 'core/contacts.html', context)
+
+
+@login_required
+def suppliers_list(request):
+    """Vue de la page Fournisseurs dédiée avec liste, recherche, pagination"""
+    search = request.GET.get('search', '').strip()
+    page_number = request.GET.get('page', 1)
+
+    queryset = Supplier.objects.filter(delete_at__isnull=True)
+    if search:
+        queryset = queryset.filter(
+            Q(name__icontains=search) | Q(contact_phone__icontains=search) | Q(niu__icontains=search)
+        )
+    queryset = queryset.order_by('name')
+
+    paginator = Paginator(queryset, 20)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': 'Fournisseurs',
+        'current_search': search,
+        'page_obj': page_obj,
+        'suppliers': page_obj.object_list,
+        'total_count': paginator.count,
+    }
+    return render(request, 'core/suppliers.html', context)
 
 
 @login_required
@@ -759,8 +778,8 @@ def add_supplier(request):
         form = SupplierForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Fournisseur "{form.cleaned_data["firstname"]}" créé avec succès.')
-            return redirect('/contacts/?tab=suppliers')
+            messages.success(request, f'Fournisseur "{form.cleaned_data["name"]}" créé avec succès.')
+            return redirect('suppliers')
     else:
         form = SupplierForm()
 
@@ -769,10 +788,9 @@ def add_supplier(request):
         'form': form,
         'form_title': 'Nouveau fournisseur',
         'form_subtitle': 'Créer un nouveau fournisseur',
-        'back_url': 'contacts',
-        'back_tab': 'suppliers',
+        'back_url': 'suppliers',
     }
-    return render(request, 'core/contacts_form.html', context)
+    return render(request, 'core/supplier_form.html', context)
 
 
 @login_required
@@ -784,20 +802,19 @@ def edit_supplier(request, pk):
         form = SupplierForm(request.POST, instance=supplier)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Fournisseur "{supplier.get_full_name()}" modifié avec succès.')
-            return redirect('/contacts/?tab=suppliers')
+            messages.success(request, f'Fournisseur "{supplier.name}" modifié avec succès.')
+            return redirect('suppliers')
     else:
         form = SupplierForm(instance=supplier)
 
     context = {
-        'page_title': f'Modifier {supplier.get_full_name()}',
+        'page_title': f'Modifier {supplier.name}',
         'form': form,
         'form_title': 'Modifier le fournisseur',
-        'form_subtitle': f'Modifier les informations de {supplier.get_full_name()}',
-        'back_url': 'contacts',
-        'back_tab': 'suppliers',
+        'form_subtitle': f'Modifier les informations de {supplier.name}',
+        'back_url': 'suppliers',
     }
-    return render(request, 'core/contacts_form.html', context)
+    return render(request, 'core/supplier_form.html', context)
 
 
 @login_required
@@ -829,13 +846,13 @@ def supplies(request):
     paginator = Paginator(queryset, 20)
     page_obj = paginator.get_page(page_number)
 
-    suppliers_list = Supplier.objects.filter(delete_at__isnull=True).order_by('firstname')
+    suppliers_for_filter = Supplier.objects.filter(delete_at__isnull=True).order_by('name')
 
     context = {
         'page_title': 'Approvisionnement',
         'page_obj': page_obj,
         'supplies': page_obj.object_list,
-        'suppliers': suppliers_list,
+        'suppliers': suppliers_for_filter,
         'current_search': search,
         'current_supplier': supplier_id,
         'current_date_from': date_from,

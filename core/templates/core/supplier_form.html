@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ form_title }} - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/contacts.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>{{ form_title }}</h1>
+            <p class="text-secondary">{{ form_subtitle }}</p>
+        </div>
+        <a href="{% url back_url %}" class="btn btn-secondary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retour à la liste
+        </a>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Formulaire -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Informations de l'entreprise</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" class="contact-form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="form-errors">
+                {% for error in form.non_field_errors %}
+                <div class="alert alert-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <!-- Nom de l'entreprise -->
+                <div class="form-group" style="grid-column: span 2;">
+                    <label class="form-label" for="id_name">{{ form.name.label }} <span class="required">*</span></label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                    <div class="field-error">{{ form.name.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- NIU -->
+                <div class="form-group">
+                    <label class="form-label" for="id_niu">{{ form.niu.label }}</label>
+                    {{ form.niu }}
+                    {% if form.niu.errors %}
+                    <div class="field-error">{{ form.niu.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Téléphone -->
+                <div class="form-group">
+                    <label class="form-label" for="id_contact_phone">{{ form.contact_phone.label }}</label>
+                    {{ form.contact_phone }}
+                    {% if form.contact_phone.errors %}
+                    <div class="field-error">{{ form.contact_phone.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Email -->
+                <div class="form-group">
+                    <label class="form-label" for="id_contact_email">{{ form.contact_email.label }}</label>
+                    {{ form.contact_email }}
+                    {% if form.contact_email.errors %}
+                    <div class="field-error">{{ form.contact_email.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Site web -->
+                <div class="form-group">
+                    <label class="form-label" for="id_website">{{ form.website.label }}</label>
+                    {{ form.website }}
+                    {% if form.website.errors %}
+                    <div class="field-error">{{ form.website.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Adresse -->
+                <div class="form-group" style="grid-column: span 2;">
+                    <label class="form-label" for="id_address">{{ form.address.label }}</label>
+                    {{ form.address }}
+                    {% if form.address.errors %}
+                    <div class="field-error">{{ form.address.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Description -->
+                <div class="form-group" style="grid-column: span 2;">
+                    <label class="form-label" for="id_description">{{ form.description.label }}</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                    <div class="field-error">{{ form.description.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2"/>
+                        <polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2"/>
+                        <polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    Enregistrer
+                </button>
+                <a href="{% url back_url %}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

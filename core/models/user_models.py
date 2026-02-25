@@ -56,18 +56,26 @@ class Client(BaseUser):
         return self.get_full_name() or f"Client #{self.id}"
 
 
-class Supplier(BaseUser):
+class Supplier(models.Model):
     """
-    Supplier model for managing product suppliers.
+    Supplier model representing a company/business that supplies products.
     """
-    gender = models.CharField(max_length=10, null=True, blank=True)
-    
+    name = models.CharField(max_length=255, verbose_name="Nom de l'entreprise", default="Fournisseur")
+    address = models.TextField(null=True, blank=True, verbose_name="Adresse")
+    niu = models.CharField(max_length=100, null=True, blank=True, verbose_name="NIU")
+    contact_phone = models.CharField(max_length=50, null=True, blank=True, verbose_name="Téléphone")
+    contact_email = models.EmailField(max_length=255, null=True, blank=True, verbose_name="Email")
+    website = models.URLField(max_length=255, null=True, blank=True, verbose_name="Site web")
+    description = models.TextField(null=True, blank=True, verbose_name="Description")
+    create_at = models.DateTimeField(auto_now_add=True)
+    delete_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         db_table = 'supplier'
-        # managed = False
         verbose_name = 'Fournisseur'
         verbose_name_plural = 'Fournisseurs'
-    
+        ordering = ['name']
+
     def __str__(self):
-        return self.get_full_name() or f"Fournisseur #{self.id}"
+        return self.name or f"Fournisseur #{self.id}"
 

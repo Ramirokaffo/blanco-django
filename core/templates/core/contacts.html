@@ -12,7 +12,7 @@
     <div class="header-content">
         <div>
             <h1>Utilisateurs</h1>
-            <p class="text-secondary">Clients, Fournisseurs et Personnel ({{ total_count }} enregistrement{{ total_count|pluralize }})</p>
+            <p class="text-secondary">Clients et Personnel ({{ total_count }} enregistrement{{ total_count|pluralize }})</p>
         </div>
         {% if current_tab == 'clients' %}
         <a href="{% url 'add_client' %}" class="btn btn-primary btn-sm">
@@ -20,13 +20,6 @@
                 <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
             Nouveau client
-        </a>
-        {% elif current_tab == 'suppliers' %}
-        <a href="{% url 'add_supplier' %}" class="btn btn-primary btn-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            Nouveau fournisseur
         </a>
         {% endif %}
     </div>
@@ -51,14 +44,6 @@
             <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
         </svg>
         Clients
-    </a>
-    <a href="{% url 'contacts' %}?tab=suppliers" class="sub-tab {% if current_tab == 'suppliers' %}active{% endif %}">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2"/>
-            <circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-            <polyline points="17 11 19 13 23 9" stroke="currentColor" stroke-width="2"/>
-        </svg>
-        Fournisseurs
     </a>
     <a href="{% url 'contacts' %}?tab=staff" class="sub-tab {% if current_tab == 'staff' %}active{% endif %}">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -96,7 +81,6 @@
     <div class="card-header">
         <h3 class="card-title">
             {% if current_tab == 'clients' %}Liste des clients
-            {% elif current_tab == 'suppliers' %}Liste des fournisseurs
             {% else %}Liste du personnel{% endif %}
         </h3>
         <div class="pagination-info-header">
@@ -139,15 +123,6 @@
                         {% if current_tab == 'clients' %}
                         <td class="text-center">
                             <a href="{% url 'edit_client' item.id %}" class="btn-icon" title="Modifier">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                </svg>
-                            </a>
-                        </td>
-                        {% elif current_tab == 'suppliers' %}
-                        <td class="text-center">
-                            <a href="{% url 'edit_supplier' item.id %}" class="btn-icon" title="Modifier">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
