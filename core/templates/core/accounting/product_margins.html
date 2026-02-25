@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Marge par produit - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Marge par produit</h1>
+            <p class="text-secondary">Exercice : {{ exercise }} — Marge globale : {{ total_margin_pct|floatformat:1 }}%</p>
+        </div>
+        <div>
+            <a href="{% url 'export_report_csv' 'product_margins' %}" class="btn btn-secondary btn-sm">⬇ Export CSV</a>
+            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">Rapports</a>
+        </div>
+    </div>
+</div>
+
+<!-- Résumé -->
+<div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1.25rem;">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Chiffre d'affaires</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">{{ total_ca|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
+    </div>
+    <div class="card" style="padding: 1.25rem;">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Coût d'achat total</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger, #e74c3c);">{{ total_cost|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
+    </div>
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--success, #28a745);">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Marge brute totale</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--success, #28a745);">{{ total_margin|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">{{ total_margin_pct|floatformat:1 }}%</div>
+    </div>
+</div>
+
+<!-- Tableau -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Détail par produit</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Produit</th>
+                        <th class="text-right">Qté vendue</th>
+                        <th class="text-right">CA (FCFA)</th>
+                        <th class="text-right">Prix achat</th>
+                        <th class="text-right">Coût total</th>
+                        <th class="text-right">Marge</th>
+                        <th class="text-right">Marge %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.product.name }}</td>
+                        <td class="text-right">{{ item.qty_sold }}</td>
+                        <td class="text-right">{{ item.revenue|floatformat:0 }}</td>
+                        <td class="text-right">{{ item.purchase_price|floatformat:0 }}</td>
+                        <td class="text-right">{{ item.cost|floatformat:0 }}</td>
+                        <td class="text-right" style="color: {% if item.margin >= 0 %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %}; font-weight: 600;">
+                            {{ item.margin|floatformat:0 }}
+                        </td>
+                        <td class="text-right">
+                            <span class="badge {% if item.margin_pct >= 30 %}badge-success{% elif item.margin_pct >= 15 %}badge-warning{% else %}badge-danger{% endif %}">
+                                {{ item.margin_pct|floatformat:1 }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-center">Aucun produit vendu</td></tr>
+                    {% endfor %}
+                </tbody>
+                {% if items %}
+                <tfoot>
+                    <tr style="font-weight: bold; border-top: 2px solid var(--border-color, #dee2e6);">
+                        <td>TOTAUX</td>
+                        <td class="text-right"></td>
+                        <td class="text-right">{{ total_ca|floatformat:0 }}</td>
+                        <td class="text-right"></td>
+                        <td class="text-right">{{ total_cost|floatformat:0 }}</td>
+                        <td class="text-right" style="color: var(--success, #28a745);">{{ total_margin|floatformat:0 }}</td>
+                        <td class="text-right">{{ total_margin_pct|floatformat:1 }}%</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

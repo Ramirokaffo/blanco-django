@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Clôture d'exercice - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>📅 Clôture d'exercice</h1>
+            <p class="text-secondary">Exercice en cours : {{ exercise }}</p>
+        </div>
+        <div>
+            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">Rapports</a>
+        </div>
+    </div>
+</div>
+
+{% if messages %}
+<div style="margin-bottom: 1rem;">
+    {% for message in messages %}
+    <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-danger{% else %}alert-info{% endif %}" style="padding: 1rem; border-radius: 0.5rem; margin-bottom: 0.5rem;">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Situation actuelle -->
+<div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--success, #28a745);">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Total Produits (classe 7)</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--success, #28a745);">{{ total_produits|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
+    </div>
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--danger, #e74c3c);">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Total Charges (classe 6)</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger, #e74c3c);">{{ total_charges|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
+    </div>
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid {% if resultat_net >= 0 %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Résultat de l'exercice</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: {% if resultat_net >= 0 %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">
+            {{ resultat_net|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">{% if resultat_net >= 0 %}Bénéfice{% else %}Perte{% endif %}</div>
+    </div>
+</div>
+
+<!-- Action de clôture -->
+{% if exercise.is_active %}
+<div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; border: 2px solid var(--danger, #e74c3c);">
+    <h2 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--danger, #e74c3c);">⚠️ Clôturer l'exercice en cours</h2>
+    <p style="font-size: 0.9rem; color: var(--text-secondary, #6c757d); margin-bottom: 1rem;">
+        Cette action est <strong>irréversible</strong>. Elle va :
+    </p>
+    <ul style="font-size: 0.9rem; color: var(--text-secondary, #6c757d); margin-bottom: 1.5rem; padding-left: 1.5rem;">
+        <li>Solder tous les comptes de charges (classe 6) et produits (classe 7)</li>
+        <li>Constater le résultat sur le compte 12 (Résultat de l'exercice)</li>
+        <li>Créer un nouvel exercice avec report à nouveau des comptes de bilan (classes 1-5)</li>
+        <li>Reporter le résultat vers le compte 131 (bénéfice) ou 139 (perte)</li>
+    </ul>
+    <form method="post" action="{% url 'close_exercise_action' %}" onsubmit="return confirm('Êtes-vous sûr de vouloir clôturer cet exercice ? Cette action est irréversible.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">🔒 Clôturer l'exercice</button>
+    </form>
+</div>
+{% else %}
+<div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; background: var(--bg-secondary, #f8f9fa);">
+    <p style="font-size: 0.95rem; color: var(--text-secondary, #6c757d);">
+        ✅ Cet exercice est déjà clôturé.
+    </p>
+</div>
+{% endif %}
+
+<!-- Historique des clôtures -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Historique des clôtures</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Exercice</th>
+                    <th>Date de clôture</th>
+                    <th>Clôturé par</th>
+                    <th class="text-right">Résultat</th>
+                    <th>Nouvel exercice</th>
+                    <th>Écriture de clôture</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in closings %}
+                <tr>
+                    <td>{{ c.exercise }}</td>
+                    <td>{{ c.closed_at|date:"d/m/Y H:i" }}</td>
+                    <td>{{ c.closed_by|default:"-" }}</td>
+                    <td class="text-right" style="font-weight: 600; color: {% if c.result_amount >= 0 %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">
+                        {{ c.result_amount|floatformat:0 }} FCFA
+                    </td>
+                    <td>{{ c.new_exercise|default:"-" }}</td>
+                    <td>{{ c.closing_entry.reference|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-secondary">Aucune clôture effectuée</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Note explicative -->
+<div class="card" style="margin-top: 1rem; padding: 1.25rem; background: var(--bg-secondary, #f8f9fa);">
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">📌 Processus de clôture OHADA</h3>
+    <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.9rem; color: var(--text-secondary, #6c757d);">
+        <li><strong>Clôture</strong> : Les comptes de gestion (6 et 7) sont soldés vers le compte 12</li>
+        <li><strong>Report à nouveau</strong> : Les soldes des comptes de bilan (1-5) sont reportés au nouvel exercice</li>
+        <li><strong>Affectation du résultat</strong> : Le résultat (compte 12) est transféré en report à nouveau (131/139)</li>
+    </ul>
+</div>
+{% endblock %}
+

@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Journal comptable - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Journal comptable</h1>
+            <p class="text-secondary">{{ total_count }} écriture{{ total_count|pluralize }} — Débit : {{ total_debit|floatformat:0 }} FCFA | Crédit : {{ total_credit|floatformat:0 }} FCFA</p>
+        </div>
+        <div>
+            <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
+            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Grand Livre</a>
+            <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
+        </div>
+    </div>
+</div>
+
+<!-- Barre de filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'accounting_journal' %}" class="filters-form">
+        <div class="filters-row">
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Référence ou libellé..." value="{{ current_search }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Journal</label>
+                <select name="journal" class="form-control">
+                    <option value="">Tous</option>
+                    {% for code, label in journal_choices %}
+                    <option value="{{ code }}" {% if current_journal == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Date début</label>
+                <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Date fin</label>
+                <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau des écritures -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Écritures comptables</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Référence</th>
+                        <th>Journal</th>
+                        <th>Libellé</th>
+                        <th>Compte</th>
+                        <th class="text-right">Débit</th>
+                        <th class="text-right">Crédit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                        {% for line in entry.lines.all %}
+                        <tr{% if forloop.first %} style="border-top: 2px solid var(--border-color, #dee2e6);"{% endif %}>
+                            {% if forloop.first %}
+                            <td rowspan="{{ entry.lines.count }}">{{ entry.date|date:"d/m/Y" }}</td>
+                            <td rowspan="{{ entry.lines.count }}"><small>{{ entry.reference }}</small></td>
+                            <td rowspan="{{ entry.lines.count }}">{{ entry.get_journal_display }}</td>
+                            <td rowspan="{{ entry.lines.count }}">{{ entry.description|truncatewords:10 }}</td>
+                            {% endif %}
+                            <td>{{ line.account.code }} - {{ line.account.name }}</td>
+                            <td class="text-right">{% if line.debit > 0 %}{{ line.debit|floatformat:0 }}{% endif %}</td>
+                            <td class="text-right">{% if line.credit > 0 %}{{ line.credit|floatformat:0 }}{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center">Aucune écriture trouvée</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+            </div>
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">&lsaquo;</a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">&rsaquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

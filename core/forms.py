@@ -6,7 +6,10 @@ from django import forms
 from core.models.inventory_models import Supply, Inventory
 from core.models.product_models import Product
 from core.models.user_models import Supplier
-from core.models.accounting_models import DailyExpense, ExpenseType
+from core.models.accounting_models import (
+    DailyExpense, ExpenseType, Payment, SupplierPayment,
+    PAYMENT_METHOD_CHOICES,
+)
 from core.models.user_models import Client
 
 
@@ -55,6 +58,19 @@ class SupplyForm(forms.ModelForm):
         label="Date d'expiration",
         required=False,
         widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+    )
+
+    payment_method = forms.ChoiceField(
+        label='Mode de paiement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    is_credit = forms.BooleanField(
+        label='Achat à crédit',
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     )
 
     class Meta:
@@ -107,6 +123,13 @@ class ExpenseForm(forms.ModelForm):
             'placeholder': 'Description de la dépense (optionnel)',
             'rows': 3,
         }),
+    )
+
+    payment_method = forms.ChoiceField(
+        label='Mode de paiement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
     )
 
     class Meta:
@@ -342,3 +365,115 @@ class SupplierForm(forms.ModelForm):
         model = Supplier
         fields = ['name', 'address', 'niu', 'contact_phone', 'contact_email', 'website', 'description']
 
+
+
+# ── Formulaires Phase 2 — Paiements ──────────────────────────────────
+
+class PaymentForm(forms.ModelForm):
+    """Formulaire d'enregistrement d'un paiement sur vente à crédit."""
+
+    amount = forms.DecimalField(
+        label='Montant (FCFA)',
+        min_value=1,
+        max_digits=15,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Montant du paiement', 'step': '1'}),
+    )
+
+    payment_method = forms.ChoiceField(
+        label='Mode de paiement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    payment_date = forms.DateField(
+        label='Date de paiement',
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+    )
+
+    reference = forms.CharField(
+        label='Référence (n° chèque, ID transaction...)',
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Référence (optionnel)'}),
+    )
+
+    notes = forms.CharField(
+        label='Notes',
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Notes (optionnel)', 'rows': 2}),
+    )
+
+    class Meta:
+        model = Payment
+        fields = ['amount', 'payment_method', 'payment_date', 'reference', 'notes']
+
+    def __init__(self, *args, credit_sale=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.credit_sale = credit_sale
+        if not self.initial.get('payment_date'):
+            from datetime import date
+            self.initial['payment_date'] = date.today()
+
+    def clean_amount(self):
+        amount = self.cleaned_data.get('amount')
+        if self.credit_sale and amount:
+            if amount > self.credit_sale.amount_remaining:
+                raise forms.ValidationError(
+                    f"Le montant dépasse le solde restant ({self.credit_sale.amount_remaining:,.0f} FCFA)."
+                )
+        return amount
+
+
+class SupplierPaymentForm(forms.ModelForm):
+    """Formulaire d'enregistrement d'un paiement fournisseur."""
+
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.filter(delete_at__isnull=True).order_by('name'),
+        label='Fournisseur',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    amount = forms.DecimalField(
+        label='Montant (FCFA)',
+        min_value=1,
+        max_digits=15,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Montant du paiement', 'step': '1'}),
+    )
+
+    payment_method = forms.ChoiceField(
+        label='Mode de paiement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    payment_date = forms.DateField(
+        label='Date de paiement',
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+    )
+
+    reference = forms.CharField(
+        label='Référence',
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Référence (optionnel)'}),
+    )
+
+    notes = forms.CharField(
+        label='Notes',
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Notes (optionnel)', 'rows': 2}),
+    )
+
+    class Meta:
+        model = SupplierPayment
+        fields = ['supplier', 'amount', 'payment_method', 'payment_date', 'reference', 'notes']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.initial.get('payment_date'):
+            from datetime import date
+            self.initial['payment_date'] = date.today()

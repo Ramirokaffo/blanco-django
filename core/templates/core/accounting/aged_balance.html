@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Balance âgée - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Balance âgée — {{ title }}</h1>
+            <p class="text-secondary">Exercice : {{ exercise }} — Total : {{ grand_total|floatformat:0 }} FCFA</p>
+        </div>
+        <div>
+            <a href="{% url 'export_report_csv' 'aged_balance' %}?type={{ current_type }}" class="btn btn-secondary btn-sm">⬇ Export CSV</a>
+            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">Rapports</a>
+        </div>
+    </div>
+</div>
+
+<!-- Onglets client / fournisseur -->
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+    <a href="{% url 'aged_balance' %}?type=client" class="btn {% if current_type == 'client' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Créances clients</a>
+    <a href="{% url 'aged_balance' %}?type=supplier" class="btn {% if current_type == 'supplier' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Dettes fournisseurs</a>
+</div>
+
+<!-- Résumé par tranche -->
+<div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    {% for tranche in tranches %}
+    <div class="card" style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">{{ tranche }} jours</div>
+        <div style="font-size: 1.3rem; font-weight: 700;">{{ totals|default_if_none:0 }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Tableau détaillé -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Détail</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Tiers</th>
+                        <th>Date</th>
+                        <th>Échéance</th>
+                        <th class="text-right">Jours</th>
+                        <th>Tranche</th>
+                        <th class="text-right">Montant (FCFA)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.reference }}</td>
+                        <td>{{ item.tiers }}</td>
+                        <td>{{ item.date|date:"d/m/Y" }}</td>
+                        <td>{% if item.due_date %}{{ item.due_date|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                        <td class="text-right">{{ item.age_days }}</td>
+                        <td>
+                            <span class="badge {% if item.tranche == '0-30' %}badge-success{% elif item.tranche == '31-60' %}badge-warning{% elif item.tranche == '61-90' %}badge-danger{% else %}badge-dark{% endif %}">
+                                {{ item.tranche }}
+                            </span>
+                        </td>
+                        <td class="text-right">{{ item.amount|floatformat:0 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-center">Aucun élément à afficher</td></tr>
+                    {% endfor %}
+                </tbody>
+                {% if items %}
+                <tfoot>
+                    <tr style="font-weight: bold; border-top: 2px solid var(--border-color, #dee2e6);">
+                        <td colspan="6">TOTAL</td>
+                        <td class="text-right">{{ grand_total|floatformat:0 }} FCFA</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -99,6 +99,10 @@ class SaleCreateSerializer(serializers.Serializer):
     client_id = serializers.IntegerField(required=False, allow_null=True)
     is_credit = serializers.BooleanField(default=False)
     due_date = serializers.DateField(required=False, allow_null=True)
+    payment_method = serializers.ChoiceField(
+        choices=['CASH', 'MOBILE_MONEY', 'BANK_TRANSFER', 'CHECK'],
+        default='CASH', required=False,
+    )
     items = SaleItemCreateSerializer(many=True)
 
     # Alias accepté par l'ancienne app mobile

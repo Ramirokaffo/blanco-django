@@ -15,6 +15,12 @@ from .models import (
     Supply, Inventory, InventorySnapshot, DailyInventory,
     # Accounting models
     Exercise, Daily, ExpenseType, RecipeType, DailyExpense, DailyRecipe, ProductExpense,
+    # Comptabilité (nouveaux modèles)
+    Account, JournalEntry, JournalEntryLine,
+    # Phase 2 — Paiements & Factures
+    Payment, SupplierPayment, Invoice,
+    # Phase 4 — TVA, Rapprochement, Clôture
+    TaxRate, BankStatement, ExerciseClosing,
     # Settings models
     SystemSettings,
 )
@@ -247,6 +253,69 @@ class ProductExpenseAdmin(admin.ModelAdmin):
     readonly_fields = ('create_at', 'delete_at',)
 
 
+# Comptabilité (Plan comptable & Journal)
+class JournalEntryLineInline(admin.TabularInline):
+    model = JournalEntryLine
+    extra = 0
+    readonly_fields = ('create_at',)
+
+
+@admin.register(Account)
+class AccountAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'account_type', 'parent', 'is_active')
+    list_filter = ('account_type', 'is_active')
+    search_fields = ('code', 'name')
+    ordering = ('code',)
+    readonly_fields = ('create_at', 'delete_at',)
+
+
+@admin.register(JournalEntry)
+class JournalEntryAdmin(admin.ModelAdmin):
+    list_display = ('reference', 'date', 'journal', 'description', 'is_validated', 'exercise')
+    list_filter = ('journal', 'is_validated', 'date')
+    search_fields = ('reference', 'description')
+    ordering = ('-date', '-create_at')
+    readonly_fields = ('create_at', 'delete_at',)
+    inlines = [JournalEntryLineInline]
+
+
+@admin.register(JournalEntryLine)
+class JournalEntryLineAdmin(admin.ModelAdmin):
+    list_display = ('entry', 'account', 'debit', 'credit', 'description')
+    list_filter = ('account',)
+    search_fields = ('entry__reference', 'account__code', 'description')
+    ordering = ('-entry__date',)
+    readonly_fields = ('create_at', 'delete_at',)
+
+
+# Phase 2 — Paiements & Factures
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('credit_sale', 'amount', 'payment_method', 'payment_date', 'staff', 'create_at')
+    list_filter = ('payment_method', 'payment_date')
+    search_fields = ('credit_sale__sale__id', 'reference')
+    ordering = ('-payment_date', '-create_at')
+    readonly_fields = ('create_at', 'delete_at',)
+
+
+@admin.register(SupplierPayment)
+class SupplierPaymentAdmin(admin.ModelAdmin):
+    list_display = ('supplier', 'amount', 'payment_method', 'payment_date', 'staff', 'create_at')
+    list_filter = ('payment_method', 'payment_date', 'supplier')
+    search_fields = ('supplier__name', 'reference')
+    ordering = ('-payment_date', '-create_at')
+    readonly_fields = ('create_at', 'delete_at',)
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    list_display = ('invoice_number', 'sale', 'invoice_date', 'due_date', 'status', 'create_at')
+    list_filter = ('status', 'invoice_date')
+    search_fields = ('invoice_number', 'sale__id')
+    ordering = ('-invoice_date', '-create_at')
+    readonly_fields = ('create_at', 'delete_at',)
+
+
 # System Settings Admin
 @admin.register(SystemSettings)
 class SystemSettingsAdmin(admin.ModelAdmin):
@@ -285,3 +354,29 @@ class SystemSettingsAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """Empêcher la suppression de l'instance unique."""
         return False
+
+
+
+# Phase 4 — TVA, Rapprochement, Clôture
+@admin.register(TaxRate)
+class TaxRateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'rate', 'is_default', 'is_active', 'create_at')
+    list_filter = ('is_default', 'is_active')
+    search_fields = ('name',)
+    ordering = ('rate',)
+
+
+@admin.register(BankStatement)
+class BankStatementAdmin(admin.ModelAdmin):
+    list_display = ('statement_date', 'account', 'description', 'amount', 'statement_type', 'is_reconciled', 'create_at')
+    list_filter = ('statement_type', 'is_reconciled', 'account')
+    search_fields = ('description', 'reference')
+    ordering = ('-statement_date',)
+
+
+@admin.register(ExerciseClosing)
+class ExerciseClosingAdmin(admin.ModelAdmin):
+    list_display = ('exercise', 'closed_at', 'closed_by', 'result_amount', 'new_exercise')
+    list_filter = ('closed_at',)
+    search_fields = ('exercise__id',)
+    ordering = ('-closed_at',)

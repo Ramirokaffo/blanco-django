@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Paiement crédit - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>{{ page_title }}</h1>
+            <p class="text-secondary">
+                Client : {% if credit_sale.sale.client %}{{ credit_sale.sale.client.firstname }} {{ credit_sale.sale.client.lastname }}{% else %}N/A{% endif %}
+                — Restant : {{ credit_sale.amount_remaining|floatformat:0 }} FCFA
+            </p>
+        </div>
+        <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Retour
+        </a>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Récapitulatif de la vente -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Détails de la vente à crédit</h3>
+    </div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label">Total vente</label>
+                <p><strong>{{ credit_sale.sale.total|floatformat:0 }} FCFA</strong></p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Déjà payé</label>
+                <p><strong>{{ credit_sale.amount_paid|floatformat:0 }} FCFA</strong></p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Solde restant</label>
+                <p><strong style="color: var(--danger, #e74c3c);">{{ credit_sale.amount_remaining|floatformat:0 }} FCFA</strong></p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Échéance</label>
+                <p>{% if credit_sale.due_date %}{{ credit_sale.due_date|date:"d/m/Y" }}{% else %}Non définie{% endif %}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Formulaire de paiement -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">Enregistrer un paiement</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" class="contact-form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="form-errors">
+                {% for error in form.non_field_errors %}
+                <div class="alert alert-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="id_amount">{{ form.amount.label }} <span class="required">*</span></label>
+                    {{ form.amount }}
+                    {% if form.amount.errors %}<div class="field-error">{{ form.amount.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_payment_method">{{ form.payment_method.label }} <span class="required">*</span></label>
+                    {{ form.payment_method }}
+                    {% if form.payment_method.errors %}<div class="field-error">{{ form.payment_method.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_payment_date">{{ form.payment_date.label }} <span class="required">*</span></label>
+                    {{ form.payment_date }}
+                    {% if form.payment_date.errors %}<div class="field-error">{{ form.payment_date.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_reference">{{ form.reference.label }}</label>
+                    {{ form.reference }}
+                    {% if form.reference.errors %}<div class="field-error">{{ form.reference.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group form-group-full">
+                    <label class="form-label" for="id_notes">{{ form.notes.label }}</label>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}<div class="field-error">{{ form.notes.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer le paiement</button>
+                <a href="{% url 'credit_sales' %}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Historique des paiements -->
+{% if payments %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Historique des paiements</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Mode</th>
+                        <th class="text-right">Montant</th>
+                        <th>Référence</th>
+                        <th>Par</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr>
+                        <td>{{ p.payment_date|date:"d/m/Y" }}</td>
+                        <td>{{ p.get_payment_method_display }}</td>
+                        <td class="text-right">{{ p.amount|floatformat:0 }} FCFA</td>
+                        <td>{{ p.reference|default:"-" }}</td>
+                        <td>{{ p.staff.get_full_name|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+

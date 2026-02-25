@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Compte de résultat - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Compte de résultat</h1>
+            <p class="text-secondary">Exercice : {{ exercise }}</p>
+        </div>
+        <div>
+            <a href="{% url 'export_report_csv' 'income_statement' %}" class="btn btn-secondary btn-sm">⬇ Export CSV</a>
+            <a href="{% url 'balance_sheet' %}" class="btn btn-secondary btn-sm">Bilan</a>
+            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">Rapports</a>
+        </div>
+    </div>
+</div>
+
+<!-- Résumé -->
+<div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--success, #28a745);">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Total Produits</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--success, #28a745);">{{ total_produits|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
+    </div>
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--danger, #e74c3c);">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Total Charges</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger, #e74c3c);">{{ total_charges|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
+    </div>
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid {% if is_benefice %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Résultat net</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: {% if is_benefice %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">
+            {% if is_benefice %}+{% endif %}{{ resultat_net|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">{% if is_benefice %}Bénéfice{% else %}Perte{% endif %}</div>
+    </div>
+</div>
+
+<!-- Produits (classe 7) -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title" style="color: var(--success, #28a745);">Produits (classe 7)</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Intitulé</th>
+                        <th class="text-right">Montant (FCFA)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in produits %}
+                    <tr>
+                        <td>{{ item.account.code }}</td>
+                        <td>{{ item.account.name }}</td>
+                        <td class="text-right">{{ item.balance|floatformat:0 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-center">Aucun produit enregistré</td></tr>
+                    {% endfor %}
+                </tbody>
+                {% if produits %}
+                <tfoot>
+                    <tr style="font-weight: bold; border-top: 2px solid var(--border-color, #dee2e6);">
+                        <td colspan="2">TOTAL PRODUITS</td>
+                        <td class="text-right">{{ total_produits|floatformat:0 }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Charges (classe 6) -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title" style="color: var(--danger, #e74c3c);">Charges (classe 6)</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Intitulé</th>
+                        <th class="text-right">Montant (FCFA)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in charges %}
+                    <tr>
+                        <td>{{ item.account.code }}</td>
+                        <td>{{ item.account.name }}</td>
+                        <td class="text-right">{{ item.balance|floatformat:0 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-center">Aucune charge enregistrée</td></tr>
+                    {% endfor %}
+                </tbody>
+                {% if charges %}
+                <tfoot>
+                    <tr style="font-weight: bold; border-top: 2px solid var(--border-color, #dee2e6);">
+                        <td colspan="2">TOTAL CHARGES</td>
+                        <td class="text-right">{{ total_charges|floatformat:0 }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Résultat -->
+<div class="card">
+    <div class="card-body" style="text-align: center; padding: 2rem;">
+        <h2 style="color: {% if is_benefice %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">
+            {% if is_benefice %}BÉNÉFICE{% else %}PERTE{% endif %} : {% if is_benefice %}+{% endif %}{{ resultat_net|floatformat:0 }} FCFA
+        </h2>
+        <p class="text-secondary">Produits ({{ total_produits|floatformat:0 }}) − Charges ({{ total_charges|floatformat:0 }})</p>
+    </div>
+</div>
+{% endblock %}
+

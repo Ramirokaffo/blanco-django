@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Bilan comptable - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Bilan comptable</h1>
+            <p class="text-secondary">Exercice : {{ exercise }}</p>
+        </div>
+        <div>
+            <a href="{% url 'export_report_csv' 'balance_sheet' %}" class="btn btn-secondary btn-sm">⬇ Export CSV</a>
+            <a href="{% url 'income_statement' %}" class="btn btn-secondary btn-sm">Compte de résultat</a>
+            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">Rapports</a>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+
+    <!-- ACTIF -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title" style="color: var(--primary, #3498db);">ACTIF</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>Compte</th><th class="text-right">Montant</th></tr></thead>
+                    <tbody>
+                        {% if actif_immobilise %}
+                        <tr style="background: var(--bg-secondary, #f8f9fa);"><td colspan="2"><strong>Actif immobilisé</strong></td></tr>
+                        {% for item in actif_immobilise %}
+                        <tr><td>{{ item.account.code }} — {{ item.account.name }}</td><td class="text-right">{{ item.balance|floatformat:0 }}</td></tr>
+                        {% endfor %}
+                        <tr style="font-weight:600;"><td>Sous-total immobilisations</td><td class="text-right">{{ total_immo|floatformat:0 }}</td></tr>
+                        {% endif %}
+
+                        {% if actif_circulant %}
+                        <tr style="background: var(--bg-secondary, #f8f9fa);"><td colspan="2"><strong>Actif circulant</strong></td></tr>
+                        {% for item in actif_circulant %}
+                        <tr><td>{{ item.account.code }} — {{ item.account.name }}</td><td class="text-right">{{ item.balance|floatformat:0 }}</td></tr>
+                        {% endfor %}
+                        <tr style="font-weight:600;"><td>Sous-total circulant</td><td class="text-right">{{ total_circ|floatformat:0 }}</td></tr>
+                        {% endif %}
+
+                        {% if tresorerie_actif %}
+                        <tr style="background: var(--bg-secondary, #f8f9fa);"><td colspan="2"><strong>Trésorerie actif</strong></td></tr>
+                        {% for item in tresorerie_actif %}
+                        <tr><td>{{ item.account.code }} — {{ item.account.name }}</td><td class="text-right">{{ item.balance|floatformat:0 }}</td></tr>
+                        {% endfor %}
+                        <tr style="font-weight:600;"><td>Sous-total trésorerie</td><td class="text-right">{{ total_treso|floatformat:0 }}</td></tr>
+                        {% endif %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight: bold; border-top: 3px solid var(--border-color, #dee2e6); font-size: 1.1em;">
+                            <td>TOTAL ACTIF</td>
+                            <td class="text-right">{{ total_actif|floatformat:0 }} FCFA</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PASSIF -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title" style="color: var(--warning, #f39c12);">PASSIF</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>Compte</th><th class="text-right">Montant</th></tr></thead>
+                    <tbody>
+                        {% if capitaux %}
+                        <tr style="background: var(--bg-secondary, #f8f9fa);"><td colspan="2"><strong>Capitaux propres</strong></td></tr>
+                        {% for item in capitaux %}
+                        <tr><td>{{ item.account.code }} — {{ item.account.name }}</td><td class="text-right">{{ item.balance|floatformat:0 }}</td></tr>
+                        {% endfor %}
+                        <tr style="font-weight:600;"><td>Sous-total capitaux</td><td class="text-right">{{ total_capitaux|floatformat:0 }}</td></tr>
+                        {% endif %}
+
+                        {% if resultat_net %}
+                        <tr style="background: var(--bg-secondary, #f8f9fa);"><td colspan="2"><strong>Résultat de l'exercice</strong></td></tr>
+                        <tr><td>Résultat net</td><td class="text-right" style="color: {% if resultat_net >= 0 %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">{{ resultat_net|floatformat:0 }}</td></tr>
+                        {% endif %}
+
+                        {% if dettes %}
+                        <tr style="background: var(--bg-secondary, #f8f9fa);"><td colspan="2"><strong>Dettes</strong></td></tr>
+                        {% for item in dettes %}
+                        <tr><td>{{ item.account.code }} — {{ item.account.name }}</td><td class="text-right">{{ item.balance|floatformat:0 }}</td></tr>
+                        {% endfor %}
+                        <tr style="font-weight:600;"><td>Sous-total dettes</td><td class="text-right">{{ total_dettes|floatformat:0 }}</td></tr>
+                        {% endif %}
+
+                        {% if tresorerie_passif %}
+                        <tr style="background: var(--bg-secondary, #f8f9fa);"><td colspan="2"><strong>Trésorerie passif</strong></td></tr>
+                        {% for item in tresorerie_passif %}
+                        <tr><td>{{ item.account.code }} — {{ item.account.name }}</td><td class="text-right">{{ item.balance|floatformat:0 }}</td></tr>
+                        {% endfor %}
+                        <tr style="font-weight:600;"><td>Sous-total trésorerie passif</td><td class="text-right">{{ total_treso_passif|floatformat:0 }}</td></tr>
+                        {% endif %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight: bold; border-top: 3px solid var(--border-color, #dee2e6); font-size: 1.1em;">
+                            <td>TOTAL PASSIF</td>
+                            <td class="text-right">{{ total_passif|floatformat:0 }} FCFA</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

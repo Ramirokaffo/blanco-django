@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Factures - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Factures</h1>
+            <p class="text-secondary">{{ total_count }} facture{{ total_count|pluralize }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'invoices' %}" class="filters-form">
+        <div class="filters-row">
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="N° facture ou client..." value="{{ current_search }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Statut</label>
+                <select name="status" class="form-control">
+                    <option value="">Tous</option>
+                    <option value="DRAFT" {% if current_status == 'DRAFT' %}selected{% endif %}>Brouillon</option>
+                    <option value="SENT" {% if current_status == 'SENT' %}selected{% endif %}>Envoyée</option>
+                    <option value="PAID" {% if current_status == 'PAID' %}selected{% endif %}>Payée</option>
+                    <option value="CANCELLED" {% if current_status == 'CANCELLED' %}selected{% endif %}>Annulée</option>
+                </select>
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+            <a href="{% url 'invoices' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Liste des factures</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>N° Facture</th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th class="text-right">Montant</th>
+                        <th>Échéance</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in invoices %}
+                    <tr>
+                        <td><strong>{{ inv.invoice_number }}</strong></td>
+                        <td>{{ inv.invoice_date|date:"d/m/Y" }}</td>
+                        <td>{% if inv.sale.client %}{{ inv.sale.client.firstname }} {{ inv.sale.client.lastname }}{% else %}-{% endif %}</td>
+                        <td class="text-right">{{ inv.sale.total|floatformat:0 }} FCFA</td>
+                        <td>{% if inv.due_date %}{{ inv.due_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+                        <td>
+                            {% if inv.status == 'PAID' %}
+                            <span class="badge badge-success">Payée</span>
+                            {% elif inv.status == 'SENT' %}
+                            <span class="badge badge-info">Envoyée</span>
+                            {% elif inv.status == 'DRAFT' %}
+                            <span class="badge badge-secondary">Brouillon</span>
+                            {% elif inv.status == 'CANCELLED' %}
+                            <span class="badge badge-danger">Annulée</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">Aucune facture trouvée</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+            </div>
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}" class="pagination-btn">&lsaquo;</a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}" class="pagination-btn">&rsaquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

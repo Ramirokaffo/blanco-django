@@ -8,14 +8,22 @@ from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-from core.models.sale_models import Sale, SaleProduct
+from core.models.sale_models import Sale, SaleProduct, CreditSale
 from core.models.user_models import Client, Supplier, CustomUser
-from core.models.accounting_models import Daily, DailyExpense, DailyRecipe, ExpenseType, Exercise
+from core.models.accounting_models import (
+    Daily, DailyExpense, DailyRecipe, ExpenseType, Exercise,
+    Account, Payment, SupplierPayment, Invoice,
+    TaxRate, BankStatement, ExerciseClosing,
+)
 from core.models.product_models import Product, Category, Gamme, Rayon
 from core.models.inventory_models import Supply, Inventory, InventorySnapshot, DailyInventory
 from core.services.daily_service import DailyService
-from core.forms import SupplyForm, ExpenseForm, ClientForm, SupplierForm, InventoryForm, DataMigrationForm
+from core.forms import (
+    SupplyForm, ExpenseForm, ClientForm, SupplierForm, InventoryForm,
+    DataMigrationForm, PaymentForm, SupplierPaymentForm,
+)
 from core.services.excercise_service import ExerciseService
+from core.services.accounting_service import AccountingService
 
 # Create your views here.
 
@@ -874,6 +882,20 @@ def add_supply(request):
             supply.total_price = supply.quantity * supply.unit_price
             supply.save()
 
+            # Enregistrer l'écriture comptable
+            payment_method = form.cleaned_data.get('payment_method', 'CASH')
+            is_credit_purchase = form.cleaned_data.get('is_credit', False)
+            try:
+                AccountingService.record_supply(
+                    supply=supply,
+                    daily=supply.daily,
+                    exercise=supply.daily.exercise,
+                    payment_method=payment_method,
+                    is_credit=is_credit_purchase,
+                )
+            except Exception:
+                pass  # Ne pas bloquer l'approvisionnement si la comptabilité échoue
+
             # Mettre à jour le stock du produit
             product = supply.product
             product.stock = (product.stock or 0) + supply.quantity
@@ -970,6 +992,18 @@ def add_expense(request):
             expense.daily = daily
             expense.exercise = daily.exercise
             expense.save()
+
+            # Enregistrer l'écriture comptable
+            payment_method = form.cleaned_data.get('payment_method', 'CASH')
+            try:
+                AccountingService.record_expense(
+                    expense=expense,
+                    daily=daily,
+                    exercise=daily.exercise,
+                    payment_method=payment_method,
+                )
+            except Exception:
+                pass  # Ne pas bloquer la dépense si la comptabilité échoue
 
             messages.success(request, f'Dépense de {expense.amount:,.0f} FCFA enregistrée avec succès.')
             return redirect('expenses')
@@ -1171,3 +1205,789 @@ def data_migration(request):
         'migration_stats': migration_stats,
     }
     return render(request, 'core/data_migration.html', context)
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VUES COMPTABLES
+# ══════════════════════════════════════════════════════════════════════════════
+
+@login_required
+def accounting_journal(request):
+    """Vue du journal comptable — liste de toutes les écritures."""
+    from core.models.accounting_models import JournalEntry, JournalEntryLine, Account
+
+    # Filtres
+    journal_filter = request.GET.get('journal', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    search = request.GET.get('search', '')
+
+    entries = JournalEntry.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('exercise', 'daily').prefetch_related('lines__account').order_by('-date', '-create_at')
+
+    if journal_filter:
+        entries = entries.filter(journal=journal_filter)
+    if date_from:
+        entries = entries.filter(date__gte=date_from)
+    if date_to:
+        entries = entries.filter(date__lte=date_to)
+    if search:
+        entries = entries.filter(
+            Q(reference__icontains=search) | Q(description__icontains=search)
+        )
+
+    paginator = Paginator(entries, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    # Totaux
+    total_debit = sum(
+        line.debit for entry in page_obj for line in entry.lines.all()
+    )
+    total_credit = sum(
+        line.credit for entry in page_obj for line in entry.lines.all()
+    )
+
+    context = {
+        'page_title': 'Journal comptable',
+        'page_obj': page_obj,
+        'entries': page_obj.object_list,
+        'journal_choices': JournalEntry.JOURNAL_CHOICES,
+        'current_journal': journal_filter,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'current_search': search,
+        'total_count': paginator.count,
+        'total_debit': total_debit,
+        'total_credit': total_credit,
+    }
+    return render(request, 'core/accounting/journal.html', context)
+
+
+@login_required
+def accounting_general_ledger(request):
+    """Vue du grand livre — détail d'un compte avec solde progressif."""
+    from core.models.accounting_models import Account
+
+    accounts = Account.objects.filter(
+        is_active=True, delete_at__isnull=True
+    ).order_by('code')
+
+    account_code = request.GET.get('account', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    selected_account = None
+    ledger_lines = []
+    total_debit = 0
+    total_credit = 0
+    balance = 0
+
+    if account_code:
+        selected_account = Account.objects.filter(code=account_code, delete_at__isnull=True).first()
+        if selected_account:
+            exercise = ExerciseService.get_or_create_current_exercise()
+            ledger_lines = AccountingService.get_general_ledger(selected_account, exercise)
+
+            # Filtrer par date si nécessaire
+            if date_from or date_to:
+                filtered = []
+                from decimal import Decimal
+                running = Decimal('0')
+                for item in ledger_lines:
+                    line = item['line']
+                    entry_date = str(line.entry.date)
+                    if date_from and entry_date < date_from:
+                        continue
+                    if date_to and entry_date > date_to:
+                        continue
+                    if selected_account.account_type in ('ACTIF', 'CHARGE'):
+                        running += line.debit - line.credit
+                    else:
+                        running += line.credit - line.debit
+                    filtered.append({'line': line, 'running_balance': running})
+                ledger_lines = filtered
+
+            total_debit = sum(item['line'].debit for item in ledger_lines)
+            total_credit = sum(item['line'].credit for item in ledger_lines)
+            balance = ledger_lines[-1]['running_balance'] if ledger_lines else 0
+
+    context = {
+        'page_title': 'Grand Livre',
+        'accounts': accounts,
+        'selected_account': selected_account,
+        'ledger_lines': ledger_lines,
+        'current_account': account_code,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'total_debit': total_debit,
+        'total_credit': total_credit,
+        'balance': balance,
+    }
+    return render(request, 'core/accounting/general_ledger.html', context)
+
+
+@login_required
+def accounting_trial_balance(request):
+    """Vue de la balance générale — solde de tous les comptes."""
+    exercise = ExerciseService.get_or_create_current_exercise()
+    trial_balance = AccountingService.get_trial_balance(exercise)
+
+    total_debit = sum(item['total_debit'] for item in trial_balance)
+    total_credit = sum(item['total_credit'] for item in trial_balance)
+
+    context = {
+        'page_title': 'Balance générale',
+        'trial_balance': trial_balance,
+        'exercise': exercise,
+        'total_debit': total_debit,
+        'total_credit': total_credit,
+        'is_balanced': total_debit == total_credit,
+    }
+    return render(request, 'core/accounting/trial_balance.html', context)
+
+
+@login_required
+def accounting_chart_of_accounts(request):
+    """Vue du plan comptable."""
+    from core.models.accounting_models import Account
+
+    accounts = Account.objects.filter(
+        is_active=True, delete_at__isnull=True
+    ).order_by('code')
+
+    # Regrouper par classe
+    classes = {}
+    for account in accounts:
+        class_num = account.code[0] if account.code else '?'
+        class_names = {
+            '1': 'Capitaux',
+            '2': 'Immobilisations',
+            '3': 'Stocks',
+            '4': 'Tiers',
+            '5': 'Trésorerie',
+            '6': 'Charges',
+            '7': 'Produits',
+        }
+        class_label = class_names.get(class_num, 'Autres')
+        if class_num not in classes:
+            classes[class_num] = {'label': class_label, 'accounts': []}
+        classes[class_num]['accounts'].append(account)
+
+    context = {
+        'page_title': 'Plan comptable',
+        'classes': dict(sorted(classes.items())),
+        'total_accounts': accounts.count(),
+    }
+    return render(request, 'core/accounting/chart_of_accounts.html', context)
+
+
+
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  PHASE 2 — Paiements crédits, Paiements fournisseurs, Factures,   ║
+# ║            Tableau de bord trésorerie                              ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+
+@login_required
+def credit_sales_list(request):
+    """Vue listant les ventes à crédit avec leur statut de paiement."""
+    search = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+
+    queryset = CreditSale.objects.select_related(
+        'sale', 'sale__client', 'sale__staff', 'sale__daily',
+    ).filter(
+        delete_at__isnull=True, sale__delete_at__isnull=True,
+    ).order_by('-sale__create_at')
+
+    if search:
+        queryset = queryset.filter(
+            Q(sale__client__firstname__icontains=search)
+            | Q(sale__client__lastname__icontains=search)
+            | Q(sale__id__icontains=search)
+        )
+    if status_filter == 'paid':
+        queryset = queryset.filter(is_fully_paid=True)
+    elif status_filter == 'unpaid':
+        queryset = queryset.filter(is_fully_paid=False)
+
+    total_credit = queryset.aggregate(t=Sum('sale__total'))['t'] or 0
+    total_paid = queryset.aggregate(t=Sum('amount_paid'))['t'] or 0
+    total_remaining = queryset.aggregate(t=Sum('amount_remaining'))['t'] or 0
+
+    paginator = Paginator(queryset, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    context = {
+        'page_title': 'Ventes à crédit',
+        'page_obj': page_obj,
+        'credit_sales': page_obj.object_list,
+        'current_search': search,
+        'current_status': status_filter,
+        'total_count': paginator.count,
+        'total_credit': total_credit,
+        'total_paid': total_paid,
+        'total_remaining': total_remaining,
+    }
+    return render(request, 'core/accounting/credit_sales.html', context)
+
+
+@login_required
+def record_credit_payment(request, credit_sale_id):
+    """Vue pour enregistrer un paiement sur une vente à crédit."""
+    credit_sale = get_object_or_404(
+        CreditSale.objects.select_related('sale', 'sale__client'),
+        id=credit_sale_id, delete_at__isnull=True,
+    )
+
+    if credit_sale.is_fully_paid:
+        messages.warning(request, 'Cette vente à crédit est déjà entièrement payée.')
+        return redirect('credit_sales')
+
+    if request.method == 'POST':
+        form = PaymentForm(request.POST, credit_sale=credit_sale)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.credit_sale = credit_sale
+            payment.staff = request.user
+            daily = DailyService.get_or_create_active_daily()
+            payment.daily = daily
+            payment.save()
+
+            # Mettre à jour le CreditSale
+            credit_sale.amount_paid += payment.amount
+            credit_sale.amount_remaining -= payment.amount
+            if credit_sale.amount_remaining <= 0:
+                credit_sale.amount_remaining = 0
+                credit_sale.is_fully_paid = True
+                credit_sale.sale.is_paid = True
+                credit_sale.sale.save(update_fields=['is_paid'])
+            credit_sale.save(update_fields=['amount_paid', 'amount_remaining', 'is_fully_paid'])
+
+            # Écriture comptable
+            try:
+                exercise = daily.exercise if daily else ExerciseService.get_or_create_current_exercise()
+                AccountingService.record_credit_payment(
+                    payment=payment,
+                    daily=daily,
+                    exercise=exercise,
+                )
+            except Exception:
+                pass
+
+            messages.success(
+                request,
+                f'Paiement de {payment.amount:,.0f} FCFA enregistré. '
+                f'Solde restant : {credit_sale.amount_remaining:,.0f} FCFA.'
+            )
+            return redirect('credit_sales')
+    else:
+        form = PaymentForm(credit_sale=credit_sale)
+
+    # Historique des paiements sur cette vente
+    payments = credit_sale.payments.filter(delete_at__isnull=True).order_by('-payment_date')
+
+    context = {
+        'page_title': f'Paiement – Vente #{credit_sale.sale_id}',
+        'form': form,
+        'credit_sale': credit_sale,
+        'payments': payments,
+    }
+    return render(request, 'core/accounting/record_payment.html', context)
+
+
+@login_required
+def supplier_payments_list(request):
+    """Vue listant les paiements fournisseurs."""
+    search = request.GET.get('search', '')
+    supplier_id = request.GET.get('supplier', '')
+
+    queryset = SupplierPayment.objects.select_related(
+        'supplier', 'supply', 'staff', 'daily',
+    ).filter(delete_at__isnull=True).order_by('-payment_date', '-create_at')
+
+    if search:
+        queryset = queryset.filter(
+            Q(supplier__name__icontains=search)
+            | Q(reference__icontains=search)
+        )
+    if supplier_id:
+        queryset = queryset.filter(supplier_id=supplier_id)
+
+    total_amount = queryset.aggregate(t=Sum('amount'))['t'] or 0
+
+    paginator = Paginator(queryset, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    suppliers = Supplier.objects.filter(delete_at__isnull=True).order_by('name')
+
+    context = {
+        'page_title': 'Paiements fournisseurs',
+        'page_obj': page_obj,
+        'supplier_payments': page_obj.object_list,
+        'suppliers': suppliers,
+        'current_search': search,
+        'current_supplier': supplier_id,
+        'total_count': paginator.count,
+        'total_amount': total_amount,
+    }
+    return render(request, 'core/accounting/supplier_payments.html', context)
+
+
+@login_required
+def add_supplier_payment(request):
+    """Vue pour enregistrer un paiement fournisseur."""
+    if request.method == 'POST':
+        form = SupplierPaymentForm(request.POST)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.staff = request.user
+            daily = DailyService.get_or_create_active_daily()
+            payment.daily = daily
+            payment.save()
+
+            # Écriture comptable
+            try:
+                exercise = daily.exercise if daily else ExerciseService.get_or_create_current_exercise()
+                AccountingService.record_supplier_payment(
+                    supplier_payment=payment,
+                    daily=daily,
+                    exercise=exercise,
+                )
+            except Exception:
+                pass
+
+            messages.success(
+                request,
+                f'Paiement de {payment.amount:,.0f} FCFA à {payment.supplier.name} enregistré.'
+            )
+            return redirect('supplier_payments')
+    else:
+        form = SupplierPaymentForm()
+
+    context = {
+        'page_title': 'Nouveau paiement fournisseur',
+        'form': form,
+    }
+    return render(request, 'core/accounting/add_supplier_payment.html', context)
+
+
+@login_required
+def invoices_list(request):
+    """Vue listant les factures."""
+    search = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+
+    queryset = Invoice.objects.select_related(
+        'sale', 'sale__client', 'sale__staff',
+    ).filter(delete_at__isnull=True).order_by('-invoice_date', '-create_at')
+
+    if search:
+        queryset = queryset.filter(
+            Q(invoice_number__icontains=search)
+            | Q(sale__client__firstname__icontains=search)
+            | Q(sale__client__lastname__icontains=search)
+        )
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+
+    paginator = Paginator(queryset, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    context = {
+        'page_title': 'Factures',
+        'page_obj': page_obj,
+        'invoices': page_obj.object_list,
+        'current_search': search,
+        'current_status': status_filter,
+        'total_count': paginator.count,
+    }
+    return render(request, 'core/accounting/invoices.html', context)
+
+
+@login_required
+def generate_invoice(request, sale_id):
+    """Génère une facture pour une vente."""
+    sale = get_object_or_404(Sale, id=sale_id, delete_at__isnull=True)
+
+    # Vérifier qu'il n'y a pas déjà une facture
+    if hasattr(sale, 'invoice') and sale.invoice and sale.invoice.delete_at is None:
+        messages.info(request, f'Facture {sale.invoice.invoice_number} existe déjà pour cette vente.')
+        return redirect('invoices')
+
+    invoice = Invoice.objects.create(
+        sale=sale,
+        invoice_number=Invoice.generate_invoice_number(),
+        invoice_date=timezone.now().date(),
+        due_date=getattr(sale, 'credit_info', None) and sale.credit_info.due_date,
+        status='PAID' if sale.is_paid else 'SENT',
+    )
+
+    messages.success(request, f'Facture {invoice.invoice_number} générée avec succès.')
+    return redirect('invoices')
+
+
+@login_required
+def treasury_dashboard(request):
+    """Tableau de bord de la trésorerie — solde de chaque compte de trésorerie."""
+    from decimal import Decimal
+
+    exercise = ExerciseService.get_or_create_current_exercise()
+
+    # Comptes de trésorerie (classe 5)
+    treasury_codes = ['571', '521', '585']
+    treasury_accounts = []
+    total_treasury = Decimal('0')
+
+    for code in treasury_codes:
+        try:
+            account = Account.objects.get(code=code, delete_at__isnull=True)
+            balance = account.get_balance(exercise)
+            treasury_accounts.append({
+                'account': account,
+                'balance': balance,
+            })
+            total_treasury += balance
+        except Account.DoesNotExist:
+            pass
+
+    # Créances clients (411)
+    try:
+        clients_account = Account.objects.get(code='411', delete_at__isnull=True)
+        clients_balance = clients_account.get_balance(exercise)
+    except Account.DoesNotExist:
+        clients_balance = Decimal('0')
+
+    # Dettes fournisseurs (401)
+    try:
+        suppliers_account = Account.objects.get(code='401', delete_at__isnull=True)
+        suppliers_balance = suppliers_account.get_balance(exercise)
+    except Account.DoesNotExist:
+        suppliers_balance = Decimal('0')
+
+    # Derniers paiements reçus
+    recent_payments = Payment.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('credit_sale__sale__client').order_by('-payment_date', '-create_at')[:10]
+
+    # Derniers paiements fournisseurs
+    recent_supplier_payments = SupplierPayment.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('supplier').order_by('-payment_date', '-create_at')[:10]
+
+    context = {
+        'page_title': 'Trésorerie',
+        'treasury_accounts': treasury_accounts,
+        'total_treasury': total_treasury,
+        'clients_balance': clients_balance,
+        'suppliers_balance': suppliers_balance,
+        'recent_payments': recent_payments,
+        'recent_supplier_payments': recent_supplier_payments,
+        'exercise': exercise,
+    }
+    return render(request, 'core/accounting/treasury.html', context)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Phase 3 — Rapports financiers
+# ═══════════════════════════════════════════════════════════════════
+
+
+@login_required
+def income_statement(request):
+    """Compte de résultat."""
+    exercise = ExerciseService.get_or_create_current_exercise()
+    data = AccountingService.get_income_statement(exercise)
+
+    context = {
+        'page_title': 'Compte de résultat',
+        'exercise': exercise,
+        **data,
+    }
+    return render(request, 'core/accounting/income_statement.html', context)
+
+
+@login_required
+def balance_sheet(request):
+    """Bilan comptable."""
+    exercise = ExerciseService.get_or_create_current_exercise()
+    data = AccountingService.get_balance_sheet(exercise)
+
+    context = {
+        'page_title': 'Bilan comptable',
+        'exercise': exercise,
+        **data,
+    }
+    return render(request, 'core/accounting/balance_sheet.html', context)
+
+
+@login_required
+def aged_balance(request):
+    """Balance âgée (clients ou fournisseurs)."""
+    balance_type = request.GET.get('type', 'client')
+    exercise = ExerciseService.get_or_create_current_exercise()
+    data = AccountingService.get_aged_balance(balance_type, exercise)
+
+    context = {
+        'page_title': f"Balance âgée — {data['title']}",
+        'exercise': exercise,
+        'current_type': balance_type,
+        **data,
+    }
+    return render(request, 'core/accounting/aged_balance.html', context)
+
+
+@login_required
+def product_margins(request):
+    """Rapport de marge par produit."""
+    exercise = ExerciseService.get_or_create_current_exercise()
+    data = AccountingService.get_product_margins(exercise)
+
+    context = {
+        'page_title': 'Marge par produit',
+        'exercise': exercise,
+        **data,
+    }
+    return render(request, 'core/accounting/product_margins.html', context)
+
+
+@login_required
+def export_report_csv(request, report_type):
+    """Export CSV d'un rapport financier."""
+    import csv
+    from django.http import HttpResponse
+
+    exercise = ExerciseService.get_or_create_current_exercise()
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response.write('\ufeff')  # BOM UTF-8 pour Excel
+    writer = csv.writer(response, delimiter=';')
+
+    if report_type == 'income_statement':
+        response['Content-Disposition'] = 'attachment; filename="compte_de_resultat.csv"'
+        data = AccountingService.get_income_statement(exercise)
+        writer.writerow(['Compte de résultat', f'Exercice {exercise}'])
+        writer.writerow([])
+        writer.writerow(['PRODUITS'])
+        writer.writerow(['Code', 'Intitulé', 'Montant'])
+        for item in data['produits']:
+            writer.writerow([item['account'].code, item['account'].name, str(item['balance'])])
+        writer.writerow(['', 'TOTAL PRODUITS', str(data['total_produits'])])
+        writer.writerow([])
+        writer.writerow(['CHARGES'])
+        writer.writerow(['Code', 'Intitulé', 'Montant'])
+        for item in data['charges']:
+            writer.writerow([item['account'].code, item['account'].name, str(item['balance'])])
+        writer.writerow(['', 'TOTAL CHARGES', str(data['total_charges'])])
+        writer.writerow([])
+        writer.writerow(['', 'RÉSULTAT NET', str(data['resultat_net'])])
+
+    elif report_type == 'balance_sheet':
+        response['Content-Disposition'] = 'attachment; filename="bilan_comptable.csv"'
+        data = AccountingService.get_balance_sheet(exercise)
+        writer.writerow(['Bilan comptable', f'Exercice {exercise}'])
+        writer.writerow([])
+        writer.writerow(['ACTIF'])
+        writer.writerow(['Code', 'Intitulé', 'Montant'])
+        for section in [data['actif_immobilise'], data['actif_circulant'], data['tresorerie_actif']]:
+            for item in section:
+                writer.writerow([item['account'].code, item['account'].name, str(item['balance'])])
+        writer.writerow(['', 'TOTAL ACTIF', str(data['total_actif'])])
+        writer.writerow([])
+        writer.writerow(['PASSIF'])
+        writer.writerow(['Code', 'Intitulé', 'Montant'])
+        for section in [data['capitaux'], data['dettes'], data['tresorerie_passif']]:
+            for item in section:
+                writer.writerow([item['account'].code, item['account'].name, str(item['balance'])])
+        if data['resultat_net'] > 0:
+            writer.writerow(['', 'Résultat de l\'exercice', str(data['resultat_net'])])
+        writer.writerow(['', 'TOTAL PASSIF', str(data['total_passif'])])
+
+    elif report_type == 'product_margins':
+        response['Content-Disposition'] = 'attachment; filename="marges_produits.csv"'
+        data = AccountingService.get_product_margins(exercise)
+        writer.writerow(['Marge par produit', f'Exercice {exercise}'])
+        writer.writerow([])
+        writer.writerow(['Produit', 'Qté vendue', 'CA (FCFA)', 'Prix achat', 'Coût total', 'Marge', 'Marge %'])
+        for item in data['items']:
+            writer.writerow([
+                item['product'].name, item['qty_sold'],
+                str(item['revenue']), str(item['purchase_price']),
+                str(item['cost']), str(item['margin']),
+                f"{item['margin_pct']:.1f}%",
+            ])
+        writer.writerow([])
+        writer.writerow(['TOTAUX', '', str(data['total_ca']), '',
+                         str(data['total_cost']), str(data['total_margin']),
+                         f"{data['total_margin_pct']:.1f}%"])
+
+    elif report_type == 'aged_balance':
+        balance_type = request.GET.get('type', 'client')
+        response['Content-Disposition'] = f'attachment; filename="balance_agee_{balance_type}.csv"'
+        data = AccountingService.get_aged_balance(balance_type, exercise)
+        writer.writerow([data['title'], f'Exercice {exercise}'])
+        writer.writerow([])
+        writer.writerow(['Référence', 'Tiers', 'Date', 'Échéance', 'Jours', 'Tranche', 'Montant'])
+        for item in data['items']:
+            writer.writerow([
+                item['reference'], item['tiers'],
+                item['date'].strftime('%d/%m/%Y') if item['date'] else '',
+                item['due_date'].strftime('%d/%m/%Y') if item['due_date'] else '',
+                item['age_days'], item['tranche'], str(item['amount']),
+            ])
+        writer.writerow([])
+        writer.writerow(['', '', '', '', '', 'TOTAL', str(data['grand_total'])])
+
+    else:
+        return HttpResponse('Type de rapport inconnu', status=400)
+
+    return response
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 4 — TVA, Rapprochement bancaire, Clôture d'exercice
+# ══════════════════════════════════════════════════════════════════════════════
+
+@login_required
+def vat_declaration(request):
+    """Déclaration de TVA."""
+    exercise = ExerciseService.get_or_create_current_exercise()
+    data = AccountingService.get_vat_declaration(exercise)
+
+    context = {
+        'page_title': 'Déclaration de TVA',
+        'exercise': exercise,
+        **data,
+    }
+    return render(request, 'core/accounting/vat_declaration.html', context)
+
+
+@login_required
+def bank_reconciliation(request):
+    """Rapprochement bancaire."""
+    account_code = request.GET.get('account', '521')
+    date_start = request.GET.get('date_start')
+    date_end = request.GET.get('date_end')
+
+    # Convertir les dates
+    from datetime import datetime as dt
+    d_start = dt.strptime(date_start, '%Y-%m-%d').date() if date_start else None
+    d_end = dt.strptime(date_end, '%Y-%m-%d').date() if date_end else None
+
+    try:
+        data = AccountingService.get_bank_reconciliation(account_code, d_start, d_end)
+    except Account.DoesNotExist:
+        from django.http import Http404
+        raise Http404("Compte bancaire introuvable")
+
+    # Comptes bancaires disponibles pour le sélecteur
+    bank_accounts = Account.objects.filter(
+        code__in=['521', '585'], delete_at__isnull=True
+    )
+
+    context = {
+        'page_title': 'Rapprochement bancaire',
+        'bank_accounts': bank_accounts,
+        'current_account': account_code,
+        'date_start': date_start or '',
+        'date_end': date_end or '',
+        **data,
+    }
+    return render(request, 'core/accounting/bank_reconciliation.html', context)
+
+
+@login_required
+def reconcile_entry(request):
+    """Rapprocher une ligne de relevé avec une écriture (POST AJAX)."""
+    from django.http import JsonResponse
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+
+    statement_id = request.POST.get('statement_id')
+    entry_line_id = request.POST.get('entry_line_id')
+
+    if not statement_id or not entry_line_id:
+        return JsonResponse({'error': 'Paramètres manquants'}, status=400)
+
+    try:
+        stmt = AccountingService.reconcile_statement(
+            int(statement_id), int(entry_line_id), user=request.user
+        )
+        return JsonResponse({
+            'success': True,
+            'message': f'Ligne rapprochée avec succès',
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required
+def unreconcile_entry(request):
+    """Annuler le rapprochement d'une ligne (POST AJAX)."""
+    from django.http import JsonResponse
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+
+    statement_id = request.POST.get('statement_id')
+    if not statement_id:
+        return JsonResponse({'error': 'Paramètre manquant'}, status=400)
+
+    try:
+        AccountingService.unreconcile_statement(int(statement_id))
+        return JsonResponse({'success': True, 'message': 'Rapprochement annulé'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required
+def exercise_closing_view(request):
+    """Page de clôture d'exercice."""
+    exercise = ExerciseService.get_or_create_current_exercise()
+
+    # Historique des clôtures
+    closings = ExerciseClosing.objects.filter(
+        delete_at__isnull=True
+    ).select_related('exercise', 'closed_by', 'new_exercise').order_by('-closed_at')
+
+    # Données pour l'exercice en cours
+    income_data = AccountingService.get_income_statement(exercise)
+
+    context = {
+        'page_title': "Clôture d'exercice",
+        'exercise': exercise,
+        'closings': closings,
+        'resultat_net': income_data['resultat_net'],
+        'total_produits': income_data['total_produits'],
+        'total_charges': income_data['total_charges'],
+    }
+    return render(request, 'core/accounting/exercise_closing.html', context)
+
+
+@login_required
+def close_exercise_action(request):
+    """Action POST pour clôturer l'exercice en cours."""
+    from django.contrib import messages
+
+    if request.method != 'POST':
+        return redirect('exercise_closing')
+
+    exercise = ExerciseService.get_or_create_current_exercise()
+
+    try:
+        closing = AccountingService.close_exercise(exercise, user=request.user)
+        new_exercise = AccountingService.open_new_exercise(closing, user=request.user)
+        messages.success(
+            request,
+            f"Exercice clôturé avec succès. Résultat : {closing.result_amount} FCFA. "
+            f"Nouvel exercice créé."
+        )
+    except ValueError as e:
+        messages.error(request, str(e))
+    except Exception as e:
+        messages.error(request, f"Erreur lors de la clôture : {str(e)}")
+
+    return redirect('exercise_closing')

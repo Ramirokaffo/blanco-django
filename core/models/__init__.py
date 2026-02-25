@@ -42,6 +42,9 @@ __all__ = [
     'DailyInventory',
 
     # Accounting models
+    'Account',
+    'JournalEntry',
+    'JournalEntryLine',
     'Exercise',
     'Daily',
     'ExpenseType',
@@ -49,6 +52,14 @@ __all__ = [
     'DailyExpense',
     'DailyRecipe',
     'ProductExpense',
+    'Payment',
+    'SupplierPayment',
+    'Invoice',
+    'PAYMENT_METHOD_CHOICES',
+    'PAYMENT_METHOD_ACCOUNT_MAP',
+    'TaxRate',
+    'BankStatement',
+    'ExerciseClosing',
 
     # Settings models
     'SystemSettings',

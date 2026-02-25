@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Grand Livre - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Grand Livre</h1>
+            {% if selected_account %}
+            <p class="text-secondary">{{ selected_account.code }} - {{ selected_account.name }} — Solde : {{ balance|floatformat:0 }} FCFA</p>
+            {% else %}
+            <p class="text-secondary">Sélectionnez un compte pour voir ses mouvements</p>
+            {% endif %}
+        </div>
+        <div>
+            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Journal</a>
+            <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
+            <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'accounting_ledger' %}" class="filters-form">
+        <div class="filters-row">
+            <div class="filter-group filter-search">
+                <label class="form-label">Compte</label>
+                <select name="account" class="form-control">
+                    <option value="">-- Sélectionner un compte --</option>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.code }}" {% if current_account == acc.code %}selected{% endif %}>{{ acc.code }} - {{ acc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Date début</label>
+                <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Date fin</label>
+                <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Afficher</button>
+            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+{% if selected_account %}
+<!-- Tableau du grand livre -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Mouvements — {{ selected_account }}</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Référence</th>
+                        <th>Libellé</th>
+                        <th class="text-right">Débit</th>
+                        <th class="text-right">Crédit</th>
+                        <th class="text-right">Solde</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in ledger_lines %}
+                    <tr>
+                        <td>{{ item.line.entry.date|date:"d/m/Y" }}</td>
+                        <td><small>{{ item.line.entry.reference }}</small></td>
+                        <td>{{ item.line.description|default:item.line.entry.description }}</td>
+                        <td class="text-right">{% if item.line.debit > 0 %}{{ item.line.debit|floatformat:0 }}{% endif %}</td>
+                        <td class="text-right">{% if item.line.credit > 0 %}{{ item.line.credit|floatformat:0 }}{% endif %}</td>
+                        <td class="text-right"><strong>{{ item.running_balance|floatformat:0 }}</strong></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">Aucun mouvement pour ce compte</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if ledger_lines %}
+                <tfoot>
+                    <tr style="font-weight: bold; border-top: 2px solid var(--border-color, #dee2e6);">
+                        <td colspan="3">TOTAUX</td>
+                        <td class="text-right">{{ total_debit|floatformat:0 }}</td>
+                        <td class="text-right">{{ total_credit|floatformat:0 }}</td>
+                        <td class="text-right">{{ balance|floatformat:0 }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+

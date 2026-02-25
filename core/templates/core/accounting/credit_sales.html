@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ventes à crédit - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Ventes à crédit</h1>
+            <p class="text-secondary">{{ total_count }} vente{{ total_count|pluralize }} — Total : {{ total_credit|floatformat:0 }} FCFA | Payé : {{ total_paid|floatformat:0 }} FCFA | Restant : {{ total_remaining|floatformat:0 }} FCFA</p>
+        </div>
+        <div>
+            <a href="{% url 'treasury_dashboard' %}" class="btn btn-secondary btn-sm">Trésorerie</a>
+        </div>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'credit_sales' %}" class="filters-form">
+        <div class="filters-row">
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Nom du client ou n° de vente..." value="{{ current_search }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Statut</label>
+                <select name="status" class="form-control">
+                    <option value="">Tous</option>
+                    <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>Non soldé</option>
+                    <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>Soldé</option>
+                </select>
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+            <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Liste des ventes à crédit</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Vente</th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th class="text-right">Total</th>
+                        <th class="text-right">Payé</th>
+                        <th class="text-right">Restant</th>
+                        <th>Échéance</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cs in credit_sales %}
+                    <tr>
+                        <td>#{{ cs.sale_id }}</td>
+                        <td>{{ cs.sale.create_at|date:"d/m/Y" }}</td>
+                        <td>{% if cs.sale.client %}{{ cs.sale.client.firstname }} {{ cs.sale.client.lastname }}{% else %}-{% endif %}</td>
+                        <td class="text-right">{{ cs.sale.total|floatformat:0 }} FCFA</td>
+                        <td class="text-right">{{ cs.amount_paid|floatformat:0 }} FCFA</td>
+                        <td class="text-right"><strong>{{ cs.amount_remaining|floatformat:0 }} FCFA</strong></td>
+                        <td>{% if cs.due_date %}{{ cs.due_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+                        <td>
+                            {% if cs.is_fully_paid %}
+                            <span class="badge badge-success">Soldé</span>
+                            {% else %}
+                            <span class="badge badge-warning">En cours</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not cs.is_fully_paid %}
+                            <a href="{% url 'record_credit_payment' cs.id %}" class="btn btn-primary btn-sm">Payer</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center">Aucune vente à crédit trouvée</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+            </div>
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}" class="pagination-btn">&lsaquo;</a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}" class="pagination-btn">&rsaquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

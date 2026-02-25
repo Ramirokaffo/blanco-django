@@ -9,6 +9,7 @@ from core.models import (
     Sale, SaleProduct, CreditSale, Product, Client, Daily,
 )
 from core.services.daily_service import DailyService
+from core.services.accounting_service import AccountingService
 
 
 class SaleService:
@@ -58,6 +59,7 @@ class SaleService:
         client_id = validated_data.pop('client_id', None)
         is_credit = validated_data.get('is_credit', False)
         due_date = validated_data.get('due_date')
+        payment_method = validated_data.pop('payment_method', 'CASH')
 
         client = Client.objects.get(id=client_id) if client_id else None
         daily = DailyService.get_or_create_active_daily()
@@ -101,6 +103,17 @@ class SaleService:
                 due_date=due_date,
                 is_fully_paid=False,
             )
+
+        # Enregistrer l'écriture comptable
+        try:
+            AccountingService.record_sale(
+                sale=sale,
+                daily=daily,
+                exercise=daily.exercise,
+                payment_method=payment_method,
+            )
+        except Exception:
+            pass  # Ne pas bloquer la vente si la comptabilité échoue
 
         return sale
 

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Plan comptable - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Plan comptable OHADA</h1>
+            <p class="text-secondary">{{ total_accounts }} compte{{ total_accounts|pluralize }}</p>
+        </div>
+        <div>
+            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Journal</a>
+            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Grand Livre</a>
+            <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
+        </div>
+    </div>
+</div>
+
+{% for class_num, class_data in classes.items %}
+<div class="card" style="margin-bottom: 1rem;">
+    <div class="card-header">
+        <h3 class="card-title">Classe {{ class_num }} — {{ class_data.label }}</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Code</th>
+                        <th>Libellé</th>
+                        <th style="width: 120px;">Type</th>
+                        <th style="width: 100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for account in class_data.accounts %}
+                    <tr>
+                        <td><strong>{{ account.code }}</strong></td>
+                        <td>{% if account.parent %}<span style="padding-left: 1.5rem;">↳ </span>{% endif %}{{ account.name }}</td>
+                        <td><span class="badge badge-{{ account.account_type|lower }}">{{ account.get_account_type_display }}</span></td>
+                        <td>
+                            <a href="{% url 'accounting_ledger' %}?account={{ account.code }}" class="btn btn-secondary btn-sm" title="Voir le grand livre">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/>
+                                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
+

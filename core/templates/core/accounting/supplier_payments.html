@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Paiements fournisseurs - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Paiements fournisseurs</h1>
+            <p class="text-secondary">{{ total_count }} paiement{{ total_count|pluralize }} — Total : {{ total_amount|floatformat:0 }} FCFA</p>
+        </div>
+        <a href="{% url 'add_supplier_payment' %}" class="btn btn-primary btn-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Nouveau paiement
+        </a>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Filtres -->
+<div class="card filters-card">
+    <form method="get" action="{% url 'supplier_payments' %}" class="filters-form">
+        <div class="filters-row">
+            <div class="filter-group filter-search">
+                <label class="form-label">Recherche</label>
+                <input type="text" name="search" class="form-control" placeholder="Fournisseur ou référence..." value="{{ current_search }}">
+            </div>
+            <div class="filter-group">
+                <label class="form-label">Fournisseur</label>
+                <select name="supplier" class="form-control">
+                    <option value="">Tous</option>
+                    {% for s in suppliers %}
+                    <option value="{{ s.id }}" {% if current_supplier == s.id|stringformat:"d" %}selected{% endif %}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        </div>
+    </form>
+</div>
+
+<!-- Tableau -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Liste des paiements</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Fournisseur</th>
+                        <th>Mode</th>
+                        <th class="text-right">Montant</th>
+                        <th>Référence</th>
+                        <th>Par</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sp in supplier_payments %}
+                    <tr>
+                        <td>{{ sp.payment_date|date:"d/m/Y" }}</td>
+                        <td>{{ sp.supplier.name }}</td>
+                        <td>{{ sp.get_payment_method_display }}</td>
+                        <td class="text-right">{{ sp.amount|floatformat:0 }} FCFA</td>
+                        <td>{{ sp.reference|default:"-" }}</td>
+                        <td>{{ sp.staff.get_full_name|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">Aucun paiement trouvé</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+            </div>
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_supplier %}&supplier={{ current_supplier }}{% endif %}" class="pagination-btn">&lsaquo;</a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-btn active">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_supplier %}&supplier={{ current_supplier }}{% endif %}" class="pagination-btn">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_supplier %}&supplier={{ current_supplier }}{% endif %}" class="pagination-btn">&rsaquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

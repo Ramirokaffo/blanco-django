@@ -96,7 +96,29 @@
                 </a>
             </li>
 
-            
+            <li class="nav-item">
+                <a href="{% url 'accounting_journal' %}" class="nav-link {% if 'accounting_' in request.resolver_match.url_name %}active{% endif %}">
+                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 2h16a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="2"/>
+                        <line x1="7" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
+                        <line x1="7" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2"/>
+                        <line x1="7" y1="15" x2="13" y2="15" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    <span>Comptabilité</span>
+                </a>
+            </li>
+
+            <li class="nav-item">
+                <a href="{% url 'treasury_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'treasury_dashboard' or request.resolver_match.url_name == 'credit_sales' or request.resolver_match.url_name == 'record_credit_payment' or request.resolver_match.url_name == 'supplier_payments' or request.resolver_match.url_name == 'add_supplier_payment' or request.resolver_match.url_name == 'invoices' %}active{% endif %}">
+                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <path d="M2 10h20" stroke="currentColor" stroke-width="2"/>
+                        <path d="M6 15h4" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    <span>Trésorerie</span>
+                </a>
+            </li>
+
             <li class="nav-item">
                 <a href="{% url 'reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">

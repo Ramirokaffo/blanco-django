@@ -29,4 +29,34 @@ urlpatterns = [
     path('reports/', views.reports, name='reports'),
     path('settings/', views.settings, name='settings'),
     path('settings/migration/', views.data_migration, name='data_migration'),
+
+    # Comptabilité
+    path('accounting/journal/', views.accounting_journal, name='accounting_journal'),
+    path('accounting/ledger/', views.accounting_general_ledger, name='accounting_ledger'),
+    path('accounting/balance/', views.accounting_trial_balance, name='accounting_balance'),
+    path('accounting/chart/', views.accounting_chart_of_accounts, name='accounting_chart'),
+
+    # Phase 2 — Trésorerie, Paiements, Factures
+    path('accounting/treasury/', views.treasury_dashboard, name='treasury_dashboard'),
+    path('accounting/credit-sales/', views.credit_sales_list, name='credit_sales'),
+    path('accounting/credit-sales/<int:credit_sale_id>/payment/', views.record_credit_payment, name='record_credit_payment'),
+    path('accounting/supplier-payments/', views.supplier_payments_list, name='supplier_payments'),
+    path('accounting/supplier-payments/add/', views.add_supplier_payment, name='add_supplier_payment'),
+    path('accounting/invoices/', views.invoices_list, name='invoices'),
+    path('accounting/invoices/generate/<int:sale_id>/', views.generate_invoice, name='generate_invoice'),
+
+    # Phase 3 — Rapports financiers
+    path('accounting/income-statement/', views.income_statement, name='income_statement'),
+    path('accounting/balance-sheet/', views.balance_sheet, name='balance_sheet'),
+    path('accounting/aged-balance/', views.aged_balance, name='aged_balance'),
+    path('accounting/product-margins/', views.product_margins, name='product_margins'),
+    path('accounting/export/<str:report_type>/', views.export_report_csv, name='export_report_csv'),
+
+    # Phase 4 — TVA, Rapprochement bancaire, Clôture d'exercice
+    path('accounting/vat-declaration/', views.vat_declaration, name='vat_declaration'),
+    path('accounting/bank-reconciliation/', views.bank_reconciliation, name='bank_reconciliation'),
+    path('accounting/reconcile/', views.reconcile_entry, name='reconcile_entry'),
+    path('accounting/unreconcile/', views.unreconcile_entry, name='unreconcile_entry'),
+    path('accounting/exercise-closing/', views.exercise_closing_view, name='exercise_closing'),
+    path('accounting/exercise-closing/close/', views.close_exercise_action, name='close_exercise_action'),
 ]

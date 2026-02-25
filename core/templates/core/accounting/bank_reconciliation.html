@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Rapprochement bancaire - {{ system_settings.company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>🏦 Rapprochement bancaire</h1>
+            <p class="text-secondary">{{ account.code }} — {{ account.name }}</p>
+        </div>
+        <div>
+            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">Rapports</a>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres -->
+<div class="card" style="padding: 1.25rem; margin-bottom: 1.5rem;">
+    <form method="get" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: end;">
+        <div>
+            <label style="font-size: 0.85rem; display: block; margin-bottom: 0.25rem;">Compte</label>
+            <select name="account" class="form-control">
+                {% for ba in bank_accounts %}
+                <option value="{{ ba.code }}" {% if ba.code == current_account %}selected{% endif %}>{{ ba.code }} — {{ ba.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.85rem; display: block; margin-bottom: 0.25rem;">Du</label>
+            <input type="date" name="date_start" value="{{ date_start }}" class="form-control">
+        </div>
+        <div>
+            <label style="font-size: 0.85rem; display: block; margin-bottom: 0.25rem;">Au</label>
+            <input type="date" name="date_end" value="{{ date_end }}" class="form-control">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+    </form>
+</div>
+
+<!-- Résumé -->
+<div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--info, #17a2b8);">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Solde relevé bancaire</div>
+        <div style="font-size: 1.3rem; font-weight: 700;">{{ solde_banque|floatformat:0 }} <small>FCFA</small></div>
+    </div>
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--primary, #3498db);">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Solde comptable</div>
+        <div style="font-size: 1.3rem; font-weight: 700;">{{ solde_comptable|floatformat:0 }} <small>FCFA</small></div>
+    </div>
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid {% if ecart == 0 %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Écart</div>
+        <div style="font-size: 1.3rem; font-weight: 700; color: {% if ecart == 0 %}var(--success, #28a745){% else %}var(--danger, #e74c3c){% endif %};">
+            {{ ecart|floatformat:0 }} <small>FCFA</small>
+        </div>
+    </div>
+    <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--success, #28a745);">
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">Rapprochement</div>
+        <div style="font-size: 1.3rem; font-weight: 700;">{{ nb_reconciled }} / {{ nb_total }}</div>
+    </div>
+</div>
+
+<!-- Lignes non rapprochées -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Relevé bancaire — Lignes non rapprochées</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Libellé</th>
+                    <th>Référence</th>
+                    <th>Type</th>
+                    <th class="text-right">Montant</th>
+                    <th>Statut</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stmt in non_reconciled_statements %}
+                <tr>
+                    <td>{{ stmt.statement_date|date:"d/m/Y" }}</td>
+                    <td>{{ stmt.description }}</td>
+                    <td>{{ stmt.reference|default:"-" }}</td>
+                    <td><span class="badge {% if stmt.statement_type == 'CREDIT' %}badge-success{% else %}badge-danger{% endif %}">{{ stmt.get_statement_type_display }}</span></td>
+                    <td class="text-right">{{ stmt.amount|floatformat:0 }} FCFA</td>
+                    <td><span class="badge badge-warning">Non rapproché</span></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-secondary">Toutes les lignes sont rapprochées ✓</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Écritures comptables non rapprochées -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Écritures comptables — Non rapprochées</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Référence</th>
+                    <th>Description</th>
+                    <th class="text-right">Débit</th>
+                    <th class="text-right">Crédit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in non_reconciled_entries %}
+                <tr>
+                    <td>{{ line.entry.date|date:"d/m/Y" }}</td>
+                    <td>{{ line.entry.reference }}</td>
+                    <td>{{ line.description }}</td>
+                    <td class="text-right">{% if line.debit %}{{ line.debit|floatformat:0 }}{% endif %}</td>
+                    <td class="text-right">{% if line.credit %}{{ line.credit|floatformat:0 }}{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-secondary">Aucune écriture non rapprochée</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
