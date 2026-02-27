@@ -8,6 +8,7 @@ from django.db.models import Q
 from core.models import (
     Sale, SaleProduct, CreditSale, Product, Client, Daily,
 )
+from core.models.inventory_models import PaymentSchedule
 from core.services.daily_service import DailyService
 from core.services.accounting_service import AccountingService
 
@@ -96,13 +97,22 @@ class SaleService:
 
         # Créer le crédit si nécessaire
         if is_credit:
-            CreditSale.objects.create(
+            credit_sale = CreditSale.objects.create(
                 sale=sale,
                 amount_paid=0,
                 amount_remaining=total,
                 due_date=due_date,
                 is_fully_paid=False,
             )
+            # Créer une échéance de paiement
+            if due_date:
+                PaymentSchedule.objects.create(
+                    schedule_type='CLIENT',
+                    credit_sale=credit_sale,
+                    due_date=due_date,
+                    amount_due=total,
+                    status='PENDING',
+                )
 
         # Enregistrer l'écriture comptable
         try:

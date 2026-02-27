@@ -21,6 +21,15 @@ class CustomUser(AbstractUser):
     profil = models.CharField(max_length=255, null=True, blank=True, verbose_name="Profil")
     delete_at = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
 
+    # ──── Modules autorisés ──────────────────────────────────────────
+    allowed_modules = models.ManyToManyField(
+        'core.AppModule',
+        blank=True,
+        related_name='users',
+        verbose_name="Modules autorisés",
+        help_text="Modules auxquels cet utilisateur a accès"
+    )
+
     class Meta:
         db_table = 'staff'  # Utiliser la table staff existante
         verbose_name = 'Utilisateur'
@@ -31,6 +40,19 @@ class CustomUser(AbstractUser):
         if self.firstname and self.lastname:
             return f"{self.firstname} {self.lastname}".strip()
         return f"{self.first_name} {self.last_name}".strip() or self.username
+
+    def has_module_access(self, module_code):
+        """Vérifie si l'utilisateur a accès à un module donné."""
+        if self.is_superuser:
+            return True
+        return self.allowed_modules.filter(code=module_code, is_active=True).exists()
+
+    def get_allowed_module_codes(self):
+        """Retourne la liste des codes de modules autorisés."""
+        if self.is_superuser:
+            from .settings_models import AppModule
+            return list(AppModule.objects.filter(is_active=True).values_list('code', flat=True))
+        return list(self.allowed_modules.filter(is_active=True).values_list('code', flat=True))
 
     def __str__(self):
         return f"{self.get_full_name()} (@{self.username})"

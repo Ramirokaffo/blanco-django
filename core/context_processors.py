@@ -27,3 +27,17 @@ def system_settings_context(request):
         'system_settings': settings,
     }
 
+
+def user_modules_context(request):
+    """
+    Injecte la liste des codes de modules autorisés pour l'utilisateur connecté.
+    Disponible dans tous les templates via {{ user_modules }}.
+    """
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        return {
+            'user_modules': request.user.get_allowed_module_codes(),
+        }
+    return {
+        'user_modules': [],
+    }
+

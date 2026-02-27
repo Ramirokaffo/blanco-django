@@ -37,7 +37,7 @@ class SupplyForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 50'}),
     )
 
-    unit_price = forms.DecimalField(
+    purchase_cost = forms.DecimalField(
         label="Prix d'achat unitaire (FCFA)",
         min_value=0,
         max_digits=10,
@@ -73,9 +73,15 @@ class SupplyForm(forms.ModelForm):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     )
 
+    due_date = forms.DateField(
+        label="Date d'échéance (pour achat à crédit)",
+        required=False,
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+    )
+
     class Meta:
         model = Supply
-        fields = ['product', 'supplier', 'quantity', 'unit_price', 'expiration_date']
+        fields = ['product', 'supplier', 'quantity', 'purchase_cost', 'expiration_date']
 
     def clean_expiration_date(self):
         exp_date = self.cleaned_data.get('expiration_date')
@@ -87,11 +93,11 @@ class SupplyForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        unit_price = cleaned_data.get('unit_price')
+        purchase_cost = cleaned_data.get('purchase_cost')
         selling_price = cleaned_data.get('selling_price')
 
-        if selling_price is not None and unit_price is not None:
-            if selling_price <= unit_price:
+        if selling_price is not None and purchase_cost is not None:
+            if selling_price <= purchase_cost:
                 self.add_error('selling_price', "Le prix de vente doit être supérieur au prix d'achat.")
 
         return cleaned_data

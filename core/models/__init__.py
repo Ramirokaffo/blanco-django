@@ -40,6 +40,8 @@ __all__ = [
     'Inventory',
     'InventorySnapshot',
     'DailyInventory',
+    'CreditSupply',
+    'PaymentSchedule',
 
     # Accounting models
     'Account',
@@ -63,5 +65,6 @@ __all__ = [
 
     # Settings models
     'SystemSettings',
+    'AppModule',
 ]
 

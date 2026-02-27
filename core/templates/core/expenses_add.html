@@ -70,6 +70,15 @@
                     {% endif %}
                 </div>
 
+                <!-- Mode de paiement -->
+                <div class="form-group">
+                    <label class="form-label" for="id_payment_method">{{ form.payment_method.label }}</label>
+                    {{ form.payment_method }}
+                    {% if form.payment_method.errors %}
+                    <div class="field-error">{{ form.payment_method.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
                 <!-- Description (pleine largeur) -->
                 <div class="form-group form-group-full">
                     <label class="form-label" for="id_description">{{ form.description.label }}</label>

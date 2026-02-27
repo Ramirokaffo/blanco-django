@@ -74,7 +74,7 @@
                         <svg class="toggle-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>Options avancées (Client, Type de vente)</span>
+                        <span>Options avancées</span>
                     </button>
 
                     <div class="collapsible-content" id="advancedOptions">
@@ -98,7 +98,7 @@
                                 <h4>Type de vente</h4>
                                 <div class="form-group">
                                     <div class="radio-group">
-                                        <label class="radio-7">
+                                        <label class="radio-7 radio-label">
                                             <input type="radio" name="saleType" value="cash" checked>
                                             <span>Comptant</span>
                                         </label>
@@ -111,6 +111,19 @@
                                 <div class="form-group" id="creditDateGroup" style="display: none;">
                                     <label class="form-label">Date d'échéance</label>
                                     <input type="date" class="form-control" id="dueDate">
+                                </div>
+                            </div>
+
+                            <!-- Mode de paiement -->
+                            <div class="form-section" id="paymentMethodSection">
+                                <h4>Mode de paiement</h4>
+                                <div class="form-group">
+                                    <select class="form-control" id="paymentMethodSelect">
+                                        <option value="CASH" selected>Espèces</option>
+                                        <option value="MOBILE_MONEY">Mobile Money</option>
+                                        <option value="BANK_TRANSFER">Virement bancaire</option>
+                                        <option value="CHECK">Chèque</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>

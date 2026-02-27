@@ -16,7 +16,7 @@ from core.models.accounting_models import (
     TaxRate, BankStatement, ExerciseClosing,
 )
 from core.models.product_models import Product, Category, Gamme, Rayon
-from core.models.inventory_models import Supply, Inventory, InventorySnapshot, DailyInventory
+from core.models.inventory_models import Supply, Inventory, InventorySnapshot, DailyInventory, CreditSupply, PaymentSchedule
 from core.services.daily_service import DailyService
 from core.forms import (
     SupplyForm, ExpenseForm, ClientForm, SupplierForm, InventoryForm,
@@ -24,8 +24,8 @@ from core.forms import (
 )
 from core.services.excercise_service import ExerciseService
 from core.services.accounting_service import AccountingService
+from core.decorators import module_required
 
-# Create your views here.
 
 
 def login_view(request):
@@ -60,6 +60,7 @@ def logout_view(request):
     return redirect('login')
 
 @login_required
+@module_required('dashboard')
 def dashboard(request):
     """Vue du tableau de bord avec les statistiques de la journée"""
     from core.models.settings_models import SystemSettings
@@ -206,6 +207,7 @@ def dashboard(request):
 
 
 @login_required
+@module_required('sales')
 def sales(request):
     """Vue de la page des ventes"""
     from django.db.models import Sum
@@ -242,6 +244,7 @@ def sales(request):
 
 
 @login_required
+@module_required('sales')
 def sales_history(request):
     """Vue de l'historique complet des ventes avec filtres et pagination"""
     from django.db.models import Sum
@@ -327,6 +330,7 @@ def sales_history(request):
 
 
 @login_required
+@module_required('products')
 def products(request):
     """Vue de la page des produits avec pagination et filtres"""
     # Récupérer les paramètres de filtre
@@ -391,6 +395,7 @@ INVENTORY_PER_PAGE_CHOICES = [10, 25, 50, 100]
 
 
 @login_required
+@module_required('inventory')
 def inventory(request):
     """Vue de la page de l'inventaire avec pagination et filtres"""
     search = request.GET.get('search', '').strip()
@@ -461,6 +466,7 @@ def inventory(request):
 
 
 @login_required
+@module_required('inventory')
 def add_inventory(request):
     """Vue pour ajouter un nouvel enregistrement d'inventaire"""
     if request.method == 'POST':
@@ -490,6 +496,7 @@ def add_inventory(request):
 
 
 @login_required
+@module_required('inventory')
 def close_inventory_summary(request):
     """Vue résumé et liste des produits pour la clôture de l'inventaire de l'exercice courant"""
     current_exercise = ExerciseService.get_or_create_current_exercise()
@@ -538,6 +545,7 @@ def close_inventory_summary(request):
 
 
 @login_required
+@module_required('inventory')
 @require_POST
 def close_inventory_confirm(request):
     """Action de clôture : met à jour le stock et marque les inventaires comme clôturés"""
@@ -604,6 +612,7 @@ SNAPSHOT_PER_PAGE_CHOICES = [10, 25, 50, 100]
 
 
 @login_required
+@module_required('inventory')
 def inventory_history(request):
     """Vue de l'historique des inventaires clôturés (InventorySnapshot)"""
     search = request.GET.get('search', '').strip()
@@ -669,6 +678,7 @@ def inventory_history(request):
 
 
 @login_required
+@module_required('contacts')
 def contacts(request):
     """Vue combinée : Clients et Personnel avec sous-onglets"""
     tab = request.GET.get('tab', 'clients')
@@ -706,6 +716,7 @@ def contacts(request):
 
 
 @login_required
+@module_required('suppliers')
 def suppliers_list(request):
     """Vue de la page Fournisseurs dédiée avec liste, recherche, pagination"""
     search = request.GET.get('search', '').strip()
@@ -732,6 +743,7 @@ def suppliers_list(request):
 
 
 @login_required
+@module_required('contacts')
 def add_client(request):
     """Vue pour ajouter un nouveau client"""
     if request.method == 'POST':
@@ -755,6 +767,7 @@ def add_client(request):
 
 
 @login_required
+@module_required('contacts')
 def edit_client(request, pk):
     """Vue pour modifier un client"""
     client = get_object_or_404(Client, pk=pk, delete_at__isnull=True)
@@ -780,6 +793,7 @@ def edit_client(request, pk):
 
 
 @login_required
+@module_required('suppliers')
 def add_supplier(request):
     """Vue pour ajouter un nouveau fournisseur"""
     if request.method == 'POST':
@@ -802,6 +816,7 @@ def add_supplier(request):
 
 
 @login_required
+@module_required('suppliers')
 def edit_supplier(request, pk):
     """Vue pour modifier un fournisseur"""
     supplier = get_object_or_404(Supplier, pk=pk, delete_at__isnull=True)
@@ -826,6 +841,7 @@ def edit_supplier(request, pk):
 
 
 @login_required
+@module_required('supplies')
 def supplies(request):
     """Vue de la page des approvisionnements avec pagination et filtres"""
     search = request.GET.get('search', '').strip()
@@ -871,6 +887,7 @@ def supplies(request):
 
 
 @login_required
+@module_required('supplies')
 def add_supply(request):
     """Vue pour ajouter un nouvel approvisionnement"""
     if request.method == 'POST':
@@ -879,12 +896,15 @@ def add_supply(request):
             supply = form.save(commit=False)
             supply.staff = request.user
             supply.daily = DailyService.get_or_create_active_daily()
-            supply.total_price = supply.quantity * supply.unit_price
+            supply.total_price = supply.quantity * supply.purchase_cost
+            is_credit_purchase = form.cleaned_data.get('is_credit', False)
+            supply.is_credit = is_credit_purchase
+            supply.selling_price = form.cleaned_data.get('selling_price') or supply.product.actual_price or 0
+            supply.is_paid = not is_credit_purchase
             supply.save()
 
             # Enregistrer l'écriture comptable
             payment_method = form.cleaned_data.get('payment_method', 'CASH')
-            is_credit_purchase = form.cleaned_data.get('is_credit', False)
             try:
                 AccountingService.record_supply(
                     supply=supply,
@@ -896,11 +916,31 @@ def add_supply(request):
             except Exception:
                 pass  # Ne pas bloquer l'approvisionnement si la comptabilité échoue
 
+            # Créer CreditSupply + PaymentSchedule si achat à crédit
+            if is_credit_purchase:
+                due_date = form.cleaned_data.get('due_date')
+                credit_supply = CreditSupply.objects.create(
+                    supply=supply,
+                    amount_paid=0,
+                    amount_remaining=supply.total_price,
+                    due_date=due_date,
+                    is_fully_paid=False,
+                )
+                # Créer une échéance de paiement
+                if due_date:
+                    PaymentSchedule.objects.create(
+                        schedule_type='SUPPLIER',
+                        credit_supply=credit_supply,
+                        due_date=due_date,
+                        amount_due=supply.total_price,
+                        status='PENDING',
+                    )
+
             # Mettre à jour le stock du produit
             product = supply.product
             product.stock = (product.stock or 0) + supply.quantity
             # Mettre à jour le dernier prix d'achat
-            product.last_purchase_price = supply.unit_price
+            product.last_purchase_price = supply.purchase_cost
             # Mettre à jour le prix de vente si renseigné
             selling_price = form.cleaned_data.get('selling_price')
             if selling_price:
@@ -914,7 +954,7 @@ def add_supply(request):
                     'message': f'Approvisionnement de {supply.quantity} x "{product.name}" enregistré avec succès.',
                     'product_name': product.name,
                     'quantity': supply.quantity,
-                    'unit_price': float(supply.unit_price),
+                    'purchase_cost': float(supply.purchase_cost),
                     'total_price': float(supply.total_price),
                 })
 
@@ -931,6 +971,7 @@ def add_supply(request):
 
 
 @login_required
+@module_required('expenses')
 def expenses(request):
     """Vue de la page des dépenses quotidiennes avec pagination et filtres"""
     search = request.GET.get('search', '').strip()
@@ -981,6 +1022,7 @@ def expenses(request):
 
 
 @login_required
+@module_required('expenses')
 def add_expense(request):
     """Vue pour ajouter une nouvelle dépense"""
     if request.method == 'POST':
@@ -1039,6 +1081,7 @@ def add_expense(request):
 
 
 @login_required
+@module_required('reports')
 def reports(request):
     """Vue de la page des rapports"""
     context = {
@@ -1048,6 +1091,7 @@ def reports(request):
 
 
 @login_required
+@module_required('dashboard')
 def get_daily_summary(request):
     """API pour récupérer le résumé de la journée en cours"""
     from core.models.inventory_models import DailyInventory
@@ -1094,6 +1138,7 @@ def get_daily_summary(request):
 
 
 @login_required
+@module_required('dashboard')
 @require_POST
 def close_daily(request):
     """Vue pour clôturer la journée et créer un DailyInventory"""
@@ -1158,6 +1203,7 @@ def close_daily(request):
 
 
 @login_required
+@module_required('settings')
 def settings(request):
     """Vue de la page des paramètres"""
     context = {
@@ -1167,6 +1213,7 @@ def settings(request):
 
 
 @login_required
+@module_required('settings')
 def data_migration(request):
     """Vue pour migrer les données de l'ancien système"""
     from core.services.migration_service import migrate_data
@@ -1213,6 +1260,7 @@ def data_migration(request):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @login_required
+@module_required('accounting')
 def accounting_journal(request):
     """Vue du journal comptable — liste de toutes les écritures."""
     from core.models.accounting_models import JournalEntry, JournalEntryLine, Account
@@ -1266,6 +1314,7 @@ def accounting_journal(request):
 
 
 @login_required
+@module_required('accounting')
 def accounting_general_ledger(request):
     """Vue du grand livre — détail d'un compte avec solde progressif."""
     from core.models.accounting_models import Account
@@ -1329,6 +1378,7 @@ def accounting_general_ledger(request):
 
 
 @login_required
+@module_required('accounting')
 def accounting_trial_balance(request):
     """Vue de la balance générale — solde de tous les comptes."""
     exercise = ExerciseService.get_or_create_current_exercise()
@@ -1349,6 +1399,7 @@ def accounting_trial_balance(request):
 
 
 @login_required
+@module_required('accounting')
 def accounting_chart_of_accounts(request):
     """Vue du plan comptable."""
     from core.models.accounting_models import Account
@@ -1391,6 +1442,7 @@ def accounting_chart_of_accounts(request):
 
 
 @login_required
+@module_required('treasury')
 def credit_sales_list(request):
     """Vue listant les ventes à crédit avec leur statut de paiement."""
     search = request.GET.get('search', '')
@@ -1435,6 +1487,7 @@ def credit_sales_list(request):
 
 
 @login_required
+@module_required('treasury')
 def record_credit_payment(request, credit_sale_id):
     """Vue pour enregistrer un paiement sur une vente à crédit."""
     credit_sale = get_object_or_404(
@@ -1499,6 +1552,7 @@ def record_credit_payment(request, credit_sale_id):
 
 
 @login_required
+@module_required('treasury')
 def supplier_payments_list(request):
     """Vue listant les paiements fournisseurs."""
     search = request.GET.get('search', '')
@@ -1537,6 +1591,7 @@ def supplier_payments_list(request):
 
 
 @login_required
+@module_required('treasury')
 def add_supplier_payment(request):
     """Vue pour enregistrer un paiement fournisseur."""
     if request.method == 'POST':
@@ -1575,6 +1630,7 @@ def add_supplier_payment(request):
 
 
 @login_required
+@module_required('treasury')
 def invoices_list(request):
     """Vue listant les factures."""
     search = request.GET.get('search', '')
@@ -1608,6 +1664,7 @@ def invoices_list(request):
 
 
 @login_required
+@module_required('treasury')
 def generate_invoice(request, sale_id):
     """Génère une facture pour une vente."""
     sale = get_object_or_404(Sale, id=sale_id, delete_at__isnull=True)
@@ -1630,6 +1687,7 @@ def generate_invoice(request, sale_id):
 
 
 @login_required
+@module_required('treasury')
 def treasury_dashboard(request):
     """Tableau de bord de la trésorerie — solde de chaque compte de trésorerie."""
     from decimal import Decimal
@@ -1696,6 +1754,7 @@ def treasury_dashboard(request):
 
 
 @login_required
+@module_required('reports')
 def income_statement(request):
     """Compte de résultat."""
     exercise = ExerciseService.get_or_create_current_exercise()
@@ -1710,6 +1769,7 @@ def income_statement(request):
 
 
 @login_required
+@module_required('reports')
 def balance_sheet(request):
     """Bilan comptable."""
     exercise = ExerciseService.get_or_create_current_exercise()
@@ -1724,12 +1784,14 @@ def balance_sheet(request):
 
 
 @login_required
+@module_required('reports')
 def aged_balance(request):
     """Balance âgée (clients ou fournisseurs)."""
     balance_type = request.GET.get('type', 'client')
     exercise = ExerciseService.get_or_create_current_exercise()
     data = AccountingService.get_aged_balance(balance_type, exercise)
 
+    print(data)
     context = {
         'page_title': f"Balance âgée — {data['title']}",
         'exercise': exercise,
@@ -1740,6 +1802,7 @@ def aged_balance(request):
 
 
 @login_required
+@module_required('reports')
 def product_margins(request):
     """Rapport de marge par produit."""
     exercise = ExerciseService.get_or_create_current_exercise()
@@ -1754,6 +1817,7 @@ def product_margins(request):
 
 
 @login_required
+@module_required('reports')
 def export_report_csv(request, report_type):
     """Export CSV d'un rapport financier."""
     import csv
@@ -1851,6 +1915,7 @@ def export_report_csv(request, report_type):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @login_required
+@module_required('accounting')
 def vat_declaration(request):
     """Déclaration de TVA."""
     exercise = ExerciseService.get_or_create_current_exercise()
@@ -1865,6 +1930,7 @@ def vat_declaration(request):
 
 
 @login_required
+@module_required('accounting')
 def bank_reconciliation(request):
     """Rapprochement bancaire."""
     account_code = request.GET.get('account', '521')
@@ -1899,6 +1965,7 @@ def bank_reconciliation(request):
 
 
 @login_required
+@module_required('accounting')
 def reconcile_entry(request):
     """Rapprocher une ligne de relevé avec une écriture (POST AJAX)."""
     from django.http import JsonResponse
@@ -1925,6 +1992,7 @@ def reconcile_entry(request):
 
 
 @login_required
+@module_required('accounting')
 def unreconcile_entry(request):
     """Annuler le rapprochement d'une ligne (POST AJAX)."""
     from django.http import JsonResponse
@@ -1944,6 +2012,7 @@ def unreconcile_entry(request):
 
 
 @login_required
+@module_required('accounting')
 def exercise_closing_view(request):
     """Page de clôture d'exercice."""
     exercise = ExerciseService.get_or_create_current_exercise()
@@ -1968,6 +2037,7 @@ def exercise_closing_view(request):
 
 
 @login_required
+@module_required('accounting')
 def close_exercise_action(request):
     """Action POST pour clôturer l'exercice en cours."""
     from django.contrib import messages

@@ -94,12 +94,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Gestion du type de vente (comptant/crédit)
+    const paymentMethodSection = document.getElementById('paymentMethodSection');
     saleTypeRadios.forEach(radio => {
         radio.addEventListener('change', function() {
             if (this.value === 'credit') {
                 creditDateGroup.style.display = 'block';
+                if (paymentMethodSection) paymentMethodSection.style.display = 'none';
             } else {
                 creditDateGroup.style.display = 'none';
+                if (paymentMethodSection) paymentMethodSection.style.display = 'block';
             }
         });
     });
@@ -496,10 +499,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            const paymentMethod = document.getElementById('paymentMethodSelect')?.value || 'CASH';
+
             const saleData = {
                 client_id: clientId || null,
                 is_credit: saleType === 'credit',
                 due_date: dueDate || null,
+                payment_method: saleType === 'credit' ? 'CASH' : paymentMethod,
                 items: cart.map(item => ({
                     product_id: item.id,
                     quantity: item.quantity,

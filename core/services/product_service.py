@@ -76,7 +76,8 @@ class ProductService:
         """
         image_files = validated_data.pop('images', [])
         stock = validated_data.pop('stock', 0)
-        unit_price = validated_data.pop('unit_price', 0)
+        unit_price = validated_data.pop('actual_price', 0)
+        last_purchase_price = validated_data.pop('last_purchase_price', 0)
 
         # 1. Créer le produit
         product = Product.objects.create(stock=stock, **validated_data)
@@ -105,11 +106,11 @@ class ProductService:
                 staff=staff,
                 daily=daily,
                 quantity=stock,
-                unit_price=unit_price or 0,
+                purchase_cost=unit_price or 0,
                 total_price=(unit_price or 0) * stock,
             )
             # Mettre à jour le dernier prix d'achat
-            product.last_purchase_price = unit_price or 0
+            product.last_purchase_price = last_purchase_price or 0
             product.save(update_fields=['last_purchase_price'])
 
         return product

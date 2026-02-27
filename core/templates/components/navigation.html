@@ -1,6 +1,7 @@
 <nav class="navigation">
     <div class="nav-container">
         <ul class="nav-menu">
+            {% if 'dashboard' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -12,7 +13,9 @@
                     <span>Tableau de bord</span>
                 </a>
             </li>
-            
+            {% endif %}
+
+            {% if 'sales' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'sales' %}" class="nav-link {% if request.resolver_match.url_name == 'sales' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -23,7 +26,9 @@
                     <span>Ventes</span>
                 </a>
             </li>
-            
+            {% endif %}
+
+            {% if 'products' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'products' %}" class="nav-link {% if request.resolver_match.url_name == 'products' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -34,8 +39,9 @@
                     <span>Produits</span>
                 </a>
             </li>
-            
+            {% endif %}
 
+            {% if 'suppliers' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'suppliers' %}" class="nav-link {% if request.resolver_match.url_name == 'suppliers' or request.resolver_match.url_name == 'add_supplier' or request.resolver_match.url_name == 'edit_supplier' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -46,7 +52,9 @@
                     <span>Fournisseurs</span>
                 </a>
             </li>
+            {% endif %}
 
+            {% if 'supplies' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'supplies' %}" class="nav-link {% if request.resolver_match.url_name == 'supplies' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -58,8 +66,10 @@
                     <span>Approvisionnement</span>
                 </a>
             </li>
+            {% endif %}
 
-                        <li class="nav-item">
+            {% if 'expenses' in user_modules %}
+            <li class="nav-item">
                 <a href="{% url 'expenses' %}" class="nav-link {% if request.resolver_match.url_name == 'expenses' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
@@ -68,8 +78,9 @@
                     <span>Dépenses</span>
                 </a>
             </li>
+            {% endif %}
 
-
+            {% if 'contacts' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'contacts' %}" class="nav-link {% if request.resolver_match.url_name == 'contacts' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -81,8 +92,10 @@
                     <span>Utilisateurs</span>
                 </a>
             </li>
+            {% endif %}
 
-                        <li class="nav-item">
+            {% if 'inventory' in user_modules %}
+            <li class="nav-item">
                 <a href="{% url 'inventory' %}" class="nav-link {% if request.resolver_match.url_name == 'inventory' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8z" stroke="currentColor" stroke-width="2"/>
@@ -95,7 +108,9 @@
                     <span>Inventaire</span>
                 </a>
             </li>
+            {% endif %}
 
+            {% if 'accounting' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'accounting_journal' %}" class="nav-link {% if 'accounting_' in request.resolver_match.url_name %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -107,7 +122,9 @@
                     <span>Comptabilité</span>
                 </a>
             </li>
+            {% endif %}
 
+            {% if 'treasury' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'treasury_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'treasury_dashboard' or request.resolver_match.url_name == 'credit_sales' or request.resolver_match.url_name == 'record_credit_payment' or request.resolver_match.url_name == 'supplier_payments' or request.resolver_match.url_name == 'add_supplier_payment' or request.resolver_match.url_name == 'invoices' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -118,7 +135,9 @@
                     <span>Trésorerie</span>
                 </a>
             </li>
+            {% endif %}
 
+            {% if 'reports' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -131,7 +150,9 @@
                     <span>Rapports</span>
                 </a>
             </li>
-            
+            {% endif %}
+
+            <!-- {% if 'settings' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'settings' %}" class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
                     <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -142,6 +163,7 @@
                     <span>Paramètres</span>
                 </a>
             </li>
+            {% endif %} -->
         </ul>
     </div>
 </nav>

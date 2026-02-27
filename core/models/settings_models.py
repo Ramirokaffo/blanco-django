@@ -5,6 +5,74 @@ System settings model for storing configurable application parameters.
 from django.db import models
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Modules applicatifs — chaque entrée correspond à un onglet / fonctionnalité
+# ──────────────────────────────────────────────────────────────────────────────
+
+DEFAULT_MODULES = [
+    ('dashboard',    'Tableau de bord',    '📊', 1),
+    ('sales',        'Ventes',             '🛒', 2),
+    ('products',     'Produits',           '📦', 3),
+    ('suppliers',    'Fournisseurs',       '🤝', 4),
+    ('supplies',     'Approvisionnement',  '🚚', 5),
+    ('expenses',     'Dépenses',           '💰', 6),
+    ('contacts',     'Utilisateurs',       '👥', 7),
+    ('inventory',    'Inventaire',         '📋', 8),
+    ('accounting',   'Comptabilité',       '📒', 9),
+    ('treasury',     'Trésorerie',         '🏦', 10),
+    ('reports',      'Rapports',           '📄', 11),
+    ('settings',     'Paramètres',         '⚙️', 12),
+]
+
+
+class AppModule(models.Model):
+    """
+    Module applicatif (onglet / fonctionnalité).
+    Chaque module peut être activé ou désactivé par utilisateur.
+    """
+    code = models.CharField(
+        max_length=50, unique=True,
+        verbose_name="Code du module",
+        help_text="Identifiant technique (ex: sales, products, accounting)"
+    )
+    name = models.CharField(
+        max_length=100, verbose_name="Nom affiché"
+    )
+    icon = models.CharField(
+        max_length=10, blank=True, default="",
+        verbose_name="Icône (emoji)"
+    )
+    order = models.PositiveIntegerField(
+        default=0, verbose_name="Ordre d'affichage"
+    )
+    is_active = models.BooleanField(
+        default=True, verbose_name="Module actif",
+        help_text="Si désactivé, le module n'est visible pour personne"
+    )
+
+    class Meta:
+        db_table = 'app_module'
+        verbose_name = 'Module applicatif'
+        verbose_name_plural = 'Modules applicatifs'
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return f"{self.icon} {self.name}" if self.icon else self.name
+
+    @classmethod
+    def init_default_modules(cls):
+        """Crée les modules par défaut s'ils n'existent pas."""
+        created = 0
+        for code, name, icon, order in DEFAULT_MODULES:
+            _, was_created = cls.objects.get_or_create(
+                code=code,
+                defaults={'name': name, 'icon': icon, 'order': order}
+            )
+            if was_created:
+                created += 1
+        return created
+
+
 class SystemSettings(models.Model):
     """
     Modèle singleton pour stocker les paramètres système de l'application.

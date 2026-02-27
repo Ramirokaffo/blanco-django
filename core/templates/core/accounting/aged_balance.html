@@ -24,15 +24,19 @@
 </div>
 
 <!-- Résumé par tranche -->
+
 <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-    {% for tranche in tranches %}
+    {% for tranche in tranches_data %}
     <div class="card" style="padding: 1rem; text-align: center;">
-        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">{{ tranche }} jours</div>
-        <div style="font-size: 1.3rem; font-weight: 700;">{{ totals|default_if_none:0 }}</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">
+            {{ tranche.label }} jours
+        </div>
+        <div style="font-size: 1.3rem; font-weight: 700;">
+            {{ tranche.amount }}
+        </div>
     </div>
     {% endfor %}
 </div>
-
 <!-- Tableau détaillé -->
 <div class="card">
     <div class="card-header">

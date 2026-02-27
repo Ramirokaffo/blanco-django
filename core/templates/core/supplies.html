@@ -110,7 +110,7 @@
                         <td class="supply-product">{{ supply.product.name }}</td>
                         <td>{{ supply.supplier.name|default:"-" }}</td>
                         <td class="text-right">{{ supply.quantity }}</td>
-                        <td class="text-right">{{ supply.unit_price|floatformat:0 }} FCFA</td>
+                        <td class="text-right">{{ supply.purchase_cost|floatformat:0 }} FCFA</td>
                         <td class="text-right supply-total">{{ supply.total_price|floatformat:0 }} FCFA</td>
                         <td>{% if supply.expiration_date %}{{ supply.expiration_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
                         <td>{{ supply.staff.get_full_name|default:"-" }}</td>

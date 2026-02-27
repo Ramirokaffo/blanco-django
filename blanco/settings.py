@@ -74,6 +74,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.qrcode_context",
                 "core.context_processors.system_settings_context",
+                "core.context_processors.user_modules_context",
             ],
         },
     },

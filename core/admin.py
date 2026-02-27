@@ -22,7 +22,7 @@ from .models import (
     # Phase 4 — TVA, Rapprochement, Clôture
     TaxRate, BankStatement, ExerciseClosing,
     # Settings models
-    SystemSettings,
+    SystemSettings, AppModule,
 )
 
 
@@ -40,6 +40,10 @@ class CustomUserAdmin(UserAdmin):
         ('Informations supplémentaires', {
             'fields': ('firstname', 'lastname', 'phone_number', 'role', 'gender', 'profil', 'delete_at')
         }),
+        ('Modules autorisés', {
+            'fields': ('allowed_modules',),
+            'description': 'Sélectionnez les modules auxquels cet utilisateur a accès. Les superusers ont accès à tout.'
+        }),
     )
 
     # Ajouter les champs personnalisés au formulaire de création
@@ -48,6 +52,8 @@ class CustomUserAdmin(UserAdmin):
             'fields': ('firstname', 'lastname', 'phone_number', 'role', 'gender', 'profil')
         }),
     )
+
+    filter_horizontal = ('allowed_modules', 'groups', 'user_permissions')
 
 
 @admin.register(Client)
@@ -102,7 +108,7 @@ class GrammageTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('code', 'name', 'category', 'stock', 'stock_limit', 'actual_price', 'last_purchase_price', 'is_price_reducible')
+    list_display = ('code', 'name', 'category', 'stock', 'stock_limit', "actual_price", "last_purchase_price", 'is_price_reducible')
     list_filter = ('category', 'gamme', 'rayon', 'is_price_reducible', 'create_at')
     search_fields = ('code', 'name', 'description', 'brand')
     list_editable = ['stock_limit', 'actual_price', 'is_price_reducible', "last_purchase_price"]
@@ -131,7 +137,7 @@ class SaleAdmin(admin.ModelAdmin):
 
 @admin.register(SaleProduct)
 class SaleProductAdmin(admin.ModelAdmin):
-    list_display = ('sale', 'product', 'quantity', 'unit_price', 'get_subtotal')
+    list_display = ('sale', 'product', 'quantity', "unit_price", 'get_subtotal')
     list_filter = ('create_at',)
     search_fields = ('sale__id', 'product__name')
     ordering = ('-create_at',)
@@ -159,7 +165,7 @@ class RefundAdmin(admin.ModelAdmin):
 # Inventory Models Admin
 @admin.register(Supply)
 class SupplyAdmin(admin.ModelAdmin):
-    list_display = ('product', 'supplier', 'quantity', 'unit_price', 'total_price', 'expiration_date', 'create_at')
+    list_display = ('product', 'supplier', 'quantity', "purchase_cost", 'selling_price', 'total_price', 'expiration_date', 'create_at')
     list_filter = ('expiration_date', 'create_at')
     search_fields = ('product__name', 'supplier__name')
     ordering = ('-create_at',)
@@ -380,3 +386,14 @@ class ExerciseClosingAdmin(admin.ModelAdmin):
     list_filter = ('closed_at',)
     search_fields = ('exercise__id',)
     ordering = ('-closed_at',)
+
+
+# Phase 5 — Modules applicatifs
+@admin.register(AppModule)
+class AppModuleAdmin(admin.ModelAdmin):
+    """Admin pour les modules applicatifs."""
+    list_display = ('code', 'name', 'icon', 'order', 'is_active')
+    list_filter = ('is_active',)
+    list_editable = ('order', 'is_active')
+    search_fields = ('code', 'name')
+    ordering = ('order',)

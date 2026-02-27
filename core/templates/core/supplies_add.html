@@ -105,6 +105,24 @@
                     <div class="field-error">{{ form.expiration_date.errors.0 }}</div>
                     {% endif %}
                 </div>
+
+                <!-- Mode de paiement -->
+                <div class="form-group">
+                    <label class="form-label" for="id_payment_method">{{ form.payment_method.label }}</label>
+                    {{ form.payment_method }}
+                    {% if form.payment_method.errors %}
+                    <div class="field-error">{{ form.payment_method.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Achat à crédit -->
+                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                    {{ form.is_credit }}
+                    <label class="form-label" for="id_is_credit" style="margin: 0;">{{ form.is_credit.label }}</label>
+                    {% if form.is_credit.errors %}
+                    <div class="field-error">{{ form.is_credit.errors.0 }}</div>
+                    {% endif %}
+                </div>
             </div>
 
             <!-- Récapitulatif -->

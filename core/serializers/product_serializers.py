@@ -118,7 +118,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'stock', 'stock_limit', 'max_salable_price', 'actual_price',
             'is_price_reducible', 'grammage', 'exp_alert_period',
             'category', 'gamme', 'rayon', 'grammage_type',
-            'images',
+            'images', 'last_purchase_price'
         ]
 
     def validate_code(self, value):
@@ -144,7 +144,7 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
             'stock', 'stock_limit', 'max_salable_price', 'actual_price',
             'is_price_reducible', 'grammage', 'exp_alert_period',
             'category', 'gamme', 'rayon', 'grammage_type',
-            'images',
+            'images', 'last_purchase_price',
         ]
         extra_kwargs = {
             'code': {'required': False},

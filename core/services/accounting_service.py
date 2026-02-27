@@ -689,6 +689,17 @@ class AccountingService:
 
             return {
                 'items': result,
+                'tranches_data': [
+                    {'label': label, 'amount': totals[label]}
+                    for label, _, _ in tranches
+                ],
+                'totals': totals,
+                'grand_total': grand_total,
+                'balance_type': 'client',
+                'title': 'Créances clients',
+            }
+            return {
+                'items': result,
                 'totals': totals,
                 'grand_total': grand_total,
                 'tranches': [t[0] for t in tranches],
@@ -743,6 +754,17 @@ class AccountingService:
                 totals[tranche_key] += net
                 grand_total += net
 
+            return {
+                'items': result,
+                'tranches_data': [
+                    {'label': label, 'amount': totals[label]}
+                    for label, _, _ in tranches
+                ],
+                'totals': totals,
+                'grand_total': grand_total,
+                'balance_type': 'client',
+                'title': 'Créances clients',
+}
             return {
                 'items': result,
                 'totals': totals,
