@@ -22,7 +22,7 @@ services:
       start_period: 60s
 
   web:
-    image: ramirokaffo/blanco:1.1
+    image: ramirokaffo/blanco:latest
     container_name: blanco_web
     restart: unless-stopped
     network_mode: host
