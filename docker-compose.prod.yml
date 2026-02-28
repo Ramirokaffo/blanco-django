@@ -1,8 +1,5 @@
-
-
 services:
 
-  # MySQL Database
   mysql:
     image: mysql:8.0
     container_name: blanco-mysql
@@ -24,9 +21,8 @@ services:
       retries: 10
       start_period: 60s
 
-  # Django Application
   web:
-    image: ramirokaffo/blanco:1.0
+    image: ramirokaffo/blanco:1.1
     container_name: blanco_web
     restart: unless-stopped
     network_mode: host
@@ -35,3 +31,6 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+
+volumes:
+  mysql_data:
