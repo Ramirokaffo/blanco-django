@@ -153,9 +153,18 @@ RUN pip install --no-cache-dir /wheels/*
 # Copier le projet
 COPY . .
 
-RUN chmod +x /app/docker-entrypoint.sh
+# RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "blanco.wsgi:application"]
+# ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "blanco.wsgi:application"]
+
+CMD sh -c "
+echo 'Exécution des migrations...' &&
+python manage.py makemigrations --noinput &&
+python manage.py migrate --noinput &&
+python manage.py collectstatic --noinput &&
+echo 'Démarrage de Gunicorn...' &&
+gunicorn --bind 0.0.0.0:8000 --workers 3 blanco.wsgi:application
+"
