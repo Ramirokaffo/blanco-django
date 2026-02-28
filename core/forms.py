@@ -2,6 +2,7 @@
 Formulaires Django pour l'application core.
 """
 
+import json
 from django import forms
 from core.models.inventory_models import Supply, Inventory
 from core.models.product_models import Product
@@ -90,7 +91,7 @@ class SupplyForm(forms.ModelForm):
     expense_type = forms.ModelChoiceField(
         queryset=ExpenseType.objects.filter(delete_at__isnull=True).order_by('name'),
         label='Type de dépense (approvisionnement)',
-        required=True,
+        required=False,
         empty_label='-- Sélectionner un type --',
         widget=forms.Select(attrs={'class': 'form-control'}),
         help_text='Ce type de dépense sera utilisé pour créer automatiquement la dépense liée à cet approvisionnement'
@@ -103,6 +104,11 @@ class SupplyForm(forms.ModelForm):
         settings = SystemSettings.get_settings()
         if settings.default_supply_expense_type:
             self.initial['expense_type'] = settings.default_supply_expense_type
+        
+        # Ajouter data-has-vat aux options du produit
+        self.fields['product'].widget.attrs['data-has-vat-map'] = json.dumps(
+            {str(p.id): p.has_vat for p in Product.objects.filter(delete_at__isnull=True)}
+        )
 
     class Meta:
         model = Supply
@@ -120,10 +126,16 @@ class SupplyForm(forms.ModelForm):
         cleaned_data = super().clean()
         purchase_cost = cleaned_data.get('purchase_cost')
         selling_price = cleaned_data.get('selling_price')
+        product = cleaned_data.get('product')
+        tax_rate = cleaned_data.get('tax_rate')
 
         if selling_price is not None and purchase_cost is not None:
             if selling_price <= purchase_cost:
                 self.add_error('selling_price', "Le prix de vente doit être supérieur au prix d'achat.")
+
+        # Vérifier que la TVA est fournie si le produit y est sujet
+        if product and product.has_vat and not tax_rate:
+            self.add_error('tax_rate', 'Ce produit est soumis à la TVA. Veuillez sélectionner un taux de TVA.')
 
         return cleaned_data
 

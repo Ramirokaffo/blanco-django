@@ -1480,11 +1480,23 @@ def close_daily(request):
 
     # Fermer la journée
     DailyService.close_current_daily()
+    
+    # Traiter la TVA différée si le mode est DEFERRED
+    from core.models.settings_models import SystemSettings
+    settings = SystemSettings.get_settings()
+    tva_mode = getattr(settings, 'tva_accounting_mode', 'IMMEDIATE')
+    enable_tva = getattr(settings, 'enable_tva_accounting', True)
+    
+    tva_entries_created = 0
+    if enable_tva and tva_mode == 'DEFERRED':
+        from core.services.accounting_service import AccountingService
+        tva_entries_created = AccountingService.record_deferred_tva_for_daily(current_daily)
 
     return JsonResponse({
         'success': True,
         'message': 'La journée a été clôturée avec succès.',
         'daily_inventory_id': daily_inventory.id,
+        'tva_entries_created': tva_entries_created,
     })
 
 

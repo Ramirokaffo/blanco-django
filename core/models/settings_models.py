@@ -146,6 +146,24 @@ class SystemSettings(models.Model):
         verbose_name="Type de dépense par défaut pour les approvisionnements"
     )
 
+    # ──── Paramètres de TVA ─────────────────────────────────────────────────
+    TVA_ACCOUNTING_MODE_CHOICES = [
+        ('IMMEDIATE', 'Immédiat - À chaque vente'),
+        ('DEFERRED', 'Différé - En fin de journée (clôture du Daily)'),
+    ]
+    tva_accounting_mode = models.CharField(
+        max_length=20,
+        choices=TVA_ACCOUNTING_MODE_CHOICES,
+        default='IMMEDIATE',
+        verbose_name="Mode d'enregistrement de la TVA",
+        help_text="Immédiat : écritures TVA créées à chaque vente. Différé : écritures créées à la clôture du Daily."
+    )
+    enable_tva_accounting = models.BooleanField(
+        default=True,
+        verbose_name="Activer la comptabilité TVA",
+        help_text="Activer l'enregistrement des écritures de TVA sur les ventes"
+    )
+
     # ──── Métadonnées ──────────────────────────────────────────────────
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Dernière modification")
 

@@ -19,6 +19,18 @@ class Sale(SoftDeleteModel):
     staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
     daily = models.ForeignKey('Daily', on_delete=models.CASCADE, related_name='sales')
     
+    # Champs pour le suivi de la comptabilité TVA
+    has_vat = models.BooleanField(
+        default=False,
+        verbose_name="TVA applicable",
+        help_text="Indique si la vente contient des produits avec TVA"
+    )
+    tva_accounting_created = models.BooleanField(
+        default=False,
+        verbose_name="Écritures TVA créées",
+        help_text="Indique si les écritures comptables de TVA ont déjà été créées"
+    )
+    
     class Meta:
         db_table = 'sale'
         # managed = False

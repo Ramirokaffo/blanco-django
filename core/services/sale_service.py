@@ -9,6 +9,7 @@ from core.models import (
     Sale, SaleProduct, CreditSale, Product, Client, Daily,
 )
 from core.models.inventory_models import PaymentSchedule
+from core.models.settings_models import SystemSettings
 from core.services.daily_service import DailyService
 from core.services.accounting_service import AccountingService
 
@@ -81,11 +82,15 @@ class SaleService:
             total=total,
             is_credit=is_credit,
             is_paid=not is_credit,
+            has_vat=False,  # Sera mis à jour après
         )
 
         # Créer les articles et mettre à jour le stock
+        has_vat = False
         for item_data in items_data:
             product = Product.objects.select_for_update().get(id=item_data['product_id'])
+            if product.has_vat:
+                has_vat = True
             SaleProduct.objects.create(
                 sale=sale,
                 product=product,
@@ -94,6 +99,18 @@ class SaleService:
             )
             product.stock -= item_data['quantity']
             product.save(update_fields=['stock'])
+
+        # Mettre à jour le champ has_vat sur la vente
+        sale.has_vat = has_vat
+        sale.save(update_fields=['has_vat'])
+
+        # Récupérer les paramètres système
+        settings = SystemSettings.get_settings()
+        enable_tva = getattr(settings, 'enable_tva_accounting', True)
+        tva_mode = getattr(settings, 'tva_accounting_mode', 'IMMEDIATE')
+
+        # Déterminer s'il faut appliquer la TVA immédiatement
+        apply_tax_now = enable_tva and has_vat and tva_mode == 'IMMEDIATE'
 
         # Créer le crédit si nécessaire
         if is_credit:
@@ -121,7 +138,12 @@ class SaleService:
                 daily=daily,
                 exercise=daily.exercise,
                 payment_method=payment_method,
+                apply_tax=apply_tax_now,
             )
+            # Marquer les écritures TVA comme créées si on est en mode immédiat
+            if apply_tax_now:
+                sale.tva_accounting_created = True
+                sale.save(update_fields=['tva_accounting_created'])
         except Exception:
             pass  # Ne pas bloquer la vente si la comptabilité échoue
 

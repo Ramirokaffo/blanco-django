@@ -125,7 +125,7 @@
                 </div>
 
                 <!-- Taux de TVA -->
-                <div class="form-group">
+                <div class="form-group" id="taxRateGroup" style="display:none;">
                     <label class="form-label" for="id_tax_rate">{{ form.tax_rate.label }}</label>
                     {{ form.tax_rate }}
                     {% if form.tax_rate.errors %}
@@ -181,6 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const qtyInput = document.getElementById('id_quantity');
     const priceInput = document.getElementById('id_unit_price');
     const taxRateSelect = document.getElementById('id_tax_rate');
+    const taxRateGroup = document.getElementById('taxRateGroup');
     const expenseTypeSelect = document.getElementById('id_expense_type');
     const summary = document.getElementById('supplySummary');
     const totalCost = document.getElementById('totalCost');
@@ -228,6 +229,22 @@ document.addEventListener('DOMContentLoaded', function() {
     priceInput.addEventListener('input', updateSummary);
     taxRateSelect.addEventListener('change', updateSummary);
     updateSummary();
+
+    // Gérer l'affichage du champ TVA selon le produit sélectionné
+    const productSelect = document.getElementById('id_product');
+    function updateTaxRateVisibility() {
+        const hasVatMap = JSON.parse(productSelect.dataset.hasVatMap || '{}');
+        const selectedId = productSelect.value;
+        const hasVat = hasVatMap[selectedId] || false;
+        if (hasVat) {
+            taxRateGroup.style.display = 'block';
+        } else {
+            taxRateGroup.style.display = 'none';
+            taxRateSelect.value = '';  // Réinitialiser si masqué
+        }
+    }
+    productSelect.addEventListener('change', updateTaxRateVisibility);
+    updateTaxRateVisibility();  // Initialiser au chargement
 
     // Intercepter la soumission du formulaire
     supplyForm.addEventListener('submit', function(e) {

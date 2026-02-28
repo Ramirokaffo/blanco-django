@@ -337,7 +337,7 @@ class SystemSettingsAdmin(admin.ModelAdmin):
             )
         }),
         ('Informations fiscales / légales', {
-            'fields': ('tax_id', 'trade_register'),
+            'fields': ('tax_id', 'trade_register', 'tva_accounting_mode', 'enable_tva_accounting'),
         }),
         ('Paramètres monétaires', {
             'fields': ('currency_symbol', 'currency_code'),
@@ -347,6 +347,9 @@ class SystemSettingsAdmin(admin.ModelAdmin):
         }),
         ('Paramètres de stock', {
             'fields': ('low_stock_threshold',),
+        }),
+        ('Paramètres par défaut', {
+            'fields': ('default_supply_expense_type',),
         }),
         ('Métadonnées', {
             'fields': ('updated_at',),

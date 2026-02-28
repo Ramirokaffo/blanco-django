@@ -209,6 +209,84 @@ class AccountingService:
             JournalEntryLine.objects.bulk_create(lines)
         return entry
 
+    # ── Écritures TVA différées pour un Daily ─────────────────────────────
+
+    @classmethod
+    def record_deferred_tva_for_daily(cls, daily):
+        """
+        Enregistre les écritures de TVA différée pour toutes les ventes du Daily
+        qui n'ont pas encore eu leurs écritures TVA créées.
+        
+        Utilisé en mode DEFERRED lors de la clôture du Daily.
+        
+        :param daily: Objet Daily pour lequel créer les écritures TVA
+        :return: Nombre d'écritures créées
+        """
+        from core.models import Sale
+        
+        # Récupérer les ventes avec TVA qui n'ont pas encore d'écritures TVA
+        sales_with_tva = Sale.objects.filter(
+            daily=daily,
+            has_vat=True,
+            tva_accounting_created=False,
+            delete_at__isnull=True,
+        )
+        
+        if not sales_with_tva.exists():
+            return 0
+        
+        tax_rate = cls.get_default_tax_rate()
+        if not tax_rate:
+            return 0
+        
+        entries_created = 0
+        
+        with transaction.atomic():
+            for sale in sales_with_tva:
+                try:
+                    amount = Decimal(str(sale.total or 0))
+                    if amount <= 0:
+                        continue
+                        
+                    ht, tva = cls.compute_tax(amount, tax_rate)
+                    
+                    if tva <= 0:
+                        continue
+                    
+                    # Créer une écriture de TVA collectée
+                    ref = cls._generate_reference('VE')
+                    entry = JournalEntry.objects.create(
+                        reference=ref,
+                        date=timezone.now().date(),
+                        description=f"TVA collectée - Vente #{sale.id} (clôture daily)",
+                        journal='VE',
+                        exercise=daily.exercise,
+                        daily=daily,
+                        sale=sale,
+                    )
+                    
+                    # Créditer le compte de TVA collectée
+                    JournalEntryLine.objects.create(
+                        entry=entry,
+                        account=cls.get_account('4431'),
+                        debit=0,
+                        credit=tva,
+                        description=f"TVA collectée – vente #{sale.id}",
+                    )
+                    
+                    # Marquer la vente comme ayant ses écritures TVA créées
+                    sale.tva_accounting_created = True
+                    sale.save(update_fields=['tva_accounting_created'])
+                    
+                    entries_created += 1
+                    
+                except Exception as e:
+                    # Log l'erreur mais continuer avec les autres ventes
+                    print(f"Erreur lors de la création des écritures TVA pour la vente #{sale.id}: {e}")
+                    continue
+        
+        return entries_created
+
     # ── Écriture pour un ACHAT / Approvisionnement ────────────────────
 
     @classmethod
