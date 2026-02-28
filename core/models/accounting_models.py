@@ -237,6 +237,10 @@ class DailyExpense(SoftDeleteModel):
     expense_type = models.ForeignKey(ExpenseType, on_delete=models.SET_NULL, null=True, related_name='daily_expenses')
     staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='expenses')
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name='expenses')
+    account = models.ForeignKey(
+        'Account', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='expenses', verbose_name="Compte comptable"
+    )
     
     class Meta:
         db_table = 'daily_expense'
@@ -259,6 +263,10 @@ class DailyRecipe(SoftDeleteModel):
     recipe_type = models.ForeignKey(RecipeType, on_delete=models.SET_NULL, null=True, related_name='daily_recipes')
     staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='recipes')
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name='recipes')
+    account = models.ForeignKey(
+        'Account', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='recipes', verbose_name="Compte comptable"
+    )
     
     class Meta:
         db_table = 'daily_recipe'

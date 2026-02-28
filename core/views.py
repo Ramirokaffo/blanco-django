@@ -12,7 +12,7 @@ from core.models.sale_models import Sale, SaleProduct, CreditSale
 from core.models.user_models import Client, Supplier, CustomUser
 from core.models.accounting_models import (
     Daily, DailyExpense, DailyRecipe, ExpenseType, Exercise,
-    Account, Payment, SupplierPayment, Invoice,
+    Account, Payment, RecipeType, SupplierPayment, Invoice,
     TaxRate, BankStatement, ExerciseClosing,
 )
 from core.models.product_models import Product, Category, Gamme, Rayon
@@ -210,24 +210,68 @@ def dashboard(request):
 @module_required('sales')
 def sales(request):
     """Vue de la page des ventes"""
-    from django.db.models import Sum
-
+    from django.db.models import Sum, F
+    
+    view_mode = request.GET.get('view_mode', 'sales')  # 'sales' or 'products'
+    search = request.GET.get('search', '').strip()
+    
     # Récupérer le Daily actif (non fermé)
     # current_daily = Daily.objects.filter(end_date__isnull=True).order_by('-start_date').first()
     current_daily = DailyService().get_or_create_active_daily()
 
     if current_daily:
-        # Récupérer uniquement les ventes du Daily en cours
-        sales_list = Sale.objects.select_related('client', 'staff', 'daily').filter(
-            delete_at__isnull=True,
-            daily=current_daily
-        ).order_by('-create_at')
-
-        # Calculer la recette totale du jour
-        total_revenue = sales_list.aggregate(total=Sum('total'))['total'] or 0
+        if view_mode == 'products':
+            # Mode produits vendus : afficher SaleProduct directement pour le daily en cours
+            queryset = SaleProduct.objects.filter(
+                delete_at__isnull=True,
+                sale__daily=current_daily,
+            ).select_related('sale', 'sale__client', 'sale__staff', 'product', 'product__category')
+            
+            # Filtre recherche (produit, client, vendeur, ID vente)
+            if search:
+                queryset = queryset.filter(
+                    Q(product__name__icontains=search)
+                    | Q(sale__client__firstname__icontains=search)
+                    | Q(sale__client__lastname__icontains=search)
+                    | Q(sale__staff__firstname__icontains=search)
+                    | Q(sale__staff__lastname__icontains=search)
+                    | Q(sale__id__icontains=search)
+                )
+            
+            queryset = queryset.order_by('-sale__create_at')
+            
+            # Total des produits vendus (quantité * prix unitaire)
+            from django.db.models import Sum as DbSum
+            total_revenue = queryset.annotate(
+                line_total=F('quantity') * F('unit_price')
+            ).aggregate(total=DbSum('line_total'))['total'] or 0
+            
+            sale_products_list = queryset
+            sales_list = []
+        else:
+            # Mode ventes par défaut
+            sales_list = Sale.objects.select_related('client', 'staff', 'daily', 'credit_info').filter(
+                delete_at__isnull=True,
+                daily=current_daily
+            ).order_by('-create_at')
+            
+            # Filtre recherche (client, vendeur, montant, ID)
+            if search:
+                sales_list = sales_list.filter(
+                    Q(client__firstname__icontains=search)
+                    | Q(client__lastname__icontains=search)
+                    | Q(staff__firstname__icontains=search)
+                    | Q(staff__lastname__icontains=search)
+                    | Q(id__icontains=search)
+                )
+            
+            # Calculer la recette totale du jour
+            total_revenue = sales_list.aggregate(total=Sum('total'))['total'] or 0
+            sale_products_list = []
     else:
         # Aucun Daily actif
         sales_list = Sale.objects.none()
+        sale_products_list = []
         total_revenue = 0
 
     # Récupérer tous les clients actifs
@@ -236,9 +280,12 @@ def sales(request):
     context = {
         'page_title': 'Ventes',
         'sales': sales_list,
+        'sale_products': sale_products_list,
         'clients': clients_list,
         'current_daily': current_daily,
         'total_revenue': total_revenue,
+        'view_mode': view_mode,
+        'current_search': search,
     }
     return render(request, 'core/sales.html', context)
 
@@ -247,7 +294,7 @@ def sales(request):
 @module_required('sales')
 def sales_history(request):
     """Vue de l'historique complet des ventes avec filtres et pagination"""
-    from django.db.models import Sum
+    from django.db.models import Sum, F
 
     search = request.GET.get('search', '').strip()
     client_id = request.GET.get('client', '')
@@ -257,10 +304,89 @@ def sales_history(request):
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     page_number = request.GET.get('page', 1)
+    view_mode = request.GET.get('view_mode', 'sales')  # 'sales' or 'products'
 
+    if view_mode == 'products':
+        # Mode produits vendus : afficher SaleProduct directement
+        queryset = SaleProduct.objects.filter(
+            delete_at__isnull=True,
+        ).select_related('sale', 'sale__client', 'sale__staff', 'product', 'product__category')
+
+        # Filtre recherche (produit, client, vendeur, ID vente)
+        if search:
+            queryset = queryset.filter(
+                Q(product__name__icontains=search)
+                | Q(sale__client__firstname__icontains=search)
+                | Q(sale__client__lastname__icontains=search)
+                | Q(sale__staff__firstname__icontains=search)
+                | Q(sale__staff__lastname__icontains=search)
+                | Q(sale__id__icontains=search)
+            )
+
+        # Filtre client
+        if client_id:
+            queryset = queryset.filter(sale__client_id=client_id)
+
+        # Filtre vendeur
+        if staff_id:
+            queryset = queryset.filter(sale__staff_id=staff_id)
+
+        # Filtre type (comptant / crédit)
+        if sale_type == 'cash':
+            queryset = queryset.filter(sale__is_credit=False)
+        elif sale_type == 'credit':
+            queryset = queryset.filter(sale__is_credit=True)
+
+        # Filtre statut paiement
+        if payment_status == 'paid':
+            queryset = queryset.filter(sale__is_paid=True)
+        elif payment_status == 'unpaid':
+            queryset = queryset.filter(sale__is_paid=False)
+
+        # Filtre dates
+        if date_from:
+            queryset = queryset.filter(sale__create_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(sale__create_at__date__lte=date_to)
+
+        queryset = queryset.order_by('-sale__create_at')
+
+        # Total des produits vendus (quantité * prix unitaire)
+        from django.db.models import Sum as DbSum
+        total_products_amount = queryset.annotate(
+            line_total=F('quantity') * F('unit_price')
+        ).aggregate(total=DbSum('line_total'))['total'] or 0
+
+        paginator = Paginator(queryset, 20)
+        page_obj = paginator.get_page(page_number)
+
+        # Listes pour les dropdowns
+        clients_list = Client.objects.filter(delete_at__isnull=True).order_by('firstname')
+        staff_list = CustomUser.objects.filter(delete_at__isnull=True, is_active=True).order_by('firstname')
+
+        context = {
+            'page_title': 'Historique des ventes - Produits',
+            'page_obj': page_obj,
+            'sale_products': page_obj.object_list,
+            'view_mode': 'products',
+            'clients': clients_list,
+            'staff_members': staff_list,
+            'current_search': search,
+            'current_client': client_id,
+            'current_staff': staff_id,
+            'current_type': sale_type,
+            'current_status': payment_status,
+            'current_date_from': date_from,
+            'current_date_to': date_to,
+            'total_count': paginator.count,
+            'total_sales_amount': total_products_amount,
+        }
+        return render(request, 'core/sales_history.html', context)
+
+    # Mode ventes par défaut (existing code)
     queryset = Sale.objects.filter(
         delete_at__isnull=True,
-    ).select_related('client', 'staff', 'daily')
+    ).select_related('client', 'staff', 'daily', 'credit_info')
 
     # Filtre recherche (client, vendeur, montant, ID)
     if search:
@@ -314,6 +440,7 @@ def sales_history(request):
         'page_title': 'Historique des ventes',
         'page_obj': page_obj,
         'sales': page_obj.object_list,
+        'view_mode': 'sales',
         'clients': clients_list,
         'staff_members': staff_list,
         'current_search': search,
@@ -852,7 +979,7 @@ def supplies(request):
 
     queryset = Supply.objects.filter(
         delete_at__isnull=True,
-    ).select_related('product', 'supplier', 'staff', 'daily')
+    ).select_related('product', 'supplier', 'staff', 'daily', 'credit_info')
 
     if search:
         queryset = queryset.filter(
@@ -892,6 +1019,8 @@ def add_supply(request):
     """Vue pour ajouter un nouvel approvisionnement"""
     if request.method == 'POST':
         form = SupplyForm(request.POST)
+        print(form.is_valid())
+        print(form.errors)
         if form.is_valid():
             supply = form.save(commit=False)
             supply.staff = request.user
@@ -901,6 +1030,25 @@ def add_supply(request):
             supply.is_credit = is_credit_purchase
             supply.selling_price = form.cleaned_data.get('selling_price') or supply.product.actual_price or 0
             supply.is_paid = not is_credit_purchase
+            
+            # Calculer le montant de la TVA
+            tax_rate = form.cleaned_data.get('tax_rate')
+            if tax_rate:
+                supply.vat_amount = supply.total_price * (tax_rate.rate / 100)
+            else:
+                supply.vat_amount = 0
+            
+            # Sauvegarder le type de dépense
+            supply.expense_type = form.cleaned_data.get('expense_type')
+            
+            # Sauvegarder le type de dépense par défaut dans les paramètres système
+            selected_expense_type = form.cleaned_data.get('expense_type')
+            if selected_expense_type:
+                from core.models.settings_models import SystemSettings
+                settings = SystemSettings.get_settings()
+                settings.default_supply_expense_type = selected_expense_type
+                settings.save()
+            
             supply.save()
 
             # Enregistrer l'écriture comptable
@@ -912,6 +1060,7 @@ def add_supply(request):
                     exercise=supply.daily.exercise,
                     payment_method=payment_method,
                     is_credit=is_credit_purchase,
+                    tax_rate=supply.tax_rate,  # Passer le taux de TVA depuis l'approvisionnement
                 )
             except Exception:
                 pass  # Ne pas bloquer l'approvisionnement si la comptabilité échoue
@@ -956,10 +1105,19 @@ def add_supply(request):
                     'quantity': supply.quantity,
                     'purchase_cost': float(supply.purchase_cost),
                     'total_price': float(supply.total_price),
+                    'vat_amount': float(supply.vat_amount) if supply.vat_amount else 0,
+                    'expense_type_id': supply.expense_type_id if supply.expense_type else None,
+                    'payment_method': payment_method,
                 })
 
             messages.success(request, f'Approvisionnement de {supply.quantity} x "{product.name}" enregistré avec succès.')
             return redirect('supplies')
+        else:
+            form = SupplyForm(request.POST)  # Re-render form with errors
+            return render(request, 'core/supplies_add.html', {
+                'page_title': 'Nouvel approvisionnement',
+                'form': form,
+            })
     else:
         form = SupplyForm()
 
@@ -973,50 +1131,91 @@ def add_supply(request):
 @login_required
 @module_required('expenses')
 def expenses(request):
-    """Vue de la page des dépenses quotidiennes avec pagination et filtres"""
+    """Vue de la page des dépenses et recettes quotidiennes avec pagination et filtres"""
+    # Paramètres communs
     search = request.GET.get('search', '').strip()
-    expense_type_id = request.GET.get('expense_type', '')
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     page_number = request.GET.get('page', 1)
-
-    queryset = DailyExpense.objects.filter(
+    active_tab = request.GET.get('tab', 'expenses')
+    
+    # === DéPENSES ===
+    expense_type_id = request.GET.get('expense_type', '')
+    
+    expenses_queryset = DailyExpense.objects.filter(
         delete_at__isnull=True,
-    ).select_related('expense_type', 'staff', 'daily', 'exercise')
+    ).select_related('expense_type', 'staff', 'daily', 'exercise', 'account')
 
     if search:
-        queryset = queryset.filter(
+        expenses_queryset = expenses_queryset.filter(
             Q(description__icontains=search) | Q(expense_type__name__icontains=search)
         )
     if expense_type_id:
-        queryset = queryset.filter(expense_type_id=expense_type_id)
+        expenses_queryset = expenses_queryset.filter(expense_type_id=expense_type_id)
     if date_from:
-        queryset = queryset.filter(create_at__date__gte=date_from)
+        expenses_queryset = expenses_queryset.filter(create_at__date__gte=date_from)
     if date_to:
-        queryset = queryset.filter(create_at__date__lte=date_to)
+        expenses_queryset = expenses_queryset.filter(create_at__date__lte=date_to)
 
-    queryset = queryset.order_by('-create_at')
+    expenses_queryset = expenses_queryset.order_by('-create_at')
 
     # Total des dépenses filtrées
     from django.db.models import Sum
-    total_expenses = queryset.aggregate(total=Sum('amount'))['total'] or 0
+    total_expenses = expenses_queryset.aggregate(total=Sum('amount'))['total'] or 0
 
-    paginator = Paginator(queryset, 20)
-    page_obj = paginator.get_page(page_number)
+    expenses_paginator = Paginator(expenses_queryset, 20)
+    expenses_page = expenses_paginator.get_page(page_number)
+    
+    # === RECETTES ===
+    recipe_type_id = request.GET.get('recipe_type', '')
+    
+    recipes_queryset = DailyRecipe.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('recipe_type', 'staff', 'daily', 'exercise', 'account')
+    
+    if search:
+        recipes_queryset = recipes_queryset.filter(
+            Q(description__icontains=search) | Q(recipe_type__name__icontains=search)
+        )
+    if recipe_type_id:
+        recipes_queryset = recipes_queryset.filter(recipe_type_id=recipe_type_id)
+    if date_from:
+        recipes_queryset = recipes_queryset.filter(create_at__date__gte=date_from)
+    if date_to:
+        recipes_queryset = recipes_queryset.filter(create_at__date__lte=date_to)
+    
+    recipes_queryset = recipes_queryset.order_by('-create_at')
+    
+    # Total des recettes filtrées
+    total_recipes = recipes_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    
+    recipes_paginator = Paginator(recipes_queryset, 20)
+    recipes_page = recipes_paginator.get_page(page_number)
 
     expense_types = ExpenseType.objects.filter(delete_at__isnull=True).order_by('name')
+    recipe_types = RecipeType.objects.filter(delete_at__isnull=True).order_by('name')
 
     context = {
-        'page_title': 'Dépenses',
-        'page_obj': page_obj,
-        'expenses': page_obj.object_list,
+        'page_title': 'Dépenses/Recettes',
+        'active_tab': active_tab,
+        # Dépenses
+        'expenses': expenses_page.object_list,
         'expense_types': expense_types,
         'current_search': search,
         'current_expense_type': expense_type_id,
+        'total_expenses': total_expenses,
+        'expenses_page': expenses_page,
+        'expenses_count': expenses_paginator.count,
+        # Recettes
+        'recipes': recipes_page.object_list,
+        'recipe_types': recipe_types,
+        'current_recipe_type': recipe_type_id,
+        'total_recipes': total_recipes,
+        'recipes_page': recipes_page,
+        'recipes_count': recipes_paginator.count,
+        # Filtres communs
         'current_date_from': date_from,
         'current_date_to': date_to,
-        'total_count': paginator.count,
-        'total_expenses': total_expenses,
     }
     return render(request, 'core/expenses.html', context)
 
@@ -1078,6 +1277,93 @@ def add_expense(request):
         'form': form,
     }
     return render(request, 'core/expenses_add.html', context)
+
+
+@require_POST
+@login_required
+@module_required('expenses')
+def add_expense_ajax(request):
+    """Vue AJAX pour ajouter une dépense depuis un approvisionnement"""
+    try:
+        form = ExpenseForm(request.POST)
+        if form.is_valid():
+            expense = form.save(commit=False)
+            expense.staff = request.user
+            daily = DailyService.get_or_create_active_daily()
+            expense.daily = daily
+            expense.exercise = daily.exercise
+            expense.save()
+
+            # Enregistrer l'écriture comptable
+            payment_method = form.cleaned_data.get('payment_method', 'CASH')
+            try:
+                AccountingService.record_expense(
+                    expense=expense,
+                    daily=daily,
+                    exercise=daily.exercise,
+                    payment_method=payment_method,
+                )
+            except Exception:
+                pass  # Ne pas bloquer la dépense si la comptabilité échoue
+
+            return JsonResponse({
+                'success': True,
+                'message': f'Dépense de {expense.amount:,.0f}FCFA enregistrée avec succès.',
+                'expense_id': expense.id,
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Formulaire invalide',
+                'errors': form.errors,
+            }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+        }, status=500)
+
+
+@login_required
+@module_required('expenses')
+def add_recipe(request):
+    """Vue pour ajouter une nouvelle recette"""
+    from core.forms import RecipeForm
+    from core.models.accounting_models import DailyRecipe
+    from core.services.accounting_service import AccountingService
+    
+    if request.method == 'POST':
+        form = RecipeForm(request.POST)
+        if form.is_valid():
+            recipe = form.save(commit=False)
+            recipe.staff = request.user
+            daily = DailyService.get_or_create_active_daily()
+            recipe.daily = daily
+            recipe.exercise = daily.exercise
+            recipe.save()
+
+            # Enregistrer l'écriture comptable
+            payment_method = form.cleaned_data.get('payment_method', 'CASH')
+            try:
+                AccountingService.record_recipe(
+                    recipe=recipe,
+                    daily=daily,
+                    exercise=daily.exercise,
+                    payment_method=payment_method,
+                )
+            except Exception:
+                pass  # Ne pas bloquer la recette si la comptabilité échoue
+
+            messages.success(request, f'Recette de {recipe.amount:,.0f} FCFA enregistrée avec succès.')
+            return redirect('expenses')
+    else:
+        form = RecipeForm()
+
+    context = {
+        'page_title': 'Nouvelle recette',
+        'form': form,
+    }
+    return render(request, 'core/recipes_add.html', context)
 
 
 @login_required
@@ -1434,9 +1720,264 @@ def accounting_chart_of_accounts(request):
     return render(request, 'core/accounting/chart_of_accounts.html', context)
 
 
+@login_required
+@module_required('accounting')
+def export_chart_of_accounts(request):
+    """Export du plan comptable en CSV ou TXT."""
+    import csv
+    from django.http import HttpResponse
+    
+    format_type = request.GET.get('format', 'csv')
+    
+    # Définir le delimiter selon le format
+    delimiter = ';' if format_type == 'csv' else '\t'
+    
+    accounts = Account.objects.filter(
+        is_active=True, delete_at__isnull=True
+    ).order_by('code')
+    
+    response = HttpResponse(content_type=f'text/{format_type}; charset=utf-8')
+    response.write('\ufeff')  # BOM UTF-8 pour Excel
+    writer = csv.writer(response, delimiter=delimiter)
+    
+    # En-tête
+    filename = f"plan_comptable.{format_type}"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    # En-têtes CSV
+    writer.writerow(['Code', 'Libellé', 'Type', 'Compte Parent', 'Description', 'Actif'])
+    
+    # Données
+    for account in accounts:
+        parent_code = account.parent.code if account.parent else ''
+        writer.writerow([
+            account.code,
+            account.name,
+            account.account_type,
+            parent_code,
+            account.description or '',
+            'Oui' if account.is_active else 'Non'
+        ])
+    
+    return response
 
-# ╔══════════════════════════════════════════════════════════════════════╗
-# ║  PHASE 2 — Paiements crédits, Paiements fournisseurs, Factures,   ║
+
+@login_required
+@module_required('accounting')
+def import_chart_of_accounts(request):
+    """Import du plan comptable depuis CSV ou TXT."""
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    import csv
+    import io
+    
+    if request.method != 'POST':
+        messages.error(request, "Méthode non autorisée.")
+        return redirect('accounting_chart')
+    
+    file = request.FILES.get('file')
+    if not file:
+        messages.error(request, "Aucun fichier sélectionné.")
+        return redirect('accounting_chart')
+    
+    # Vérifier l'extension
+    filename = file.name.lower()
+    if not (filename.endswith('.csv') or filename.endswith('.txt')):
+        messages.error(request, "Le fichier doit être au format CSV ou TXT.")
+        return redirect('accounting_chart')
+    
+    delimiter = ';' if filename.endswith('.csv') else '\t'
+    
+    try:
+        # Lire le fichier
+        decoded = file.read().decode('utf-8-sig')
+        reader = csv.reader(io.StringIO(decoded), delimiter=delimiter)
+        
+        # Sauter l'en-tête
+        header = next(reader, None)
+        
+        accounts_created = 0
+        accounts_updated = 0
+        errors = []
+        
+        for row_num, row in enumerate(reader, start=2):
+            if not row or len(row) < 3:
+                continue
+            
+            try:
+                code = row[0].strip()
+                name = row[1].strip()
+                account_type = row[2].strip().upper()
+                
+                # Valider le type de compte
+                valid_types = ['ACTIF', 'PASSIF', 'CHARGE', 'PRODUIT']
+                if account_type not in valid_types:
+                    errors.append(f"Ligne {row_num}: Type de compte invalide '{account_type}'")
+                    continue
+                
+                # Vérifier si le compte existe déjà
+                parent_code = row[3].strip() if len(row) > 3 else ''
+                description = row[4].strip() if len(row) > 4 else ''
+                is_active = row[5].strip().lower() != 'non' if len(row) > 5 else True
+                
+                # Chercher le parent
+                parent = None
+                if parent_code:
+                    try:
+                        parent = Account.objects.get(code=parent_code, delete_at__isnull=True)
+                    except Account.DoesNotExist:
+                        errors.append(f"Ligne {row_num}: Compte parent '{parent_code}' introuvable")
+                        continue
+                
+                # Créer ou mettre à jour
+                account, created = Account.objects.update_or_create(
+                    code=code,
+                    defaults={
+                        'name': name,
+                        'account_type': account_type,
+                        'parent': parent,
+                        'description': description,
+                        'is_active': is_active,
+                    }
+                )
+                
+                if created:
+                    accounts_created += 1
+                else:
+                    accounts_updated += 1
+                    
+            except Exception as e:
+                errors.append(f"Ligne {row_num}: {str(e)}")
+        
+        # Message de succès/erreur
+        if accounts_created > 0:
+            messages.success(request, f"{accounts_created} compte(s) créé(s).")
+        if accounts_updated > 0:
+            messages.success(request, f"{accounts_updated} compte(s) mis à jour.")
+        if errors:
+            for error in errors[:10]:  # Limiter à 10 erreurs affichées
+                messages.warning(request, error)
+            if len(errors) > 10:
+                messages.warning(request, f"... et {len(errors) - 10} erreur(s) supplémentaire(s).")
+        
+    except Exception as e:
+        messages.error(request, f"Erreur lors de l'importation: {str(e)}")
+    
+    return redirect('accounting_chart')
+
+
+@login_required
+@module_required('accounting')
+def accounting_add_entry(request):
+    """Vue pour ajouter une écriture comptable manuelle (Opérations Diverses)."""
+    from core.forms import JournalEntryForm
+    from core.models.accounting_models import Account, JournalEntry, JournalEntryLine, Exercise
+    from core.services.accounting_service import AccountingService
+    from decimal import Decimal
+    
+    accounts = Account.objects.filter(
+        is_active=True, delete_at__isnull=True
+    ).order_by('code')
+    
+    if request.method == 'POST':
+        form = JournalEntryForm(request.POST)
+        
+        # Récupérer les lignes
+        line_count = int(request.POST.get('line_count', 2))
+        lines_data = []
+        errors = []
+        
+        total_debit = Decimal('0')
+        total_credit = Decimal('0')
+        
+        for i in range(line_count):
+            account_id = request.POST.get(f'account_{i}')
+            debit = request.POST.get(f'debit_{i}', '0').replace(',', '.')
+            credit = request.POST.get(f'credit_{i}', '0').replace(',', '.')
+            line_desc = request.POST.get(f'line_desc_{i}', '')
+            
+            if not account_id:
+                continue
+                
+            try:
+                debit_val = Decimal(debit) if debit else Decimal('0')
+                credit_val = Decimal(credit) if credit else Decimal('0')
+                
+                # Au moins un montant doit être positif
+                if debit_val == 0 and credit_val == 0:
+                    continue
+                    
+                # Les deux ne peuvent pas être positifs
+                if debit_val > 0 and credit_val > 0:
+                    errors.append(f"Ligne {i+1}: Un compte ne peut pas avoir à la fois un débit et un crédit.")
+                    continue
+                    
+                total_debit += debit_val
+                total_credit += credit_val
+                
+                lines_data.append({
+                    'account_id': int(account_id),
+                    'debit': debit_val,
+                    'credit': credit_val,
+                    'description': line_desc
+                })
+                
+            except Exception as e:
+                errors.append(f"Ligne {i+1}: {str(e)}")
+        
+        # Validation
+        if not form.is_valid():
+            errors.extend([f"{k}: {v[0]}" for k, v in form.errors.items()])
+        
+        if not lines_data:
+            errors.append("Veuillez saisir au moins une ligne avec un montant.")
+        
+        if total_debit != total_credit:
+            errors.append(f"L'écriture n'est pas équilibrée. Total débit: {total_debit}, Total crédit: {total_credit}")
+        
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+        else:
+            # Créer l'écriture
+            try:
+                exercise = ExerciseService.get_or_create_current_exercise()
+                ref = AccountingService._generate_reference('OD')  # OD = Opérations Diverses
+                
+                entry = JournalEntry.objects.create(
+                    reference=ref,
+                    date=form.cleaned_data['date'],
+                    description=form.cleaned_data['description'],
+                    journal='OD',  # Journal des Opérations Diverses
+                    exercise=exercise,
+                    is_validated=True,
+                )
+                
+                # Créer les lignes
+                for line_data in lines_data:
+                    JournalEntryLine.objects.create(
+                        entry=entry,
+                        account_id=line_data['account_id'],
+                        debit=line_data['debit'],
+                        credit=line_data['credit'],
+                        description=line_data['description'],
+                    )
+                
+                messages.success(request, f"Écriture {ref} créée avec succès!")
+                return redirect('accounting_journal')
+                
+            except Exception as e:
+                messages.error(request, f"Erreur lors de la création: {str(e)}")
+    else:
+        form = JournalEntryForm()
+    
+    context = {
+        'page_title': 'Nouvelle écriture comptable',
+        'form': form,
+        'accounts': accounts,
+        'journal_choices': JournalEntry.JOURNAL_CHOICES,
+    }
+    return render(request, 'core/accounting/add_entry.html', context)
 # ║            Tableau de bord trésorerie                              ║
 # ╚══════════════════════════════════════════════════════════════════════╝
 
@@ -1627,6 +2168,95 @@ def add_supplier_payment(request):
         'form': form,
     }
     return render(request, 'core/accounting/add_supplier_payment.html', context)
+
+
+@login_required
+@module_required('treasury')
+def record_supply_payment(request, supply_id):
+    """Vue pour enregistrer un paiement pour un approvisionnement à crédit spécifique."""
+    from core.models.inventory_models import CreditSupply
+    
+    supply = get_object_or_404(Supply, id=supply_id, delete_at__isnull=True)
+    
+    if not supply.is_credit:
+        messages.warning(request, 'Cet approvisionnement n\'est pas un achat à crédit.')
+        return redirect('supplies')
+    
+    # Récupérer ou créer le CreditSupply
+    try:
+        credit_supply = supply.credit_info
+    except CreditSupply.DoesNotExist:
+        credit_supply = CreditSupply.objects.create(
+            supply=supply,
+            amount_paid=0,
+            amount_remaining=supply.total_price,
+            is_fully_paid=False,
+        )
+    
+    if credit_supply.is_fully_paid:
+        messages.warning(request, 'Cet approvisionnement est déjà payé.')
+        return redirect('supplies')
+
+    if request.method == 'POST':
+        form = SupplierPaymentForm(request.POST)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.staff = request.user
+            daily = DailyService.get_or_create_active_daily()
+            payment.daily = daily
+            payment.save()
+
+            # Mettre à jour le CreditSupply
+            credit_supply.amount_paid += payment.amount
+            credit_supply.amount_remaining -= payment.amount
+            
+            # Vérifier si le paiement est complet
+            if credit_supply.amount_remaining <= 0:
+                credit_supply.amount_remaining = 0
+                credit_supply.is_fully_paid = True
+                supply.is_paid = True
+                supply.save(update_fields=['is_paid'])
+            
+            credit_supply.save(update_fields=['amount_paid', 'amount_remaining', 'is_fully_paid'])
+
+            # Écriture comptable
+            try:
+                exercise = daily.exercise if daily else ExerciseService.get_or_create_current_exercise()
+                AccountingService.record_supplier_payment(
+                    supplier_payment=payment,
+                    daily=daily,
+                    exercise=exercise,
+                )
+            except Exception:
+                pass
+
+            messages.success(
+                request,
+                f'Paiement de {payment.amount:,.0f} FCFA pour {supply.product.name} enregistré. '
+                f'Restant: {credit_supply.amount_remaining:,.0f} FCFA'
+            )
+            return redirect('supplies')
+    else:
+        # Pré-remplir le formulaire avec le montant restant
+        initial_data = {
+            'amount': credit_supply.amount_remaining,
+            'supplier': supply.supplier,
+        }
+        form = SupplierPaymentForm(initial=initial_data)
+
+    # Historique des paiements pour ce fournisseur
+    payments = SupplierPayment.objects.filter(
+        supplier=supply.supplier, delete_at__isnull=True
+    ).order_by('-payment_date')[:5]
+
+    context = {
+        'page_title': f'Paiement – {supply.product.name}',
+        'form': form,
+        'supply': supply,
+        'credit_supply': credit_supply,
+        'payments': payments,
+    }
+    return render(request, 'core/accounting/record_supply_payment.html', context)
 
 
 @login_required

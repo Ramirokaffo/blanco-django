@@ -9,6 +9,43 @@
     gap: 15px;
 }
 
+/* Header actions (view mode + buttons) */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* View mode switcher */
+.view-mode-switch {
+    display: flex;
+    background-color: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 4px;
+    gap: 4px;
+}
+
+.view-mode-switch .mode-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.view-mode-switch .mode-btn:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+}
+
+.view-mode-switch .mode-btn.active {
+    background-color: var(--primary-color);
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+}
+
 /* Filters card */
 .filters-card {
     margin-bottom: 20px;

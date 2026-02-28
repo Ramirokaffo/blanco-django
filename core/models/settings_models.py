@@ -136,6 +136,16 @@ class SystemSettings(models.Model):
         help_text="Quantité en dessous de laquelle une alerte est déclenchée"
     )
 
+    # ──── Paramètres d'approvisionnement ────────────────────────────────────
+    default_supply_expense_type = models.ForeignKey(
+        'core.ExpenseType',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+        verbose_name="Type de dépense par défaut pour les approvisionnements"
+    )
+
     # ──── Métadonnées ──────────────────────────────────────────────────
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Dernière modification")
 

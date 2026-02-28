@@ -1,5 +1,6 @@
 /* Page de vente - Styles spécifiques */
 
+/* Header */
 .page-header {
     margin-bottom: 30px;
 }
@@ -21,6 +22,54 @@
 .text-secondary {
     color: var(--text-secondary);
     margin: 5px 0 0 0;
+}
+
+/* Header buttons + view mode switcher */
+.header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* View mode switcher */
+.view-mode-switch {
+    display: flex;
+    background-color: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 4px;
+    gap: 4px;
+}
+
+.view-mode-switch .mode-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.view-mode-switch .mode-btn:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+}
+
+.view-mode-switch .mode-btn.active {
+    background-color: var(--primary-color);
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+}
+
+/* Search form */
+.search-form {
+    display: flex;
+    align-items: center;
+}
+
+.search-group {
+    display: flex;
+    align-items: center;
 }
 
 /* Amélioration des boutons principaux */

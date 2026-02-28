@@ -24,6 +24,32 @@ class Supply(SoftDeleteModel):
     is_credit = models.BooleanField(default=False, verbose_name="Achat à crédit")
     is_paid = models.BooleanField(default=True, verbose_name="Entièrement payé")
     
+    # Champs TVA
+    tax_rate = models.ForeignKey(
+        'core.TaxRate', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='supplies',
+        verbose_name="Taux de TVA"
+    )
+    vat_amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Montant TVA"
+    )
+    
+    # Type de dépense pour l'approvisionnement
+    expense_type = models.ForeignKey(
+        'core.ExpenseType',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supplies',
+        verbose_name="Type de dépense"
+    )
+    
     class Meta:
         db_table = 'supply'
         # managed = False

@@ -11,8 +11,11 @@
             <p class="text-secondary">{{ total_count }} écriture{{ total_count|pluralize }} — Débit : {{ total_debit|floatformat:0 }} FCFA | Crédit : {{ total_credit|floatformat:0 }} FCFA</p>
         </div>
         <div>
-            <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
-            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Grand Livre</a>
+            <a href="{% url 'accounting_add_entry' %}" class="btn btn-primary btn-sm" style="margin-right: 5px;">
+                + Nouvelle écriture
+            </a>
+            <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Plan comptable</a>
+            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Grand Livre</a>
             <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
         </div>
     </div>

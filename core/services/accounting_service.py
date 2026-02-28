@@ -214,7 +214,7 @@ class AccountingService:
     @classmethod
     def record_supply(cls, supply, daily, exercise,
                       payment_method='CASH', is_credit=False,
-                      apply_tax=False):
+                      tax_rate=None):
         """
         Enregistre l'écriture comptable d'un approvisionnement.
         Sans TVA :
@@ -224,12 +224,13 @@ class AccountingService:
           Débit  601              | HT
           Débit  4451 TVA déduct. | TVA
           Crédit 571/521/585/401  | TTC
+        
+        :param tax_rate: objet TaxRate optionnel. Si fourni, la TVA sera calculée.
         """
         amount = Decimal(str(supply.total_price or 0))
         if amount <= 0:
             return None
 
-        tax_rate = cls.get_default_tax_rate() if apply_tax else None
         ht, tva = cls.compute_tax(amount, tax_rate)
 
         with transaction.atomic():
@@ -288,12 +289,20 @@ class AccountingService:
         Enregistre l'écriture comptable d'une dépense.
         Débit  65  Autres charges      | montant
         Crédit 571/521/585 Trésorerie  | montant
+        
+        Si expense.account est défini, utilise ce compte au lieu de 65.
         """
         amount = Decimal(str(expense.amount or 0))
         if amount <= 0:
             return None
 
         account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(payment_method, '571')
+        
+        # Utiliser le compte sélectionné dans la dépense ou défaut 65
+        if expense.account:
+            expense_account = expense.account
+        else:
+            expense_account = cls.get_account('65')
 
         with transaction.atomic():
             ref = cls._generate_reference('CA')
@@ -309,7 +318,7 @@ class AccountingService:
             JournalEntryLine.objects.bulk_create([
                 JournalEntryLine(
                     entry=entry,
-                    account=cls.get_account('65'),
+                    account=expense_account,
                     debit=amount, credit=0,
                     description=expense.description or f"Dépense #{expense.id}",
                 ),
@@ -318,6 +327,55 @@ class AccountingService:
                     account=cls.get_account(account_code),
                     debit=0, credit=amount,
                     description=f"Sortie de caisse – dépense #{expense.id}",
+                ),
+            ])
+        return entry
+
+    # ── Écriture pour une RECETTE ───────────────────────────────────────
+
+    @classmethod
+    def record_recipe(cls, recipe, daily, exercise, payment_method='CASH'):
+        """
+        Enregistre l'écriture comptable d'une recette.
+        Débit  571/521/585 Trésorerie  | montant
+        Crédit 75  Autres produits     | montant
+        
+        Si recipe.account est défini, utilise ce compte au lieu de 75.
+        """
+        amount = Decimal(str(recipe.amount or 0))
+        if amount <= 0:
+            return None
+
+        account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(payment_method, '571')
+        
+        # Utiliser le compte sélectionné dans la recette ou défaut 75
+        if recipe.account:
+            recipe_account = recipe.account
+        else:
+            recipe_account = cls.get_account('75')
+
+        with transaction.atomic():
+            ref = cls._generate_reference('CA')
+            entry = JournalEntry.objects.create(
+                reference=ref,
+                date=timezone.now().date(),
+                description=f"Recette – {recipe.recipe_type.name if recipe.recipe_type else 'Divers'}",
+                journal='CA',
+                exercise=exercise,
+                daily=daily,
+            )
+            JournalEntryLine.objects.bulk_create([
+                JournalEntryLine(
+                    entry=entry,
+                    account=cls.get_account(account_code),
+                    debit=amount, credit=0,
+                    description=f"Entrée de caisse – recette #{recipe.id}",
+                ),
+                JournalEntryLine(
+                    entry=entry,
+                    account=recipe_account,
+                    debit=0, credit=amount,
+                    description=recipe.description or f"Recette #{recipe.id}",
                 ),
             ])
         return entry

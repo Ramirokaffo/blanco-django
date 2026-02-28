@@ -78,25 +78,26 @@ class Product(SoftDeleteModel):
     """
     Main product model.
     """
-    code = models.CharField(max_length=255, unique=True)
-    name = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
-    brand = models.CharField(max_length=255, null=True, blank=True)
-    color = models.CharField(max_length=100, null=True, blank=True)
-    stock = models.IntegerField(default=0)
-    stock_limit = models.IntegerField(null=True, blank=True)
-    max_salable_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    actual_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    last_purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    exp_alert_period = models.IntegerField(null=True, blank=True, help_text="Expiration alert period in days")
-    grammage = models.FloatField(null=True, blank=True)
-    is_price_reducible = models.BooleanField(default=True)
+    code = models.CharField(max_length=255, unique=True, verbose_name="Code", help_text="Code du produit")
+    name = models.CharField(max_length=255, verbose_name="Nom", help_text="Nom du produit")
+    description = models.TextField(null=True, blank=True, verbose_name="Description", help_text="Description du produit")
+    brand = models.CharField(max_length=255, null=True, blank=True, verbose_name="Marque", help_text="Marque du produit")
+    color = models.CharField(max_length=100, null=True, blank=True, verbose_name="Couleur", help_text="Couleur du produit")
+    stock = models.IntegerField(default=0, verbose_name="Stock", help_text="Stock actuel du produit")
+    stock_limit = models.IntegerField(null=True, blank=True, verbose_name="Seuil d'alerte de stock", help_text="Seuil d'alerte de stock")
+    max_salable_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Prix maximum autorisé pour la vente", help_text="Prix maximum autorisé pour la vente")
+    last_purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Dernier prix d'achat", help_text="Dernier prix d'achat du produit")
+    actual_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Prix actuel du produit", help_text="Prix actuel du produit")
+    exp_alert_period = models.IntegerField(null=True, blank=True, verbose_name="Période d'alerte d'expiration (jours)", help_text="Période d'alerte d'expiration (jours)")
+    grammage = models.FloatField(null=True, blank=True, verbose_name="Grammage", help_text="Grammage du produit")
+    is_price_reducible = models.BooleanField(default=True, verbose_name="Prix réductible?", help_text="Indique si le prix du produit peut être réduit")
+    has_vat = models.BooleanField(default=True, verbose_name="TVA applicable?", help_text="Indique si le produit est soumis à la TVA")
     
     # Foreign Keys
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
-    gamme = models.ForeignKey(Gamme, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
-    grammage_type = models.ForeignKey(GrammageType, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
-    rayon = models.ForeignKey(Rayon, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Catégorie", related_name='products', help_text="Catégorie du produit")
+    gamme = models.ForeignKey(Gamme, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Gamme", related_name='products', help_text="Gamme du produit")
+    grammage_type = models.ForeignKey(GrammageType, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Type de grammage", related_name='products', help_text="Type de grammage du produit")
+    rayon = models.ForeignKey(Rayon, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Rayon", related_name='products', help_text="Rayon du produit")
     
     class Meta:
         db_table = 'product'
@@ -119,9 +120,9 @@ class ProductImage(SoftDeleteModel):
     """
     Product images model.
     """
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
-    image_path = models.CharField(max_length=500)
-    is_primary = models.BooleanField(default=False)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Produit associé", related_name='images', help_text="Produit associé")
+    image_path = models.CharField(max_length=500, verbose_name="Chemin de l'image", help_text="Chemin de l'image")
+    is_primary = models.BooleanField(default=False, verbose_name="Image principale", help_text="Indique si l'image est la principale")
     
     class Meta:
         db_table = 'product_image'

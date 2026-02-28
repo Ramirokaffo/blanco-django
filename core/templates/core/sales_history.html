@@ -13,25 +13,49 @@
     <div class="header-content">
         <div>
             <h1>Historique des ventes</h1>
-            <p class="text-secondary">{{ total_count }} vente{{ total_count|pluralize }} — Total : {{ total_sales_amount|floatformat:0 }} FCFA</p>
+            <p class="text-secondary">
+                {% if view_mode == 'products' %}
+                    {{ total_count }} produit{{ total_count|pluralize }} vendu{{ total_count|pluralize }} — Total : {{ total_sales_amount|floatformat:0 }} FCFA
+                {% else %}
+                    {{ total_count }} vente{{ total_count|pluralize }} — Total : {{ total_sales_amount|floatformat:0 }} FCFA
+                {% endif %}
+            </p>
         </div>
-        <a href="{% url 'sales' %}" class="btn btn-secondary btn-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Retour aux ventes
-        </a>
+        <div class="header-actions">
+            <!-- Mode switcher -->
+            <div class="view-mode-switch">
+                <a href="{% url 'sales_history' %}?view_mode=sales&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}"
+                   class="mode-btn {% if view_mode != 'products' %}active{% endif %}">
+                    Ventes
+                </a>
+                <a href="{% url 'sales_history' %}?view_mode=products&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}"
+                   class="mode-btn {% if view_mode == 'products' %}active{% endif %}">
+                    Produits
+                </a>
+            </div>
+            <a href="{% url 'sales' %}" class="btn btn-secondary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Retour aux ventes
+            </a>
+        </div>
     </div>
 </div>
 
 <!-- Barre de filtres -->
 <div class="card filters-card">
     <form method="get" action="{% url 'sales_history' %}" class="filters-form" id="filtersForm">
+        <input type="hidden" name="view_mode" value="{{ view_mode }}">
         <div class="filters-row">
             <!-- Recherche -->
             <div class="filter-group filter-search">
                 <label class="form-label">Recherche</label>
+                {% if view_mode == 'products' %}
+                <input type="text" name="search" class="form-control" placeholder="Produit, client, vendeur, n° vente..." value="{{ current_search }}">
+                {% else %}
                 <input type="text" name="search" class="form-control" placeholder="Client, vendeur, n° vente..." value="{{ current_search }}">
+                {% endif %}
             </div>
 
             <!-- Client -->
@@ -98,12 +122,120 @@
                 </svg>
                 Filtrer
             </button>
-            <a href="{% url 'sales_history' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+            <a href="{% url 'sales_history' %}?view_mode={{ view_mode }}" class="btn btn-secondary btn-sm">Réinitialiser</a>
         </div>
     </form>
 </div>
 
-<!-- Tableau des ventes -->
+{% if view_mode == 'products' %}
+<!-- Tableau des produits vendus -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Liste des produits vendus</h3>
+        <div class="pagination-info-header">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#ID</th>
+                        <th>Date</th>
+                        <th>Produit</th>
+                        <th>Catégorie</th>
+                        <th>Prix unitaire</th>
+                        <th>Quantité</th>
+                        <th>Total</th>
+                        <th>Client</th>
+                        <th>Vendeur</th>
+                        <th>Type</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sp in sale_products %}
+                    <tr>
+                        <td class="text-code">#{{ sp.sale.id }}</td>
+                        <td>{{ sp.sale.create_at|date:"d/m/Y H:i" }}</td>
+                        <td class="font-weight-bold">{{ sp.product.name }}</td>
+                        <td>
+                            {% if sp.product.category %}
+                                {{ sp.product.category.name }}
+                            {% else %}
+                                <span class="text-secondary">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ sp.unit_price|floatformat:0 }} FCFA</td>
+                        <td>{{ sp.quantity }}</td>
+                        <td class="font-weight-bold">{{ sp.get_subtotal|floatformat:0 }} FCFA</td>
+                        <td>
+                            {% if sp.sale.client %}
+                                {{ sp.sale.client }}
+                            {% else %}
+                                <span class="text-secondary">Client de passage</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ sp.sale.staff.get_full_name|default:"-" }}</td>
+                        <td>
+                            {% if sp.sale.is_credit %}
+                                <span class="badge badge-warning">Crédit</span>
+                            {% else %}
+                                <span class="badge badge-success">Comptant</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if sp.sale.is_paid %}
+                                <span class="badge badge-success">Payé</span>
+                            {% else %}
+                                <span class="badge badge-danger">Non payé</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="text-center text-secondary" style="padding: 2rem;">Aucun produit vendu trouvé.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination pour le mode produits -->
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="pagination-container">
+    <div class="pagination-info">
+        Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} produit{{ total_count|pluralize }} vendu{{ total_count|pluralize }}
+    </div>
+    <div class="pagination-buttons">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&view_mode=products&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
+            &laquo; Précédent
+        </a>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <span class="pagination-btn active">{{ num }}</span>
+            {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                <a href="?page={{ num }}&view_mode=products&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&view_mode=products&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
+            Suivant &raquo;
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- Tableau des ventes (mode par défaut) -->
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Liste des ventes</h3>
@@ -123,6 +255,7 @@
                         <th>Montant</th>
                         <th>Type</th>
                         <th>Statut</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -153,10 +286,28 @@
                                 <span class="badge badge-danger">Non payé</span>
                             {% endif %}
                         </td>
+                        <td>
+                            <div class="action-buttons">
+                                {% if sale.is_credit and sale.credit_info and not sale.credit_info.is_fully_paid %}
+                                <a href="{% url 'record_credit_payment' sale.credit_info.id %}" class="btn btn-primary btn-sm" title="Enregistrer un paiement">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    Payer
+                                </a>
+                                {% endif %}
+                                <button class="btn-icon" onclick="printSale({{ sale.id }})" title="Imprimer la facture">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                        <path d="M4 5V2h8v3M4 11H2V7h12v4h-2" stroke="currentColor" stroke-width="1.5"/>
+                                        <rect x="4" y="9" width="8" height="5" stroke="currentColor" stroke-width="1.5"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center text-secondary" style="padding: 2rem;">Aucune vente trouvée.</td>
+                        <td colspan="8" class="text-center text-secondary" style="padding: 2rem;">Aucune vente trouvée.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -165,7 +316,7 @@
     </div>
 </div>
 
-<!-- Pagination -->
+<!-- Pagination pour le mode ventes -->
 {% if page_obj.paginator.num_pages > 1 %}
 <div class="pagination-container">
     <div class="pagination-info">
@@ -173,7 +324,7 @@
     </div>
     <div class="pagination-buttons">
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
+        <a href="?page={{ page_obj.previous_page_number }}&view_mode=sales&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
             &laquo; Précédent
         </a>
         {% endif %}
@@ -182,17 +333,34 @@
             {% if page_obj.number == num %}
                 <span class="pagination-btn active">{{ num }}</span>
             {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-                <a href="?page={{ num }}&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">{{ num }}</a>
+                <a href="?page={{ num }}&view_mode=sales&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">{{ num }}</a>
             {% endif %}
         {% endfor %}
 
         {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
+        <a href="?page={{ page_obj.next_page_number }}&view_mode=sales&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
             Suivant &raquo;
         </a>
         {% endif %}
     </div>
 </div>
 {% endif %}
+{% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Paramètres système injectés pour les factures
+    window.SYSTEM_SETTINGS = {
+        companyName: "{{ system_settings.company_name|escapejs }}",
+        companyLogo: "{% if system_settings.company_logo %}{{ system_settings.company_logo.url }}{% endif %}",
+        companyAddress: "{{ system_settings.company_address|escapejs }}",
+        companyPhone: "{{ system_settings.company_phone|escapejs }}",
+        companyEmail: "{{ system_settings.company_email|escapejs }}",
+        currencySymbol: "{{ system_settings.currency_symbol|escapejs }}",
+        receiptFooter: "{{ system_settings.receipt_footer|escapejs }}",
+    };
+</script>
+<script src="{% static 'js/sales.js' %}"></script>
 {% endblock %}

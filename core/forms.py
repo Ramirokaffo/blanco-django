@@ -7,8 +7,8 @@ from core.models.inventory_models import Supply, Inventory
 from core.models.product_models import Product
 from core.models.user_models import Supplier
 from core.models.accounting_models import (
-    DailyExpense, ExpenseType, Payment, SupplierPayment,
-    PAYMENT_METHOD_CHOICES,
+    DailyExpense, DailyRecipe, ExpenseType, Payment, SupplierPayment,
+    PAYMENT_METHOD_CHOICES, Account, RecipeType, TaxRate
 )
 from core.models.user_models import Client
 
@@ -51,7 +51,7 @@ class SupplyForm(forms.ModelForm):
         max_digits=10,
         decimal_places=2,
         required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Laisser vide pour garder le prix actuel', 'step': '1'}),
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Laisser vide pour garder le prix actuel', 'step': '1', "id": "id_unit_price"}),
     )
 
     expiration_date = forms.DateField(
@@ -79,9 +79,34 @@ class SupplyForm(forms.ModelForm):
         widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
     )
 
+    tax_rate = forms.ModelChoiceField(
+        queryset=TaxRate.objects.filter(delete_at__isnull=True, is_active=True).order_by('name'),
+        label='Taux de TVA',
+        required=False,
+        empty_label='-- Sans TVA --',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    expense_type = forms.ModelChoiceField(
+        queryset=ExpenseType.objects.filter(delete_at__isnull=True).order_by('name'),
+        label='Type de dépense (approvisionnement)',
+        required=True,
+        empty_label='-- Sélectionner un type --',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        help_text='Ce type de dépense sera utilisé pour créer automatiquement la dépense liée à cet approvisionnement'
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Pré-remplir le type de dépense depuis les paramètres système
+        from core.models.settings_models import SystemSettings
+        settings = SystemSettings.get_settings()
+        if settings.default_supply_expense_type:
+            self.initial['expense_type'] = settings.default_supply_expense_type
+
     class Meta:
         model = Supply
-        fields = ['product', 'supplier', 'quantity', 'purchase_cost', 'expiration_date']
+        fields = ['product', 'supplier', 'quantity', 'purchase_cost', 'expiration_date', 'is_credit', 'tax_rate', 'expense_type']
 
     def clean_expiration_date(self):
         exp_date = self.cleaned_data.get('expiration_date')
@@ -138,9 +163,65 @@ class ExpenseForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-control'}),
     )
 
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.filter(is_active=True, delete_at__isnull=True).order_by('code'),
+        label='Compte comptable (optionnel)',
+        required=False,
+        empty_label='-- Par défaut (6xx) --',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
     class Meta:
         model = DailyExpense
-        fields = ['expense_type', 'amount', 'description']
+        fields = ['expense_type', 'amount', 'description', 'account', 'payment_method']
+
+
+class RecipeForm(forms.ModelForm):
+    """Formulaire d'ajout de recette quotidienne."""
+
+    recipe_type = forms.ModelChoiceField(
+        queryset=RecipeType.objects.filter(delete_at__isnull=True).order_by('name'),
+        label='Type de recette',
+        empty_label='-- Sélectionner un type --',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    amount = forms.DecimalField(
+        label='Montant (FCFA)',
+        min_value=1,
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 5000', 'step': '1'}),
+    )
+
+    description = forms.CharField(
+        label='Description',
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'placeholder': 'Description de la recette (optionnel)',
+            'rows': 3,
+        }),
+    )
+
+    payment_method = forms.ChoiceField(
+        label='Mode de paiement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.filter(is_active=True, delete_at__isnull=True).order_by('code'),
+        label='Compte comptable (optionnel)',
+        required=False,
+        empty_label='-- Par défaut (7xx) --',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    class Meta:
+        model = DailyRecipe
+        fields = ['recipe_type', 'amount', 'description', 'account']
 
 
 GENDER_CHOICES = [
@@ -483,3 +564,88 @@ class SupplierPaymentForm(forms.ModelForm):
         if not self.initial.get('payment_date'):
             from datetime import date
             self.initial['payment_date'] = date.today()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Formulaire d'écriture comptable manuelle (Journal des Opérations Diverses)
+# ──────────────────────────────────────────────────────────────────────────────
+
+from core.models.accounting_models import Account, JournalEntry, JournalEntryLine, Exercise
+
+
+class JournalEntryForm(forms.Form):
+    """Formulaire pour créer une écriture comptable manuelle."""
+
+    date = forms.DateField(
+        label='Date',
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+    )
+
+    description = forms.CharField(
+        label='Libellé de l\'écriture',
+        max_length=500,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Description de l\'opération'}),
+    )
+
+    # Pour les lignes d'écriture
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Initialiser la date du jour
+        if not self.initial.get('date'):
+            from datetime import date
+            self.initial['date'] = date.today()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # La validation des lignes se fera côté vue
+        return cleaned_data
+
+
+class JournalEntryLineForm(forms.Form):
+    """Formulaire pour une ligne d'écriture comptable."""
+
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.filter(
+            is_active=True, delete_at__isnull=True
+        ).order_by('code'),
+        label='Compte',
+        widget=forms.Select(attrs={'class': 'form-control account-select'}),
+    )
+
+    debit = forms.DecimalField(
+        label='Débit',
+        required=False,
+        min_value=0,
+        max_digits=15,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control amount-input debit-input',
+            'placeholder': '0.00',
+            'step': '0.01',
+            'min': '0'
+        }),
+    )
+
+    credit = forms.DecimalField(
+        label='Crédit',
+        required=False,
+        min_value=0,
+        max_digits=15,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control amount-input credit-input',
+            'placeholder': '0.00',
+            'step': '0.01',
+            'min': '0'
+        }),
+    )
+
+    line_description = forms.CharField(
+        label='Libellé ligne',
+        required=False,
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Libellé (optionnel)'
+        }),
+    )

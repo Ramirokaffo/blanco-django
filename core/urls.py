@@ -22,8 +22,10 @@ urlpatterns = [
     path('suppliers/', views.suppliers_list, name='suppliers'),
     path('suppliers/add/', views.add_supplier, name='add_supplier'),
     path('suppliers/<int:pk>/edit/', views.edit_supplier, name='edit_supplier'),
-    path('expenses/', views.expenses, name='expenses'),
+    path('expenses-recipe/', views.expenses, name='expenses'),
     path('expenses/add/', views.add_expense, name='add_expense'),
+    path('expenses/add/ajax/', views.add_expense_ajax, name='add_expense_ajax'),
+    path('recipes/add/', views.add_recipe, name='add_recipe'),
     path('daily/summary/', views.get_daily_summary, name='get_daily_summary'),
     path('daily/close/', views.close_daily, name='close_daily'),
     path('reports/', views.reports, name='reports'),
@@ -32,9 +34,12 @@ urlpatterns = [
 
     # Comptabilité
     path('accounting/journal/', views.accounting_journal, name='accounting_journal'),
+    path('accounting/journal/add/', views.accounting_add_entry, name='accounting_add_entry'),
     path('accounting/ledger/', views.accounting_general_ledger, name='accounting_ledger'),
     path('accounting/balance/', views.accounting_trial_balance, name='accounting_balance'),
     path('accounting/chart/', views.accounting_chart_of_accounts, name='accounting_chart'),
+    path('accounting/chart/export/', views.export_chart_of_accounts, name='export_chart_of_accounts'),
+    path('accounting/chart/import/', views.import_chart_of_accounts, name='import_chart_of_accounts'),
 
     # Phase 2 — Trésorerie, Paiements, Factures
     path('accounting/treasury/', views.treasury_dashboard, name='treasury_dashboard'),
@@ -42,6 +47,7 @@ urlpatterns = [
     path('accounting/credit-sales/<int:credit_sale_id>/payment/', views.record_credit_payment, name='record_credit_payment'),
     path('accounting/supplier-payments/', views.supplier_payments_list, name='supplier_payments'),
     path('accounting/supplier-payments/add/', views.add_supplier_payment, name='add_supplier_payment'),
+    path('accounting/supply/<int:supply_id>/payment/', views.record_supply_payment, name='record_supply_payment'),
     path('accounting/invoices/', views.invoices_list, name='invoices'),
     path('accounting/invoices/generate/<int:sale_id>/', views.generate_invoice, name='generate_invoice'),
 

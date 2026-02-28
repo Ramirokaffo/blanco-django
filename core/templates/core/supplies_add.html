@@ -81,10 +81,10 @@
 
                 <!-- Prix d'achat unitaire -->
                 <div class="form-group">
-                    <label class="form-label" for="id_unit_price">{{ form.unit_price.label }} <span class="required">*</span></label>
-                    {{ form.unit_price }}
-                    {% if form.unit_price.errors %}
-                    <div class="field-error">{{ form.unit_price.errors.0 }}</div>
+                    <label class="form-label" for="id_unit_price">{{ form.purchase_cost.label }} <span class="required">*</span></label>
+                    {{ form.purchase_cost }}
+                    {% if form.purchase_cost.errors %}
+                    <div class="field-error">{{ form.purchase_cost.errors.0 }}</div>
                     {% endif %}
                 </div>
 
@@ -123,6 +123,25 @@
                     <div class="field-error">{{ form.is_credit.errors.0 }}</div>
                     {% endif %}
                 </div>
+
+                <!-- Taux de TVA -->
+                <div class="form-group">
+                    <label class="form-label" for="id_tax_rate">{{ form.tax_rate.label }}</label>
+                    {{ form.tax_rate }}
+                    {% if form.tax_rate.errors %}
+                    <div class="field-error">{{ form.tax_rate.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Type de dépense -->
+                <div class="form-group">
+                    <label class="form-label" for="id_expense_type">{{ form.expense_type.label }} <span class="required">*</span></label>
+                    {{ form.expense_type }}
+                    {% if form.expense_type.errors %}
+                    <div class="field-error">{{ form.expense_type.errors.0 }}</div>
+                    {% endif %}
+                    <small class="form-help">{{ form.expense_type.help_text }}</small>
+                </div>
             </div>
 
             <!-- Récapitulatif -->
@@ -131,6 +150,14 @@
                 <div class="summary-row">
                     <span>Coût total :</span>
                     <strong id="totalCost">0 FCFA</strong>
+                </div>
+                <div class="summary-row" id="vatRow" style="display:none;">
+                    <span>TVA :</span>
+                    <strong id="vatAmount">0 FCFA</strong>
+                </div>
+                <div class="summary-row" id="totalWithVatRow" style="display:none;">
+                    <span>Total TTC :</span>
+                    <strong id="totalWithVat">0 FCFA</strong>
                 </div>
             </div>
 
@@ -153,17 +180,45 @@
 document.addEventListener('DOMContentLoaded', function() {
     const qtyInput = document.getElementById('id_quantity');
     const priceInput = document.getElementById('id_unit_price');
+    const taxRateSelect = document.getElementById('id_tax_rate');
+    const expenseTypeSelect = document.getElementById('id_expense_type');
     const summary = document.getElementById('supplySummary');
     const totalCost = document.getElementById('totalCost');
+    const vatRow = document.getElementById('vatRow');
+    const vatAmount = document.getElementById('vatAmount');
+    const totalWithVatRow = document.getElementById('totalWithVatRow');
+    const totalWithVat = document.getElementById('totalWithVat');
     const supplyForm = document.getElementById('supplyForm');
 
     function updateSummary() {
         const qty = parseInt(qtyInput.value) || 0;
         const price = parseFloat(priceInput.value) || 0;
         const total = qty * price;
+        const selectedTaxRate = taxRateSelect.value;
+        
+        // Get the rate from the selected option
+        let taxRate = 0;
+        const selectedOption = taxRateSelect.options[taxRateSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            taxRate = parseFloat(selectedOption.dataset.rate) || 0;
+        }
+        
+        const vat = total * (taxRate / 100);
+        const totalWithVatValue = total + vat;
+
         if (qty > 0 && price > 0) {
             summary.style.display = 'block';
             totalCost.textContent = total.toLocaleString('fr-FR') + ' FCFA';
+            
+            if (taxRate > 0) {
+                vatRow.style.display = 'flex';
+                totalWithVatRow.style.display = 'flex';
+                vatAmount.textContent = vat.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' FCFA';
+                totalWithVat.textContent = totalWithVatValue.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' FCFA';
+            } else {
+                vatRow.style.display = 'none';
+                totalWithVatRow.style.display = 'none';
+            }
         } else {
             summary.style.display = 'none';
         }
@@ -171,6 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     qtyInput.addEventListener('input', updateSummary);
     priceInput.addEventListener('input', updateSummary);
+    taxRateSelect.addEventListener('change', updateSummary);
     updateSummary();
 
     // Intercepter la soumission du formulaire
@@ -193,39 +249,104 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 // Afficher un message de succès
                 const totalPrice = parseFloat(data.total_price);
+                const vatAmountValue = parseFloat(data.vat_amount || 0);
+                const expenseTypeId = data.expense_type_id;
                 const amount = totalPrice.toFixed(2);
 
-                // Construire l'URL pour la page d'ajout de dépenses avec paramètres pré-remplis
-                const expenseUrl = new URL("{% url 'add_expense' %}", window.location.origin);
-                expenseUrl.searchParams.append('amount', amount);
-                expenseUrl.searchParams.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price} FCFA)`);
-                expenseUrl.searchParams.append('expense_type', 'approvisionnement');
+                // Check if we should auto-create expense
+                if (expenseTypeId) {
+                    // Automatically create the expense
+                    const expenseData = new FormData();
+                    expenseData.append('expense_type', expenseTypeId);
+                    expenseData.append('amount', (totalPrice + vatAmountValue).toFixed(2));
+                    expenseData.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price}FCFA)`);
+                    expenseData.append('payment_method', data.payment_method || 'CASH');
+                    expenseData.append('csrfmiddlewaretoken', formData.get('csrfmiddlewaretoken'));
 
-                // Ouvrir immédiatement la page d'ajout de dépenses dans un nouvel onglet
-                window.open(expenseUrl.toString(), '_blank');
+                    fetch("{% url 'add_expense_ajax' %}", {
+                        method: 'POST',
+                        body: expenseData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                        }
+                    })
+                    .then(expResponse => expResponse.json())
+                    .then(expData => {
+                        let message = data.message;
+                        if (expData.success) {
+                            message += '<br><small>La dépense a été créée automatiquement.</small>';
+                        } else {
+                            message += '<br><small>Attention: La dépense automatique n\'a pas pu être créée.</small>';
+                        }
+                        
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'alert alert-success';
+                        messageDiv.style.marginBottom = '20px';
+                        messageDiv.innerHTML = `<strong>✓ Succès!</strong> ${message}`;
 
-                // Afficher un message de succès
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'alert alert-success';
-                messageDiv.style.marginBottom = '20px';
-                messageDiv.innerHTML = `
-                    <strong>✓ Succès!</strong> ${data.message}<br>
-                    <small>La page d'ajout de dépenses a été ouverte dans un nouvel onglet.</small>
-                `;
+                        const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
+                        if (messagesContainer) {
+                            messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+                        }
 
-                const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
-                if (messagesContainer) {
-                    messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+                        // Réinitialiser le formulaire
+                        supplyForm.reset();
+                        summary.style.display = 'none';
+
+                        // Rediriger vers la liste des approvisionnements après un court délai
+                        setTimeout(() => {
+                            window.location.href = "{% url 'supplies' %}";
+                        }, 1500);
+                    })
+                    .catch(expError => {
+                        console.error('Erreur création dépense:', expError);
+                        // Continue anyway, show success message
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'alert alert-success';
+                        messageDiv.style.marginBottom = '20px';
+                        messageDiv.innerHTML = `<strong>✓ Succès!</strong> ${data.message}<br><small>La création automatique de la dépense a échoué. Vous pouvez la créer manuellement.</small>`;
+
+                        const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
+                        if (messagesContainer) {
+                            messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+                        }
+
+                        supplyForm.reset();
+                        summary.style.display = 'none';
+
+                        setTimeout(() => {
+                            window.location.href = "{% url 'supplies' %}";
+                        }, 1500);
+                    });
+                } else {
+                    // Old behavior: redirect to expense page
+                    const expenseUrl = new URL("{% url 'add_expense' %}", window.location.origin);
+                    expenseUrl.searchParams.append('amount', amount);
+                    expenseUrl.searchParams.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price}FCFA)`);
+                    expenseUrl.searchParams.append('expense_type', 'approvisionnement');
+
+                    window.open(expenseUrl.toString(), '_blank');
+
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'alert alert-success';
+                    messageDiv.style.marginBottom = '20px';
+                    messageDiv.innerHTML = `
+                        <strong>✓ Succès!</strong> ${data.message}<br>
+                        <small>La page d'ajout de dépenses a été ouverte dans un nouvel onglet.</small>
+                    `;
+
+                    const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
+                    if (messagesContainer) {
+                        messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+                    }
+
+                    supplyForm.reset();
+                    summary.style.display = 'none';
+
+                    setTimeout(() => {
+                        window.location.href = "{% url 'supplies' %}";
+                    }, 1500);
                 }
-
-                // Réinitialiser le formulaire
-                supplyForm.reset();
-                summary.style.display = 'none';
-
-                // Rediriger vers la liste des approvisionnements après un court délai
-                setTimeout(() => {
-                    window.location.href = "{% url 'supplies' %}";
-                }, 1500);
             }
         })
         .catch(error => {
@@ -236,4 +357,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-

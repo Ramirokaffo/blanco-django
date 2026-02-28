@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.entry-form-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+.entry-lines-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.entry-lines-table th {
+    background: var(--bg-secondary);
+    padding: 10px;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+}
+.entry-lines-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.entry-lines-table .amount-cell {
+    width: 150px;
+}
+.entry-lines-table .account-cell {
+    width: 250px;
+}
+.entry-lines-table input[type="number"] {
+    width: 100%;
+    text-align: right;
+}
+.add-line-btn {
+    margin-top: 10px;
+}
+.total-row {
+    font-weight: bold;
+    background: var(--bg-secondary);
+}
+.total-row td {
+    border-top: 2px solid var(--border-color);
+}
+.balance-indicator {
+    padding: 10px;
+    margin-top: 15px;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: bold;
+}
+.balance-ok {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.balance-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>Nouvelle écriture comptable</h1>
+            <p class="text-secondary">Journal des Opérations Diverses (OD)</p>
+        </div>
+        <div>
+            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">
+                Retour au journal
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card entry-form-container">
+    <div class="card-body">
+        <form method="post" id="entryForm">
+            {% csrf_token %}
+            
+            <!-- Informations de l'écriture -->
+            <div class="form-row" style="display: flex; gap: 20px; margin-bottom: 20px;">
+                <div class="form-group" style="flex: 1;">
+                    <label for="id_date">Date</label>
+                    <input type="date" class="form-control" id="id_date" name="date" 
+                           value="{{ form.date.value|date:'Y-m-d'|default:form.initial.date }}" required>
+                </div>
+                <div class="form-group" style="flex: 3;">
+                    <label for="id_description">Libellé de l'écriture</label>
+                    <input type="text" class="form-control" id="id_description" name="description" 
+                           placeholder="Description de l'opération" required>
+                </div>
+            </div>
+            
+            <!-- Lignes d'écriture -->
+            <h4 style="margin-bottom: 15px;">Lignes d'écriture</h4>
+            
+            <table class="entry-lines-table" id="linesTable">
+                <thead>
+                    <tr>
+                        <th>Compte</th>
+                        <th>Débit</th>
+                        <th>Crédit</th>
+                        <th>Libellé</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="linesBody">
+                    <!-- Les lignes seront ajoutées ici par JavaScript -->
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td>TOTAL</td>
+                        <td id="totalDebit">0.00</td>
+                        <td id="totalCredit">0.00</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div id="balanceIndicator" class="balance-indicator balance-error">
+                L'écriture n'est pas équilibrée
+            </div>
+            
+            <button type="button" class="btn btn-secondary btn-sm add-line-btn" onclick="addLine()">
+                + Ajouter une ligne
+            </button>
+            
+            <input type="hidden" name="line_count" id="lineCount" value="2">
+            
+            <div style="margin-top: 30px; text-align: right;">
+                <a href="{% url 'accounting_journal' %}" class="btn btn-secondary">Annuler</a>
+                <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                    Enregistrer l'écriture
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const accounts = [
+    {% for account in accounts %}
+    { id: {{ account.id }}, code: "{{ account.code }}", name: "{{ account.name|escapejs }}" },
+    {% endfor %}
+];
+
+let lineIndex = 0;
+
+function addLine(accountId = '', debit = '', credit = '', lineDesc = '') {
+    const tbody = document.getElementById('linesBody');
+    const row = document.createElement('tr');
+    row.id = `line-${lineIndex}`;
+    
+    // Options du select de compte
+    let options = '<option value="">-- Sélectionner un compte --</option>';
+    accounts.forEach(acc => {
+        const selected = acc.id == accountId ? 'selected' : '';
+        options += `<option value="${acc.id}" ${selected}>${acc.code} - ${acc.name}</option>`;
+    });
+    
+    row.innerHTML = `
+        <td>
+            <select class="form-control" name="account_${lineIndex}" onchange="updateBalance()">
+                ${options}
+            </select>
+        </td>
+        <td class="amount-cell">
+            <input type="number" class="form-control debit-input" name="debit_${lineIndex}" 
+                   value="${debit}" step="0.01" min="0" placeholder="0.00" 
+                   oninput="clearCredit(this); updateBalance()">
+        </td>
+        <td class="amount-cell">
+            <input type="number" class="form-control credit-input" name="credit_${lineIndex}" 
+                   value="${credit}" step="0.01" min="0" placeholder="0.00" 
+                   oninput="clearDebit(this); updateBalance()">
+        </td>
+        <td>
+            <input type="text" class="form-control" name="line_desc_${lineIndex}" 
+                   value="${lineDesc}" placeholder="Libellé (optionnel)">
+        </td>
+        <td>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeLine(${lineIndex})" 
+                    title="Supprimer">
+                ×
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(row);
+    lineIndex++;
+    document.getElementById('lineCount').value = lineIndex;
+    updateBalance();
+}
+
+function removeLine(index) {
+    const row = document.getElementById(`line-${index}`);
+    if (row) {
+        row.remove();
+        updateBalance();
+    }
+}
+
+function clearDebit(input) {
+    if (input.value && input.value !== '0') {
+        const row = input.closest('tr');
+        const creditInput = row.querySelector('.credit-input');
+        if (creditInput) creditInput.value = '';
+    }
+}
+
+function clearCredit(input) {
+    if (input.value && input.value !== '0') {
+        const row = input.closest('tr');
+        const debitInput = row.querySelector('.debit-input');
+        if (debitInput) debitInput.value = '';
+    }
+}
+
+function updateBalance() {
+    let totalDebit = 0;
+    let totalCredit = 0;
+    
+    document.querySelectorAll('.debit-input').forEach(input => {
+        totalDebit += parseFloat(input.value) || 0;
+    });
+    
+    document.querySelectorAll('.credit-input').forEach(input => {
+        totalCredit += parseFloat(input.value) || 0;
+    });
+    
+    document.getElementById('totalDebit').textContent = totalDebit.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    document.getElementById('totalCredit').textContent = totalCredit.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    
+    const indicator = document.getElementById('balanceIndicator');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    const diff = Math.abs(totalDebit - totalCredit);
+    if (diff < 0.01 && totalDebit > 0 && totalCredit > 0) {
+        indicator.className = 'balance-indicator balance-ok';
+        indicator.textContent = 'Écriture équilibrée ✓';
+        submitBtn.disabled = false;
+    } else {
+        indicator.className = 'balance-indicator balance-error';
+        indicator.textContent = `Écriture non équilibrée (différence: ${diff.toFixed(2)})`;
+        submitBtn.disabled = true;
+    }
+}
+
+// Initialiser avec 2 lignes
+document.addEventListener('DOMContentLoaded', function() {
+    addLine();
+    addLine();
+});
+</script>
+{% endblock %}

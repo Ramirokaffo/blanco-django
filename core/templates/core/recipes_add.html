@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Nouvelle dépense - {{ system_settings.company_name }}{% endblock %}
+{% block title %}Nouvelle recette - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/expenses.css' %}">
@@ -11,8 +11,8 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Nouvelle dépense</h1>
-            <p class="text-secondary">Enregistrer une nouvelle dépense quotidienne</p>
+            <h1>Nouvelle recette</h1>
+            <p class="text-secondary">Enregistrer une nouvelle recette quotidienne</p>
         </div>
         <a href="{% url 'expenses' %}" class="btn btn-secondary btn-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -37,10 +37,10 @@
 <!-- Formulaire -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Informations de la dépense</h3>
+        <h3 class="card-title">Informations de la recette</h3>
     </div>
     <div class="card-body">
-        <form method="post" action="{% url 'add_expense' %}" class="expense-form" id="expenseForm">
+        <form method="post" action="{% url 'add_recipe' %}" class="expense-form" id="recipeForm">
             {% csrf_token %}
 
             {% if form.non_field_errors %}
@@ -52,12 +52,12 @@
             {% endif %}
 
             <div class="form-grid">
-                <!-- Type de dépense -->
+                <!-- Type de recette -->
                 <div class="form-group">
-                    <label class="form-label" for="id_expense_type">{{ form.expense_type.label }} <span class="required">*</span></label>
-                    {{ form.expense_type }}
-                    {% if form.expense_type.errors %}
-                    <div class="field-error">{{ form.expense_type.errors.0 }}</div>
+                    <label class="form-label" for="id_recipe_type">{{ form.recipe_type.label }} <span class="required">*</span></label>
+                    {{ form.recipe_type }}
+                    {% if form.recipe_type.errors %}
+                    <div class="field-error">{{ form.recipe_type.errors.0 }}</div>
                     {% endif %}
                 </div>
 
@@ -86,7 +86,7 @@
                     {% if form.account.errors %}
                     <div class="field-error">{{ form.account.errors.0 }}</div>
                     {% endif %}
-                    <small class="form-text text-muted">Laissez vide pour utiliser le compte 65 par défaut</small>
+                    <small class="form-text text-muted">Laissez vide pour utiliser le compte 75 par défaut</small>
                 </div>
 
                 <!-- Description (pleine largeur) -->
@@ -104,7 +104,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    Enregistrer la dépense
+                    Enregistrer la recette
                 </button>
                 <a href="{% url 'expenses' %}" class="btn btn-secondary">Annuler</a>
             </div>
@@ -112,4 +112,3 @@
     </div>
 </div>
 {% endblock %}
-

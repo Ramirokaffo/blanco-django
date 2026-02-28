@@ -14,12 +14,20 @@
             <h1>Approvisionnement</h1>
             <p class="text-secondary">Historique des approvisionnements ({{ total_count }} enregistrement{{ total_count|pluralize }})</p>
         </div>
-        <a href="{% url 'add_supply' %}" class="btn btn-primary btn-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            Nouvel approvisionnement
-        </a>
+        <div class="header-buttons">
+            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Dettes fournisseurs
+            </a>
+            <a href="{% url 'add_supply' %}" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Nouvel approvisionnement
+            </a>
+        </div>
     </div>
 </div>
 
@@ -97,10 +105,12 @@
                         <th>Produit</th>
                         <th>Fournisseur</th>
                         <th>Quantité</th>
-                        <th>Prix unitaire</th>
-                        <th>Prix total</th>
+                        <th>Prix d'achat</th>
+                        <th>Prix total d'achat</th>
                         <th>Expiration</th>
                         <th>Personnel</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -114,6 +124,32 @@
                         <td class="text-right supply-total">{{ supply.total_price|floatformat:0 }} FCFA</td>
                         <td>{% if supply.expiration_date %}{{ supply.expiration_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
                         <td>{{ supply.staff.get_full_name|default:"-" }}</td>
+                        <td>
+                            {% if supply.is_credit %}
+                                {% if supply.credit_info %}
+                                    {% if supply.credit_info.is_fully_paid %}
+                                        <span class="badge badge-success">Payé</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">En cours</span>
+                                        <span class="text-muted">({{ supply.credit_info.amount_remaining|floatformat:0 }} restant)</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge badge-warning">Crédit</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge badge-info">Comptant</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if supply.is_credit and supply.credit_info and not supply.credit_info.is_fully_paid %}
+                            <a href="{% url 'record_supply_payment' supply.id %}" class="btn btn-primary btn-sm" title="Enregistrer un paiement">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                                Payer
+                            </a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>

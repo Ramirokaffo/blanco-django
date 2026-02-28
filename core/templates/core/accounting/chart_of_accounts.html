@@ -3,6 +3,31 @@
 
 {% block title %}Plan comptable - {{ system_settings.company_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+.import-form-container {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.import-form-container h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+.import-form-container .form-group {
+    margin-bottom: 15px;
+}
+.import-form-container .btn-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div class="header-content">
@@ -11,12 +36,57 @@
             <p class="text-secondary">{{ total_accounts }} compte{{ total_accounts|pluralize }}</p>
         </div>
         <div>
-            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Journal</a>
-            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Grand Livre</a>
+            <a href="{% url 'export_chart_of_accounts' %}?format=csv" class="btn btn-primary btn-sm" style="margin-right: 5px;">
+                Exporter CSV
+            </a>
+            <a href="{% url 'export_chart_of_accounts' %}?format=txt" class="btn btn-primary btn-sm" style="margin-right: 5px;">
+                Exporter TXT
+            </a>
+            <button type="button" class="btn btn-success btn-sm" onclick="toggleImportForm()" style="margin-right: 5px;">
+                Importer
+            </button>
+            <a href="{% url 'accounting_add_entry' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">
+                + Nouvelle écriture
+            </a>
+            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Journal</a>
+            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Grand Livre</a>
             <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
         </div>
     </div>
 </div>
+
+<!-- Import Form (collapsible) -->
+<div id="importForm" class="import-form-container" style="display: none;">
+    <h3>Importer un plan comptable</h3>
+    <form method="post" action="{% url 'import_chart_of_accounts' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="importFile">Fichier CSV ou TXT</label>
+            <input type="file" class="form-control" id="importFile" name="file" accept=".csv,.txt" required>
+            <small class="form-text text-muted">
+                Format attendu: Code; Libellé; Type; Compte Parent (optionnel); Description (optionnel); Actif (optionnel)
+            </small>
+        </div>
+        <div class="alert alert-info">
+            <strong>Types de comptes:</strong> ACTIF, PASSIF, CHARGE, PRODUIT
+        </div>
+        <div class="btn-group">
+            <button type="submit" class="btn btn-primary">Importer</button>
+            <button type="button" class="btn btn-secondary" onclick="toggleImportForm()">Annuler</button>
+        </div>
+    </form>
+</div>
+
+<!-- Messages -->
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 {% for class_num, class_data in classes.items %}
 <div class="card" style="margin-bottom: 1rem;">
@@ -56,5 +126,18 @@
     </div>
 </div>
 {% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleImportForm() {
+    const form = document.getElementById('importForm');
+    if (form.style.display === 'none') {
+        form.style.display = 'block';
+    } else {
+        form.style.display = 'none';
+    }
+}
+</script>
 {% endblock %}
 
