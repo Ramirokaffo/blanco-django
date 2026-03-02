@@ -82,20 +82,12 @@ class ProductService:
         # 1. Créer le produit
         product = Product.objects.create(stock=stock, **validated_data)
 
-        # 2. Sauvegarder les images
-        image_dir = os.path.join(settings.MEDIA_ROOT, 'product')
-        os.makedirs(image_dir, exist_ok=True)
-
+        # 2. Sauvegarder les images (Django gère la sauvegarde automatiquement avec ImageField)
         for i, img_file in enumerate(images):
             is_primary = (i == 0)
-            file_name = img_file.name
-            file_path = os.path.join(image_dir, file_name)
-            with open(file_path, 'wb+') as dest:
-                for chunk in img_file.chunks():
-                    dest.write(chunk)
             ProductImage.objects.create(
                 product=product,
-                image_path=file_name,
+                image=img_file,
                 is_primary=is_primary,
             )
 
@@ -130,22 +122,14 @@ class ProductService:
             setattr(product, field, value)
         product.save()
 
-        # Sauvegarder les nouvelles images si fournies
+        # Sauvegarder les nouvelles images si fournies (Django gère la sauvegarde automatiquement avec ImageField)
         if images:
-            image_dir = os.path.join(settings.MEDIA_ROOT, 'product')
-            os.makedirs(image_dir, exist_ok=True)
-
             for i, img_file in enumerate(images):
                 # Si c'est la première image et qu'il n'y a pas d'image primaire, la marquer comme primaire
                 is_primary = (i == 0 and not product.images.filter(is_primary=True).exists())
-                file_name = img_file.name
-                file_path = os.path.join(image_dir, file_name)
-                with open(file_path, 'wb+') as dest:
-                    for chunk in img_file.chunks():
-                        dest.write(chunk)
                 ProductImage.objects.create(
                     product=product,
-                    image_path=file_name,
+                    image=img_file,
                     is_primary=is_primary,
                 )
 

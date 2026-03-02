@@ -5,6 +5,7 @@ Parse les données SQL VALUES et les importe dans le nouveau système Django.
 
 import re
 from django.db import transaction
+from django.db.models.fields.files import ImageFieldFile
 from core.models.product_models import (
     Product, ProductImage, Category, Gamme, Rayon, GrammageType
 )
@@ -286,11 +287,26 @@ def migrate_data(
                     delete_at = row[5] if len(row) > 5 else None
                     if delete_at is not None:
                         continue  # Image supprimée dans l'ancien système
+                    
+                    # L'ancien path coneient uniquement le nom du fichier, pas le chemin complet. On l'adapte pour créer l'instance, mais les fichiers doivent être copiés manuellement vers media/product/
+                    image_filename = image_path.split('/')[-1] if '/' in image_path else image_path
+                    new_image_path = f'product/{image_filename}'
 
+                    # Construire l'image django à partir de l'ancien path pour enregistrer l'instance
+                    image = ImageFieldFile(
+                        instance=None,
+                        field=ProductImage._meta.get_field('image'),
+                        name=new_image_path
+                    )
+
+                    # Pour les tests
+                    # new_product = Product.objects.get(id=10)
+                    # new_product_id = new_product.id
+                    
                     ProductImage.objects.create(
                         product_id=new_product_id,
-                        image_path=image_path,
                         is_primary=False,
+                        image=image
                     )
                     stats['images'] += 1
 

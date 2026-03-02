@@ -108,7 +108,7 @@ class GrammageTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('code', 'name', 'category', 'stock', 'stock_limit', "actual_price", "last_purchase_price", 'is_price_reducible')
+    list_display = ('id', 'code', 'name', 'category', 'stock', 'stock_limit', "actual_price", "last_purchase_price", 'is_price_reducible')
     list_filter = ('category', 'gamme', 'rayon', 'is_price_reducible', 'create_at')
     search_fields = ('code', 'name', 'description', 'brand')
     list_editable = ['stock_limit', 'actual_price', 'is_price_reducible', "last_purchase_price"]
@@ -118,9 +118,9 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
-    list_display = ('product', 'image_path', 'is_primary', 'create_at')
+    list_display = ('product', 'image', 'is_primary', 'create_at')
     list_filter = ('is_primary', 'create_at')
-    search_fields = ('product__name', 'image_path')
+    search_fields = ('product__name', 'image')
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
 

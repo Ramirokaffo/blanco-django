@@ -4,7 +4,6 @@ services:
     image: mysql:8.0
     container_name: blanco-mysql
     restart: unless-stopped
-    network_mode: host
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -14,23 +13,19 @@ services:
       - .env
     volumes:
       - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysql", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}", "-e", "SELECT 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
+    ports:
+      - "3306:3306"
 
   web:
-    image: ramirokaffo/blanco:latest
+    image: ramirokaffo/blanco:1.2
     container_name: blanco_web
     restart: unless-stopped
-    network_mode: host
     env_file:
       - .env
     depends_on:
-      mysql:
-        condition: service_healthy
+      - mysql
+    ports:
+      - "8000:8000"
     volumes:
       - ./media:/app/media
 

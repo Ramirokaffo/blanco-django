@@ -121,7 +121,7 @@ class ProductImage(SoftDeleteModel):
     Product images model.
     """
     product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Produit associé", related_name='images', help_text="Produit associé")
-    image_path = models.CharField(max_length=500, verbose_name="Chemin de l'image", help_text="Chemin de l'image")
+    image = models.ImageField(upload_to='product/', null=True, verbose_name="Image du produit", help_text="Fichier image du produit")
     is_primary = models.BooleanField(default=False, verbose_name="Image principale", help_text="Indique si l'image est la principale")
     
     class Meta:
