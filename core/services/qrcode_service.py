@@ -28,25 +28,27 @@ class QRCodeService:
         Détecte l'adresse IP locale de la machine.
         Reproduit WIFIService.get_local_ip() de l'ancienne application.
         """
-        """Get the host IP by finding the default gateway."""
-        result = subprocess.run(
-            ["ip", "route", "show", "default"],
-            capture_output=True,
-            text=True
-        )
-        # Output: "default via 172.17.0.1 dev eth0"
-        gateway = result.stdout.split()[2]
-        return gateway
-        
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            s.connect(("192.255.255.255", 1))
-            ip = s.getsockname()[0]
-        except Exception:
-            ip = "127.0.0.1"
-        finally:
-            s.close()
-        return ip
+        print(settings.GET_IP_METHOD)
+        if settings.GET_IP_METHOD == 1:
+            """Get the host IP by finding the default gateway."""
+            result = subprocess.run(
+                ["ip", "route", "show", "default"],
+                capture_output=True,
+                text=True
+            )
+            # Output: "default via 172.17.0.1 dev eth0"
+            gateway = result.stdout.split()[2]
+            return gateway
+        else:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(("192.255.255.255", 1))
+                ip = s.getsockname()[0]
+            except Exception:
+                ip = "127.0.0.1"
+            finally:
+                s.close()
+            return ip
 
     @staticmethod
     def generate_qr_code(data: str) -> str:

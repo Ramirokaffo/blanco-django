@@ -24,6 +24,7 @@ from core.services.qrcode_service import QRCodeService
 
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", cast=bool)
+GET_IP_METHOD = config("GET_IP_METHOD", default=0, cast=int)
 
 local_ip = QRCodeService.get_local_ip()
 
@@ -173,6 +174,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Login URL
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
+
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
