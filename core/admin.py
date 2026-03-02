@@ -26,6 +26,16 @@ from .models import (
 )
 
 
+def configure_admin_site():
+    """Configure le site d'administration BLANCO"""
+    admin.site.site_header = "Administration BLANCO"
+    admin.site.site_title = "Administration BLANCO"
+    admin.site.index_title = "Panneau d'administration BLANCO"
+
+
+# Appliquer la configuration
+configure_admin_site()
+
 # User Models Admin
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):

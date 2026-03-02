@@ -17,7 +17,7 @@ services:
       - "3306:3306"
 
   web:
-    image: ramirokaffo/blanco:1.2
+    image: ramirokaffo/blanco:latest
     container_name: blanco_web
     restart: unless-stopped
     env_file:
