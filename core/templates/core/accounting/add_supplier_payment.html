@@ -3,91 +3,184 @@
 
 {% block title %}Nouveau paiement fournisseur - {{ system_settings.company_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+.supplier-payment-page { display: grid; gap: 1.5rem; }
+.supplier-payment-page .page-header { margin-bottom: 0; padding: 1.5rem; border: 1px solid var(--border-color); border-radius: 20px; background: linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary)), var(--bg-primary)); box-shadow: var(--shadow-sm); }
+.supplier-payment-page .header-content { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.supplier-payment-kicker { display: inline-flex; align-items: center; gap: .45rem; padding: .4rem .75rem; margin-bottom: .85rem; border-radius: 999px; background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color); font-size: .82rem; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.supplier-payment-subtitle { max-width: 760px; line-height: 1.7; }
+.supplier-payment-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .85fr); gap: 1.5rem; align-items: start; }
+.supplier-payment-main, .supplier-payment-side { display: grid; gap: 1.5rem; }
+.supplier-payment-card { padding: 0; overflow: hidden; }
+.supplier-payment-card .card-header, .supplier-payment-info .card-header { padding: 1.25rem 1.5rem 0; margin-bottom: 1rem; }
+.supplier-payment-card .card-body, .supplier-payment-info .card-body { padding: 0 1.5rem 1.5rem; }
+.supplier-payment-form { display: grid; gap: 1.25rem; }
+.supplier-payment-form .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.25rem; }
+.supplier-payment-form .form-group { display: grid; gap: .45rem; }
+.supplier-payment-form .form-group-full { grid-column: 1 / -1; }
+.supplier-payment-form input, .supplier-payment-form select, .supplier-payment-form textarea { width: 100%; padding: .95rem 1rem; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-primary); color: var(--text-primary); font: inherit; transition: border-color .2s ease, box-shadow .2s ease; }
+.supplier-payment-form textarea { min-height: 120px; resize: vertical; }
+.supplier-payment-form input:focus, .supplier-payment-form select:focus, .supplier-payment-form textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color) 14%, transparent); }
+.field-error { color: var(--danger-color, #e74c3c); font-size: .88rem; }
+.required { color: var(--danger-color, #e74c3c); }
+.form-errors, .messages-container { display: grid; gap: .75rem; }
+.payment-tip { padding: 1rem 1.1rem; border-radius: 16px; background: color-mix(in srgb, var(--success-color, #28a745) 10%, var(--bg-primary)); border: 1px solid color-mix(in srgb, var(--success-color, #28a745) 22%, var(--border-color)); }
+.payment-tip strong { display: block; margin-bottom: .35rem; color: var(--text-primary); }
+.form-actions { display: flex; flex-wrap: wrap; gap: .85rem; padding-top: .25rem; }
+.supplier-summary { display: grid; gap: 1rem; }
+.summary-card { padding: 1rem 1.1rem; border: 1px solid var(--border-color); border-radius: 16px; background: linear-gradient(180deg, var(--bg-primary), var(--bg-secondary)); }
+.summary-label { display: block; margin-bottom: .45rem; color: var(--text-secondary); font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+.summary-value { display: block; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); }
+.summary-note { color: var(--text-secondary); line-height: 1.6; }
+.process-steps { display: grid; gap: .85rem; }
+.process-step { display: grid; grid-template-columns: 34px 1fr; gap: .85rem; align-items: start; }
+.process-badge { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color); font-weight: 700; }
+.process-step strong { display: block; margin-bottom: .2rem; color: var(--text-primary); }
+.process-step p { margin: 0; color: var(--text-secondary); line-height: 1.5; }
+@media (max-width: 960px) { .supplier-payment-layout, .supplier-payment-page .header-content, .supplier-payment-form .form-grid { grid-template-columns: 1fr; } .supplier-payment-page .header-content { display: grid; } }
+@media (max-width: 640px) { .supplier-payment-page .page-header, .supplier-payment-card .card-header, .supplier-payment-card .card-body, .supplier-payment-info .card-header, .supplier-payment-info .card-body { padding-left: 1rem; padding-right: 1rem; } .form-actions .btn { width: 100%; justify-content: center; } }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <div class="header-content">
-        <div>
-            <h1>{{ page_title }}</h1>
-            <p class="text-secondary">Enregistrer un paiement à un fournisseur</p>
+<div class="supplier-payment-page">
+    <div class="page-header">
+        <div class="header-content">
+            <div>
+                <span class="supplier-payment-kicker">Trésorerie fournisseur</span>
+                <h1>{{ page_title }}</h1>
+            </div>
+            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Retour à la liste
+            </a>
         </div>
-        <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Retour à la liste
-        </a>
     </div>
-</div>
 
-<!-- Messages -->
-{% if messages %}
-<div class="messages-container">
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-    {% endfor %}
-</div>
-{% endif %}
-
-<!-- Formulaire -->
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Informations du paiement</h3>
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
     </div>
-    <div class="card-body">
-        <form method="post" class="contact-form">
-            {% csrf_token %}
+    {% endif %}
 
-            {% if form.non_field_errors %}
-            <div class="form-errors">
-                {% for error in form.non_field_errors %}
-                <div class="alert alert-error">{{ error }}</div>
-                {% endfor %}
-            </div>
-            {% endif %}
+    <div class="supplier-payment-layout">
+        <div class="supplier-payment-main">
+            <div class="card supplier-payment-card">
+                <div class="card-header">
+                    <h3 class="card-title">Informations du paiement</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="supplier-payment-form">
+                        {% csrf_token %}
 
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label" for="id_supplier">{{ form.supplier.label }} <span class="required">*</span></label>
-                    {{ form.supplier }}
-                    {% if form.supplier.errors %}<div class="field-error">{{ form.supplier.errors.0 }}</div>{% endif %}
+                        {% if form.non_field_errors %}
+                        <div class="form-errors">
+                            {% for error in form.non_field_errors %}
+                            <div class="alert alert-error">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label" for="id_supplier">{{ form.supplier.label }} <span class="required">*</span></label>
+                                {{ form.supplier }}
+                                {% if form.supplier.errors %}<div class="field-error">{{ form.supplier.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_amount">{{ form.amount.label }} <span class="required">*</span></label>
+                                {{ form.amount }}
+                                {% if form.amount.errors %}<div class="field-error">{{ form.amount.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_payment_method">{{ form.payment_method.label }} <span class="required">*</span></label>
+                                {{ form.payment_method }}
+                                {% if form.payment_method.errors %}<div class="field-error">{{ form.payment_method.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_payment_date">{{ form.payment_date.label }} <span class="required">*</span></label>
+                                {{ form.payment_date }}
+                                {% if form.payment_date.errors %}<div class="field-error">{{ form.payment_date.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_reference">{{ form.reference.label }}</label>
+                                {{ form.reference }}
+                                {% if form.reference.errors %}<div class="field-error">{{ form.reference.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group form-group-full">
+                                <label class="form-label" for="id_notes">{{ form.notes.label }}</label>
+                                {{ form.notes }}
+                                {% if form.notes.errors %}<div class="field-error">{{ form.notes.errors.0 }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                                Enregistrer le paiement
+                            </button>
+                            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary">Annuler</a>
+                        </div>
+                    </form>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_amount">{{ form.amount.label }} <span class="required">*</span></label>
-                    {{ form.amount }}
-                    {% if form.amount.errors %}<div class="field-error">{{ form.amount.errors.0 }}</div>{% endif %}
+            </div>
+        </div>
+
+        <aside class="supplier-payment-side">
+            <div class="card supplier-payment-info">
+                <div class="card-header">
+                    <h3 class="card-title">Repères utiles</h3>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_payment_method">{{ form.payment_method.label }} <span class="required">*</span></label>
-                    {{ form.payment_method }}
-                    {% if form.payment_method.errors %}<div class="field-error">{{ form.payment_method.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_payment_date">{{ form.payment_date.label }} <span class="required">*</span></label>
-                    {{ form.payment_date }}
-                    {% if form.payment_date.errors %}<div class="field-error">{{ form.payment_date.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_reference">{{ form.reference.label }}</label>
-                    {{ form.reference }}
-                    {% if form.reference.errors %}<div class="field-error">{{ form.reference.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="form-group form-group-full">
-                    <label class="form-label" for="id_notes">{{ form.notes.label }}</label>
-                    {{ form.notes }}
-                    {% if form.notes.errors %}<div class="field-error">{{ form.notes.errors.0 }}</div>{% endif %}
+                <div class="card-body">
+                    <div class="supplier-summary">
+                        <div class="summary-card">
+                            <span class="summary-label">À vérifier</span>
+                            <span class="summary-value">Référence et méthode</span>
+                            <p class="summary-note">Ajoutez une référence de chèque, virement ou pièce justificative pour faciliter les recherches futures.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                    Enregistrer le paiement
-                </button>
-                <a href="{% url 'supplier_payments' %}" class="btn btn-secondary">Annuler</a>
+            <div class="card supplier-payment-info">
+                <div class="card-header">
+                    <h3 class="card-title">Étapes</h3>
+                </div>
+                <div class="card-body">
+                    <div class="process-steps">
+                        <div class="process-step">
+                            <span class="process-badge">1</span>
+                            <div>
+                                <strong>Sélectionner le fournisseur</strong>
+                                <p>Choisissez le bon partenaire avant de saisir le règlement.</p>
+                            </div>
+                        </div>
+                        <div class="process-step">
+                            <span class="process-badge">2</span>
+                            <div>
+                                <strong>Renseigner le paiement</strong>
+                                <p>Montant, mode de paiement, date et référence si disponible.</p>
+                            </div>
+                        </div>
+                        <div class="process-step">
+                            <span class="process-badge">3</span>
+                            <div>
+                                <strong>Valider la saisie</strong>
+                                <p>Le paiement sera ajouté à votre suivi fournisseur.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </form>
+        </aside>
     </div>
 </div>
 {% endblock %}

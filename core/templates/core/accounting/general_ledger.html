@@ -3,103 +3,192 @@
 
 {% block title %}Grand Livre - {{ system_settings.company_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+.ledger-page { display: grid; gap: 1.5rem; }
+.ledger-page .page-header { margin-bottom: 0; padding: 1.5rem; border: 1px solid var(--border-color); border-radius: 20px; background: linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary)), var(--bg-primary)); box-shadow: var(--shadow-sm); }
+.ledger-page .header-content { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.ledger-kicker { display: inline-flex; align-items: center; padding: .4rem .75rem; margin-bottom: .8rem; border-radius: 999px; background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color); font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.ledger-subtitle { max-width: 760px; line-height: 1.7; }
+.header-actions { display: flex; flex-wrap: wrap; gap: .65rem; justify-content: flex-end; }
+.ledger-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.stat-card { padding: 1.15rem 1.2rem; border: 1px solid var(--border-color); border-radius: 18px; background: linear-gradient(180deg, var(--bg-primary), var(--bg-secondary)); box-shadow: var(--shadow-sm); }
+.stat-card.is-accent { border-color: color-mix(in srgb, var(--primary-color) 20%, var(--border-color)); background: color-mix(in srgb, var(--primary-color) 8%, var(--bg-primary)); }
+.stat-label { display: block; margin-bottom: .45rem; color: var(--text-secondary); font-size: .82rem; letter-spacing: .05em; text-transform: uppercase; }
+.stat-value { display: block; font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+.filters-card { padding: 0; overflow: hidden; }
+.filters-topbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.25rem 1.5rem 0; }
+.filters-title-group { display: grid; gap: .2rem; }
+.filters-helper { color: var(--text-secondary); font-size: .92rem; }
+.filters-card .card-body { padding: 1.4rem 1.5rem 1.5rem; }
+.filters-form { display: grid; gap: 1rem; }
+.filters-row { display: grid; grid-template-columns: 1.4fr repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.filter-group { display: grid; gap: .45rem; }
+.filter-group .form-control { width: 100%; padding: .95rem 1rem; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-primary); color: var(--text-primary); }
+.filter-group .form-control:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color) 14%, transparent); }
+.filters-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.ledger-table-card, .ledger-empty-card { padding: 0; overflow: hidden; }
+.ledger-table-card .card-header, .ledger-empty-card .card-header { margin-bottom: 0; padding: 1.25rem 1.5rem; background: linear-gradient(180deg, var(--bg-primary), var(--bg-secondary)); }
+.ledger-table-card .card-body, .ledger-empty-card .card-body { padding: 1.25rem 1.5rem 1.5rem; }
+.table-meta { display: inline-flex; align-items: center; justify-content: center; padding: .45rem .75rem; border-radius: 999px; background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color); font-size: .84rem; font-weight: 600; }
+.ledger-table-wrapper { border: 1px solid var(--border-color); border-radius: 18px; overflow: auto; background: var(--bg-primary); }
+.ledger-table-card .table { min-width: 860px; }
+.ledger-table-card .table thead { background: var(--bg-secondary); }
+.ledger-table-card .table th { font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text-secondary); }
+.ledger-table-card .table td, .ledger-table-card .table th { vertical-align: middle; }
+.entry-ref { display: inline-flex; padding: .25rem .55rem; border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font-size: .8rem; }
+.amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
+.amount-cell strong { color: var(--text-primary); }
+.running-balance { color: var(--primary-color); font-weight: 700; }
+.muted-cell { color: var(--text-secondary); }
+.totals-row td { font-weight: 700; border-top: 2px solid color-mix(in srgb, var(--primary-color) 14%, var(--border-color)); background: color-mix(in srgb, var(--primary-color) 4%, var(--bg-secondary)); }
+.empty-state { padding: 2.5rem 1.5rem; text-align: center; color: var(--text-secondary); }
+.empty-state-title { margin-bottom: .45rem; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+@media (max-width: 1080px) { .ledger-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters-row { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .ledger-page .header-content, .filters-topbar { display: grid; } .header-actions { justify-content: stretch; } .header-actions .btn, .filters-actions .btn { width: 100%; justify-content: center; } .ledger-stats { grid-template-columns: 1fr; } .ledger-table-card .card-header, .ledger-table-card .card-body, .ledger-empty-card .card-header, .ledger-empty-card .card-body, .filters-card .card-body, .filters-topbar { padding-left: 1rem; padding-right: 1rem; } }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <div class="header-content">
-        <div>
-            <h1>Grand Livre</h1>
-            {% if selected_account %}
-            <p class="text-secondary">{{ selected_account.code }} - {{ selected_account.name }} — Solde : {{ balance|floatformat:0 }} FCFA</p>
-            {% else %}
-            <p class="text-secondary">Sélectionnez un compte pour voir ses mouvements</p>
-            {% endif %}
-        </div>
-        <div>
-            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Journal</a>
-            <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
-            <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
-        </div>
-    </div>
-</div>
-
-<!-- Filtres -->
-<div class="card filters-card">
-    <form method="get" action="{% url 'accounting_ledger' %}" class="filters-form">
-        <div class="filters-row">
-            <div class="filter-group filter-search">
-                <label class="form-label">Compte</label>
-                <select name="account" class="form-control">
-                    <option value="">-- Sélectionner un compte --</option>
-                    {% for acc in accounts %}
-                    <option value="{{ acc.code }}" {% if current_account == acc.code %}selected{% endif %}>{{ acc.code }} - {{ acc.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="filter-group">
-                <label class="form-label">Date début</label>
-                <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
-            </div>
-            <div class="filter-group">
-                <label class="form-label">Date fin</label>
-                <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
-            </div>
-        </div>
-        <div class="filters-actions">
-            <button type="submit" class="btn btn-primary btn-sm">Afficher</button>
-            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
-        </div>
-    </form>
-</div>
-
-{% if selected_account %}
-<!-- Tableau du grand livre -->
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Mouvements — {{ selected_account }}</h3>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Référence</th>
-                        <th>Libellé</th>
-                        <th class="text-right">Débit</th>
-                        <th class="text-right">Crédit</th>
-                        <th class="text-right">Solde</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in ledger_lines %}
-                    <tr>
-                        <td>{{ item.line.entry.date|date:"d/m/Y" }}</td>
-                        <td><small>{{ item.line.entry.reference }}</small></td>
-                        <td>{{ item.line.description|default:item.line.entry.description }}</td>
-                        <td class="text-right">{% if item.line.debit > 0 %}{{ item.line.debit|floatformat:0 }}{% endif %}</td>
-                        <td class="text-right">{% if item.line.credit > 0 %}{{ item.line.credit|floatformat:0 }}{% endif %}</td>
-                        <td class="text-right"><strong>{{ item.running_balance|floatformat:0 }}</strong></td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="text-center">Aucun mouvement pour ce compte</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                {% if ledger_lines %}
-                <tfoot>
-                    <tr style="font-weight: bold; border-top: 2px solid var(--border-color, #dee2e6);">
-                        <td colspan="3">TOTAUX</td>
-                        <td class="text-right">{{ total_debit|floatformat:0 }}</td>
-                        <td class="text-right">{{ total_credit|floatformat:0 }}</td>
-                        <td class="text-right">{{ balance|floatformat:0 }}</td>
-                    </tr>
-                </tfoot>
+<div class="ledger-page">
+    <div class="page-header">
+        <div class="header-content">
+            <div>
+                <span class="ledger-kicker">Comptabilité générale</span>
+                <h1>Grand Livre</h1>
+                {% if selected_account %}
+                <p class="text-secondary ledger-subtitle">Analyse détaillée du compte {{ selected_account.code }} - {{ selected_account.name }} avec un solde courant de {{ balance|floatformat:0 }} FCFA.</p>
+                {% else %}
+                <p class="text-secondary ledger-subtitle">Sélectionnez un compte et une période pour visualiser l’historique détaillé de ses mouvements.</p>
                 {% endif %}
-            </table>
+            </div>
+            <div class="header-actions">
+                <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Journal</a>
+                <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
+                <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
+            </div>
         </div>
     </div>
+
+    {% if selected_account %}
+    <div class="ledger-stats">
+        <div class="stat-card is-accent">
+            <span class="stat-label">Compte sélectionné</span>
+            <span class="stat-value">{{ selected_account.code }}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Solde</span>
+            <span class="stat-value">{{ balance|floatformat:0 }} FCFA</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Total débit</span>
+            <span class="stat-value">{{ total_debit|floatformat:0 }} FCFA</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Total crédit</span>
+            <span class="stat-value">{{ total_credit|floatformat:0 }} FCFA</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card filters-card">
+        <div class="filters-topbar">
+            <div class="filters-title-group">
+                <h3 class="card-title">Filtres du grand livre</h3>
+                <p class="filters-helper">Choisissez un compte puis définissez votre période d’analyse.</p>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="get" action="{% url 'accounting_ledger' %}" class="filters-form">
+                <div class="filters-row">
+                    <div class="filter-group filter-search">
+                        <label class="form-label">Compte</label>
+                        <select name="account" class="form-control">
+                            <option value="">-- Sélectionner un compte --</option>
+                            {% for acc in accounts %}
+                            <option value="{{ acc.code }}" {% if current_account == acc.code %}selected{% endif %}>{{ acc.code }} - {{ acc.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="form-label">Date début</label>
+                        <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
+                    </div>
+                    <div class="filter-group">
+                        <label class="form-label">Date fin</label>
+                        <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
+                    </div>
+                </div>
+                <div class="filters-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">Afficher</button>
+                    <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if selected_account %}
+    <div class="card ledger-table-card">
+        <div class="card-header">
+            <h3 class="card-title">Mouvements — {{ selected_account }}</h3>
+            <div class="table-meta">{{ ledger_lines|length }} ligne{{ ledger_lines|length|pluralize }}</div>
+        </div>
+        <div class="card-body">
+            <div class="ledger-table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Référence</th>
+                            <th>Libellé</th>
+                            <th class="text-right">Débit</th>
+                            <th class="text-right">Crédit</th>
+                            <th class="text-right">Solde</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in ledger_lines %}
+                        <tr>
+                            <td><strong>{{ item.line.entry.date|date:"d/m/Y" }}</strong></td>
+                            <td><span class="entry-ref">{{ item.line.entry.reference }}</span></td>
+                            <td class="muted-cell">{{ item.line.description|default:item.line.entry.description }}</td>
+                            <td class="amount-cell">{% if item.line.debit > 0 %}<strong>{{ item.line.debit|floatformat:0 }}</strong>{% else %}<span class="muted-cell">—</span>{% endif %}</td>
+                            <td class="amount-cell">{% if item.line.credit > 0 %}<strong>{{ item.line.credit|floatformat:0 }}</strong>{% else %}<span class="muted-cell">—</span>{% endif %}</td>
+                            <td class="amount-cell"><span class="running-balance">{{ item.running_balance|floatformat:0 }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="empty-state">Aucun mouvement pour ce compte sur la période sélectionnée.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if ledger_lines %}
+                    <tfoot>
+                        <tr class="totals-row">
+                            <td colspan="3">TOTAUX</td>
+                            <td class="amount-cell">{{ total_debit|floatformat:0 }}</td>
+                            <td class="amount-cell">{{ total_credit|floatformat:0 }}</td>
+                            <td class="amount-cell">{{ balance|floatformat:0 }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card ledger-empty-card">
+        <div class="card-header">
+            <h3 class="card-title">Prêt pour l’analyse</h3>
+        </div>
+        <div class="card-body">
+            <div class="empty-state">
+                <div class="empty-state-title">Sélectionnez un compte</div>
+                <p>Choisissez un compte dans les filtres ci-dessus pour afficher ses mouvements détaillés et son solde cumulé.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
-{% endif %}
 {% endblock %}
 

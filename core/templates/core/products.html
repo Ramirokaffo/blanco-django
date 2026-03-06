@@ -111,8 +111,12 @@
                 <tbody>
                     {% for product in products %}
                     <tr>
-                        <td class="product-code">{{ product.code }}</td>
-                        <td class="product-name">{{ product.name }}</td>
+                        <td class="product-code">
+                            <a href="{% url 'product_detail' product.id %}" class="product-link">{{ product.code }}</a>
+                        </td>
+                        <td class="product-name">
+                            <a href="{% url 'product_detail' product.id %}" class="product-link product-link-name">{{ product.name }}</a>
+                        </td>
                         <td>{{ product.brand|default:"-" }}</td>
                         <td>{{ product.category.name|default:"-" }}</td>
                         <td>{{ product.rayon.name|default:"-" }}</td>

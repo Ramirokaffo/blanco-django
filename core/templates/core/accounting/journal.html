@@ -3,126 +3,199 @@
 
 {% block title %}Journal comptable - {{ system_settings.company_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+.journal-page { display: grid; gap: 1.5rem; }
+.journal-page .page-header { margin-bottom: 0; padding: 1.5rem; border: 1px solid var(--border-color); border-radius: 20px; background: linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary)), var(--bg-primary)); box-shadow: var(--shadow-sm); }
+.journal-page .header-content { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.journal-kicker { display: inline-flex; align-items: center; padding: .4rem .75rem; margin-bottom: .8rem; border-radius: 999px; background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color); font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.journal-subtitle { max-width: 760px; line-height: 1.7; }
+.header-actions { display: flex; flex-wrap: wrap; gap: .65rem; justify-content: flex-end; }
+.journal-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.stat-card { padding: 1.15rem 1.2rem; border: 1px solid var(--border-color); border-radius: 18px; background: linear-gradient(180deg, var(--bg-primary), var(--bg-secondary)); box-shadow: var(--shadow-sm); }
+.stat-label { display: block; margin-bottom: .45rem; color: var(--text-secondary); font-size: .82rem; letter-spacing: .05em; text-transform: uppercase; }
+.stat-value { display: block; font-size: 1.45rem; font-weight: 700; color: var(--text-primary); }
+.stat-card.is-accent { border-color: color-mix(in srgb, var(--primary-color) 20%, var(--border-color)); background: color-mix(in srgb, var(--primary-color) 8%, var(--bg-primary)); }
+.filters-card { padding: 0; overflow: hidden; }
+.filters-card .card-body { padding: 1.4rem 1.5rem 1.5rem; }
+.filters-topbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.25rem 1.5rem 0; }
+.filters-title-group { display: grid; gap: .2rem; }
+.filters-helper { color: var(--text-secondary); font-size: .92rem; }
+.filters-form { display: grid; gap: 1rem; }
+.filters-row { display: grid; grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.filter-group { display: grid; gap: .45rem; }
+.filter-group .form-control { width: 100%; padding: .95rem 1rem; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-primary); color: var(--text-primary); }
+.filter-group .form-control:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color) 14%, transparent); }
+.filters-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.journal-table-card { padding: 0; overflow: hidden; }
+.journal-table-card .card-header { margin-bottom: 0; padding: 1.25rem 1.5rem; background: linear-gradient(180deg, var(--bg-primary), var(--bg-secondary)); }
+.journal-table-card .card-body { padding: 1.25rem 1.5rem 1.5rem; }
+.table-meta { display: inline-flex; align-items: center; justify-content: center; padding: .45rem .75rem; border-radius: 999px; background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color); font-size: .84rem; font-weight: 600; }
+.journal-table-wrapper { border: 1px solid var(--border-color); border-radius: 18px; overflow: auto; background: var(--bg-primary); }
+.journal-table-card .table { min-width: 980px; }
+.journal-table-card .table thead { background: var(--bg-secondary); }
+.journal-table-card .table th { font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text-secondary); }
+.journal-table-card .table td { vertical-align: top; }
+.entry-start td { border-top: 2px solid color-mix(in srgb, var(--primary-color) 14%, var(--border-color)) !important; }
+.entry-ref { display: inline-flex; padding: .25rem .55rem; border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); font-size: .8rem; }
+.journal-tag { display: inline-flex; align-items: center; padding: .28rem .62rem; border-radius: 999px; background: color-mix(in srgb, var(--primary-color) 10%, var(--bg-secondary)); color: var(--primary-color); font-size: .8rem; font-weight: 600; }
+.account-name { font-weight: 600; color: var(--text-primary); }
+.amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
+.amount-cell strong { color: var(--text-primary); }
+.muted-cell { color: var(--text-secondary); }
+.empty-state { padding: 2.5rem 1.5rem; text-align: center; color: var(--text-secondary); }
+.pagination-container { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+.pagination-info { color: var(--text-secondary); font-size: .92rem; }
+.pagination { display: flex; flex-wrap: wrap; gap: .45rem; }
+.pagination-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; height: 40px; padding: 0 .8rem; border-radius: 10px; text-decoration: none; color: var(--text-primary); background: var(--bg-secondary); border: 1px solid var(--border-color); transition: all .2s ease; }
+.pagination-btn:hover { color: var(--primary-color); border-color: color-mix(in srgb, var(--primary-color) 25%, var(--border-color)); transform: translateY(-1px); }
+.pagination-btn.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+@media (max-width: 1080px) { .journal-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 768px) { .journal-page .header-content, .filters-topbar { display: grid; } .header-actions { justify-content: stretch; } .header-actions .btn, .filters-actions .btn { width: 100%; justify-content: center; } .journal-stats, .filters-row { grid-template-columns: 1fr; } .journal-table-card .card-header, .journal-table-card .card-body, .filters-card .card-body, .filters-topbar { padding-left: 1rem; padding-right: 1rem; } }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <div class="header-content">
-        <div>
-            <h1>Journal comptable</h1>
-            <p class="text-secondary">{{ total_count }} écriture{{ total_count|pluralize }} — Débit : {{ total_debit|floatformat:0 }} FCFA | Crédit : {{ total_credit|floatformat:0 }} FCFA</p>
-        </div>
-        <div>
-            <a href="{% url 'accounting_add_entry' %}" class="btn btn-primary btn-sm" style="margin-right: 5px;">
-                + Nouvelle écriture
-            </a>
-            <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Plan comptable</a>
-            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Grand Livre</a>
-            <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
+<div class="journal-page">
+    <div class="page-header">
+        <div class="header-content">
+            <div>
+                <span class="journal-kicker">Comptabilité générale</span>
+                <h1>Journal comptable</h1>
+                <p class="text-secondary journal-subtitle">{{ total_count }} écriture{{ total_count|pluralize }} enregistrée{{ total_count|pluralize }} avec un total débit de {{ total_debit|floatformat:0 }} FCFA et un total crédit de {{ total_credit|floatformat:0 }} FCFA.</p>
+            </div>
+            <div class="header-actions">
+                <a href="{% url 'accounting_add_entry' %}" class="btn btn-primary btn-sm">+ Nouvelle écriture</a>
+                <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
+                <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Grand livre</a>
+                <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Barre de filtres -->
-<div class="card filters-card">
-    <form method="get" action="{% url 'accounting_journal' %}" class="filters-form">
-        <div class="filters-row">
-            <div class="filter-group filter-search">
-                <label class="form-label">Recherche</label>
-                <input type="text" name="search" class="form-control" placeholder="Référence ou libellé..." value="{{ current_search }}">
-            </div>
-            <div class="filter-group">
-                <label class="form-label">Journal</label>
-                <select name="journal" class="form-control">
-                    <option value="">Tous</option>
-                    {% for code, label in journal_choices %}
-                    <option value="{{ code }}" {% if current_journal == code %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="filter-group">
-                <label class="form-label">Date début</label>
-                <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
-            </div>
-            <div class="filter-group">
-                <label class="form-label">Date fin</label>
-                <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
-            </div>
+    <div class="journal-stats">
+        <div class="stat-card is-accent">
+            <span class="stat-label">Écritures</span>
+            <span class="stat-value">{{ total_count }}</span>
         </div>
-        <div class="filters-actions">
-            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
-            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+        <div class="stat-card">
+            <span class="stat-label">Total débit</span>
+            <span class="stat-value">{{ total_debit|floatformat:0 }} FCFA</span>
         </div>
-    </form>
-</div>
-
-<!-- Tableau des écritures -->
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Écritures comptables</h3>
-        <div class="pagination-info-header">
-            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        <div class="stat-card">
+            <span class="stat-label">Total crédit</span>
+            <span class="stat-value">{{ total_credit|floatformat:0 }} FCFA</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Pagination</span>
+            <span class="stat-value">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
         </div>
     </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Référence</th>
-                        <th>Journal</th>
-                        <th>Libellé</th>
-                        <th>Compte</th>
-                        <th class="text-right">Débit</th>
-                        <th class="text-right">Crédit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for entry in entries %}
-                        {% for line in entry.lines.all %}
-                        <tr{% if forloop.first %} style="border-top: 2px solid var(--border-color, #dee2e6);"{% endif %}>
-                            {% if forloop.first %}
-                            <td rowspan="{{ entry.lines.count }}">{{ entry.date|date:"d/m/Y" }}</td>
-                            <td rowspan="{{ entry.lines.count }}"><small>{{ entry.reference }}</small></td>
-                            <td rowspan="{{ entry.lines.count }}">{{ entry.get_journal_display }}</td>
-                            <td rowspan="{{ entry.lines.count }}">{{ entry.description|truncatewords:10 }}</td>
-                            {% endif %}
-                            <td>{{ line.account.code }} - {{ line.account.name }}</td>
-                            <td class="text-right">{% if line.debit > 0 %}{{ line.debit|floatformat:0 }}{% endif %}</td>
-                            <td class="text-right">{% if line.credit > 0 %}{{ line.credit|floatformat:0 }}{% endif %}</td>
+
+    <div class="card filters-card">
+        <div class="filters-topbar">
+            <div class="filters-title-group">
+                <h3 class="card-title">Filtres et recherche</h3>
+                <p class="filters-helper">Affinez vos écritures par journal, période ou mot-clé.</p>
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="get" action="{% url 'accounting_journal' %}" class="filters-form">
+                <div class="filters-row">
+                    <div class="filter-group filter-search">
+                        <label class="form-label">Recherche</label>
+                        <input type="text" name="search" class="form-control" placeholder="Référence ou libellé..." value="{{ current_search }}">
+                    </div>
+                    <div class="filter-group">
+                        <label class="form-label">Journal</label>
+                        <select name="journal" class="form-control">
+                            <option value="">Tous</option>
+                            {% for code, label in journal_choices %}
+                            <option value="{{ code }}" {% if current_journal == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="form-label">Date début</label>
+                        <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
+                    </div>
+                    <div class="filter-group">
+                        <label class="form-label">Date fin</label>
+                        <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
+                    </div>
+                </div>
+                <div class="filters-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+                    <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card journal-table-card">
+        <div class="card-header">
+            <h3 class="card-title">Écritures comptables</h3>
+            <div class="table-meta">Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}</div>
+        </div>
+        <div class="card-body">
+            <div class="journal-table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Référence</th>
+                            <th>Journal</th>
+                            <th>Libellé</th>
+                            <th>Compte</th>
+                            <th class="text-right">Débit</th>
+                            <th class="text-right">Crédit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries %}
+                            {% for line in entry.lines.all %}
+                            <tr class="{% if forloop.first %}entry-start{% endif %}">
+                                {% if forloop.first %}
+                                <td rowspan="{{ entry.lines.count }}"><strong>{{ entry.date|date:"d/m/Y" }}</strong></td>
+                                <td rowspan="{{ entry.lines.count }}"><span class="entry-ref">{{ entry.reference }}</span></td>
+                                <td rowspan="{{ entry.lines.count }}"><span class="journal-tag">{{ entry.get_journal_display }}</span></td>
+                                <td rowspan="{{ entry.lines.count }}" class="muted-cell">{{ entry.description|truncatewords:10 }}</td>
+                                {% endif %}
+                                <td><span class="account-name">{{ line.account.code }}</span> - {{ line.account.name }}</td>
+                                <td class="amount-cell">{% if line.debit > 0 %}<strong>{{ line.debit|floatformat:0 }}</strong>{% else %}<span class="muted-cell">—</span>{% endif %}</td>
+                                <td class="amount-cell">{% if line.credit > 0 %}<strong>{{ line.credit|floatformat:0 }}</strong>{% else %}<span class="muted-cell">—</span>{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="empty-state">Aucune écriture trouvée pour les critères sélectionnés.</td>
                         </tr>
                         {% endfor %}
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center">Aucune écriture trouvée</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                    </tbody>
+                </table>
+            </div>
 
-        <!-- Pagination -->
-        {% if page_obj.paginator.num_pages > 1 %}
-        <div class="pagination-container">
-            <div class="pagination-info">
-                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
-            </div>
-            <div class="pagination">
-                {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">&lsaquo;</a>
-                {% endif %}
-                {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                        <span class="pagination-btn active">{{ num }}</span>
-                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">{{ num }}</a>
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="pagination-container">
+                <div class="pagination-info">Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}</div>
+                <div class="pagination">
+                    {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">&lsaquo;</a>
                     {% endif %}
-                {% endfor %}
-                {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">&rsaquo;</a>
-                {% endif %}
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <span class="pagination-btn active">{{ num }}</span>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <a href="?page={{ num }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">&rsaquo;</a>
+                    {% endif %}
+                </div>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

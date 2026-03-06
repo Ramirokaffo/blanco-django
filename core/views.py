@@ -518,6 +518,31 @@ def products(request):
     return render(request, 'core/products.html', context)
 
 
+@login_required
+@module_required('products')
+def product_detail(request, pk):
+    """Vue détaillée d'un produit."""
+    product = get_object_or_404(
+        Product.objects.filter(delete_at__isnull=True).select_related(
+            'category', 'gamme', 'rayon', 'grammage_type'
+        ),
+        pk=pk,
+    )
+
+    product_images = list(
+        product.images.filter(delete_at__isnull=True).order_by('-is_primary', 'id')
+    )
+    primary_image = product_images[0] if product_images else None
+
+    context = {
+        'page_title': product.name,
+        'product': product,
+        'product_images': product_images,
+        'primary_image': primary_image,
+    }
+    return render(request, 'core/product_detail.html', context)
+
+
 INVENTORY_PER_PAGE_CHOICES = [10, 25, 50, 100]
 
 

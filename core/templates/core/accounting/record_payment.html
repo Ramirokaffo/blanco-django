@@ -3,147 +3,204 @@
 
 {% block title %}Paiement crédit - {{ system_settings.company_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+.payment-page { display: grid; gap: 1.5rem; }
+.payment-page .page-header { margin-bottom: 0; padding: 1.5rem; border: 1px solid var(--border-color); border-radius: 20px; background: linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary)), var(--bg-primary)); box-shadow: var(--shadow-sm); }
+.payment-page .header-content { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.payment-kicker { display: inline-flex; align-items: center; gap: .45rem; padding: .4rem .75rem; margin-bottom: .85rem; border-radius: 999px; background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color); font-size: .82rem; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.payment-subtitle { max-width: 760px; line-height: 1.7; }
+.payment-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, .9fr); gap: 1.5rem; align-items: start; }
+.payment-main, .payment-side { display: grid; gap: 1.5rem; }
+.payment-card { padding: 0; overflow: hidden; }
+.payment-card .card-header, .payment-history .card-header { padding: 1.25rem 1.5rem 0; margin-bottom: 1rem; }
+.payment-card .card-body, .payment-history .card-body { padding: 0 1.5rem 1.5rem; }
+.summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.summary-item { padding: 1rem 1.1rem; border: 1px solid var(--border-color); border-radius: 16px; background: linear-gradient(180deg, var(--bg-primary), var(--bg-secondary)); }
+.summary-label { display: block; margin-bottom: .45rem; color: var(--text-secondary); font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+.summary-value { display: block; font-size: 1.3rem; font-weight: 700; color: var(--text-primary); }
+.summary-item.is-highlight { border-color: color-mix(in srgb, var(--danger-color, #e74c3c) 25%, var(--border-color)); background: color-mix(in srgb, var(--danger-color, #e74c3c) 8%, var(--bg-primary)); }
+.summary-item.is-highlight .summary-value { color: var(--danger-color, #e74c3c); }
+.payment-tip { padding: 1rem 1.1rem; border-radius: 16px; background: color-mix(in srgb, var(--success-color, #28a745) 10%, var(--bg-primary)); border: 1px solid color-mix(in srgb, var(--success-color, #28a745) 22%, var(--border-color)); }
+.payment-tip strong { display: block; margin-bottom: .35rem; color: var(--text-primary); }
+.payment-form { display: grid; gap: 1.25rem; }
+.payment-form .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.25rem; }
+.payment-form .form-group { display: grid; gap: .45rem; }
+.payment-form .form-group-full { grid-column: 1 / -1; }
+.payment-form input, .payment-form select, .payment-form textarea { width: 100%; padding: .95rem 1rem; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-primary); color: var(--text-primary); font: inherit; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.payment-form textarea { min-height: 120px; resize: vertical; }
+.payment-form input:focus, .payment-form select:focus, .payment-form textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color) 14%, transparent); }
+.field-error { color: var(--danger-color, #e74c3c); font-size: .88rem; }
+.required { color: var(--danger-color, #e74c3c); }
+.form-errors { display: grid; gap: .75rem; }
+.form-actions { display: flex; flex-wrap: wrap; gap: .85rem; padding-top: .25rem; }
+.messages-container { display: grid; gap: .75rem; }
+.payment-history .table-responsive { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 16px; }
+.payment-history .table thead { background: var(--bg-secondary); }
+.payment-history .table th { font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; color: var(--text-secondary); }
+.payment-history .table td strong { font-size: 1rem; }
+.text-right { text-align: right; }
+.empty-state { padding: 2rem 1.25rem; text-align: center; border: 1px dashed var(--border-color); border-radius: 16px; color: var(--text-secondary); background: var(--bg-secondary); }
+@media (max-width: 960px) { .payment-layout, .payment-page .header-content, .summary-grid, .payment-form .form-grid { grid-template-columns: 1fr; } .payment-page .header-content { display: grid; } }
+@media (max-width: 640px) { .payment-page .page-header, .payment-card .card-header, .payment-card .card-body, .payment-history .card-header, .payment-history .card-body { padding-left: 1rem; padding-right: 1rem; } .form-actions .btn { width: 100%; justify-content: center; } }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <div class="header-content">
-        <div>
-            <h1>{{ page_title }}</h1>
-            <p class="text-secondary">
-                Client : {% if credit_sale.sale.client %}{{ credit_sale.sale.client.firstname }} {{ credit_sale.sale.client.lastname }}{% else %}N/A{% endif %}
-                — Restant : {{ credit_sale.amount_remaining|floatformat:0 }} FCFA
-            </p>
-        </div>
-        <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Retour
-        </a>
-    </div>
-</div>
-
-<!-- Messages -->
-{% if messages %}
-<div class="messages-container">
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-    {% endfor %}
-</div>
-{% endif %}
-
-<!-- Récapitulatif de la vente -->
-<div class="card" style="margin-bottom: 1.5rem;">
-    <div class="card-header">
-        <h3 class="card-title">Détails de la vente à crédit</h3>
-    </div>
-    <div class="card-body">
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-label">Total vente</label>
-                <p><strong>{{ credit_sale.sale.total|floatformat:0 }} FCFA</strong></p>
+<div class="payment-page">
+    <div class="page-header">
+        <div class="header-content">
+            <div>
+                <span class="payment-kicker">Suivi de règlement</span>
+                <h1>{{ page_title }}</h1>
+                <p class="text-secondary payment-subtitle">
+                    Client : {% if credit_sale.sale.client %}{{ credit_sale.sale.client.firstname }} {{ credit_sale.sale.client.lastname }}{% else %}N/A{% endif %}
+                    — Solde actuel : {{ credit_sale.amount_remaining|floatformat:0 }} FCFA
+                </p>
             </div>
-            <div class="form-group">
-                <label class="form-label">Déjà payé</label>
-                <p><strong>{{ credit_sale.amount_paid|floatformat:0 }} FCFA</strong></p>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Solde restant</label>
-                <p><strong style="color: var(--danger, #e74c3c);">{{ credit_sale.amount_remaining|floatformat:0 }} FCFA</strong></p>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Échéance</label>
-                <p>{% if credit_sale.due_date %}{{ credit_sale.due_date|date:"d/m/Y" }}{% else %}Non définie{% endif %}</p>
-            </div>
+            <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Retour
+            </a>
         </div>
     </div>
-</div>
 
-<!-- Formulaire de paiement -->
-<div class="card" style="margin-bottom: 1.5rem;">
-    <div class="card-header">
-        <h3 class="card-title">Enregistrer un paiement</h3>
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
     </div>
-    <div class="card-body">
-        <form method="post" class="contact-form">
-            {% csrf_token %}
+    {% endif %}
 
-            {% if form.non_field_errors %}
-            <div class="form-errors">
-                {% for error in form.non_field_errors %}
-                <div class="alert alert-error">{{ error }}</div>
-                {% endfor %}
+    <div class="payment-layout">
+        <div class="payment-main">
+            <div class="card payment-card">
+                <div class="card-header">
+                    <h3 class="card-title">Enregistrer un paiement</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="payment-form">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                        <div class="form-errors">
+                            {% for error in form.non_field_errors %}
+                            <div class="alert alert-error">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="payment-tip">
+                            <strong>Conseil</strong>
+                            Enregistrez uniquement le montant reçu aujourd’hui. Le solde restant sera recalculé automatiquement.
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label" for="id_amount">{{ form.amount.label }} <span class="required">*</span></label>
+                                {{ form.amount }}
+                                {% if form.amount.errors %}<div class="field-error">{{ form.amount.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_payment_method">{{ form.payment_method.label }} <span class="required">*</span></label>
+                                {{ form.payment_method }}
+                                {% if form.payment_method.errors %}<div class="field-error">{{ form.payment_method.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_payment_date">{{ form.payment_date.label }} <span class="required">*</span></label>
+                                {{ form.payment_date }}
+                                {% if form.payment_date.errors %}<div class="field-error">{{ form.payment_date.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_reference">{{ form.reference.label }}</label>
+                                {{ form.reference }}
+                                {% if form.reference.errors %}<div class="field-error">{{ form.reference.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="form-group form-group-full">
+                                <label class="form-label" for="id_notes">{{ form.notes.label }}</label>
+                                {{ form.notes }}
+                                {% if form.notes.errors %}<div class="field-error">{{ form.notes.errors.0 }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Enregistrer le paiement</button>
+                            <a href="{% url 'credit_sales' %}" class="btn btn-secondary">Annuler</a>
+                        </div>
+                    </form>
+                </div>
             </div>
-            {% endif %}
 
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label" for="id_amount">{{ form.amount.label }} <span class="required">*</span></label>
-                    {{ form.amount }}
-                    {% if form.amount.errors %}<div class="field-error">{{ form.amount.errors.0 }}</div>{% endif %}
+            <div class="card payment-history">
+                <div class="card-header">
+                    <h3 class="card-title">Historique des paiements</h3>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_payment_method">{{ form.payment_method.label }} <span class="required">*</span></label>
-                    {{ form.payment_method }}
-                    {% if form.payment_method.errors %}<div class="field-error">{{ form.payment_method.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_payment_date">{{ form.payment_date.label }} <span class="required">*</span></label>
-                    {{ form.payment_date }}
-                    {% if form.payment_date.errors %}<div class="field-error">{{ form.payment_date.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_reference">{{ form.reference.label }}</label>
-                    {{ form.reference }}
-                    {% if form.reference.errors %}<div class="field-error">{{ form.reference.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="form-group form-group-full">
-                    <label class="form-label" for="id_notes">{{ form.notes.label }}</label>
-                    {{ form.notes }}
-                    {% if form.notes.errors %}<div class="field-error">{{ form.notes.errors.0 }}</div>{% endif %}
+                <div class="card-body">
+                    {% if payments %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Mode</th>
+                                    <th class="text-right">Montant</th>
+                                    <th>Référence</th>
+                                    <th>Par</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in payments %}
+                                <tr>
+                                    <td>{{ p.payment_date|date:"d/m/Y" }}</td>
+                                    <td>{{ p.get_payment_method_display }}</td>
+                                    <td class="text-right"><strong>{{ p.amount|floatformat:0 }} FCFA</strong></td>
+                                    <td>{{ p.reference|default:"-" }}</td>
+                                    <td>{{ p.staff.get_full_name|default:"-" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        Aucun paiement enregistré pour le moment.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
-
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Enregistrer le paiement</button>
-                <a href="{% url 'credit_sales' %}" class="btn btn-secondary">Annuler</a>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Historique des paiements -->
-{% if payments %}
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Historique des paiements</h3>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Mode</th>
-                        <th class="text-right">Montant</th>
-                        <th>Référence</th>
-                        <th>Par</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in payments %}
-                    <tr>
-                        <td>{{ p.payment_date|date:"d/m/Y" }}</td>
-                        <td>{{ p.get_payment_method_display }}</td>
-                        <td class="text-right">{{ p.amount|floatformat:0 }} FCFA</td>
-                        <td>{{ p.reference|default:"-" }}</td>
-                        <td>{{ p.staff.get_full_name|default:"-" }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
         </div>
+
+        <aside class="payment-side">
+            <div class="card payment-card">
+                <div class="card-header">
+                    <h3 class="card-title">Détails de la vente à crédit</h3>
+                </div>
+                <div class="card-body">
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <span class="summary-label">Total vente</span>
+                            <span class="summary-value">{{ credit_sale.sale.total|floatformat:0 }} FCFA</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Déjà payé</span>
+                            <span class="summary-value">{{ credit_sale.amount_paid|floatformat:0 }} FCFA</span>
+                        </div>
+                        <div class="summary-item is-highlight">
+                            <span class="summary-label">Solde restant</span>
+                            <span class="summary-value">{{ credit_sale.amount_remaining|floatformat:0 }} FCFA</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Échéance</span>
+                            <span class="summary-value">{% if credit_sale.due_date %}{{ credit_sale.due_date|date:"d/m/Y" }}{% else %}Non définie{% endif %}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 </div>
-{% endif %}
 {% endblock %}
 

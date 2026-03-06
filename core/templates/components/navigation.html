@@ -110,45 +110,66 @@
             </li>
             {% endif %}
 
-            {% if 'accounting' in user_modules %}
-            <li class="nav-item">
-                <a href="{% url 'accounting_journal' %}" class="nav-link {% if 'accounting_' in request.resolver_match.url_name %}active{% endif %}">
-                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M4 2h16a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="2"/>
-                        <line x1="7" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
-                        <line x1="7" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2"/>
-                        <line x1="7" y1="15" x2="13" y2="15" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    <span>Comptabilité</span>
-                </a>
-            </li>
-            {% endif %}
+            {% if 'accounting' in user_modules or 'treasury' in user_modules or 'reports' in user_modules %}
+            <li class="nav-item nav-item-dropdown {% if 'accounting_' in request.resolver_match.url_name or request.resolver_match.url_name == 'treasury_dashboard' or request.resolver_match.url_name == 'credit_sales' or request.resolver_match.url_name == 'record_credit_payment' or request.resolver_match.url_name == 'supplier_payments' or request.resolver_match.url_name == 'add_supplier_payment' or request.resolver_match.url_name == 'record_supply_payment' or request.resolver_match.url_name == 'invoices' or request.resolver_match.url_name == 'reports' or request.resolver_match.url_name == 'income_statement' or request.resolver_match.url_name == 'balance_sheet' or request.resolver_match.url_name == 'aged_balance' or request.resolver_match.url_name == 'product_margins' or request.resolver_match.url_name == 'vat_declaration' or request.resolver_match.url_name == 'bank_reconciliation' or request.resolver_match.url_name == 'exercise_closing' %}active{% endif %}">
+                <details class="nav-dropdown">
+                    <summary class="nav-dropdown-trigger">
+                        <span class="nav-dropdown-trigger-main">
+                            <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M7 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M7 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M7 16h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <span>Comptabilité</span>
+                        </span>
+                        <svg class="nav-dropdown-caret" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </summary>
 
-            {% if 'treasury' in user_modules %}
-            <li class="nav-item">
-                <a href="{% url 'treasury_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'treasury_dashboard' or request.resolver_match.url_name == 'credit_sales' or request.resolver_match.url_name == 'record_credit_payment' or request.resolver_match.url_name == 'supplier_payments' or request.resolver_match.url_name == 'add_supplier_payment' or request.resolver_match.url_name == 'invoices' %}active{% endif %}">
-                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
-                        <path d="M2 10h20" stroke="currentColor" stroke-width="2"/>
-                        <path d="M6 15h4" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    <span>Trésorerie</span>
-                </a>
-            </li>
-            {% endif %}
+                    <div class="nav-dropdown-menu">
+                        {% if 'accounting' in user_modules %}
+                        <div class="nav-dropdown-section">
+                            <div class="nav-dropdown-title">Comptabilité</div>
+                            <div class="nav-dropdown-links">
+                                <a href="{% url 'accounting_journal' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_journal' or request.resolver_match.url_name == 'accounting_add_entry' %}active{% endif %}">Journal</a>
+                                <a href="{% url 'accounting_ledger' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_ledger' %}active{% endif %}">Grand livre</a>
+                                <a href="{% url 'accounting_balance' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_balance' %}active{% endif %}">Balance</a>
+                                <a href="{% url 'accounting_chart' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_chart' %}active{% endif %}">Plan comptable</a>
+                            </div>
+                        </div>
+                        {% endif %}
 
-            {% if 'reports' in user_modules %}
-            <li class="nav-item">
-                <a href="{% url 'reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
-                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"/>
-                        <polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/>
-                        <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2"/>
-                        <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2"/>
-                        <polyline points="10 9 9 9 8 9" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    <span>Rapports</span>
-                </a>
+                        {% if 'treasury' in user_modules %}
+                        <div class="nav-dropdown-section">
+                            <div class="nav-dropdown-title">Trésorerie</div>
+                            <div class="nav-dropdown-links">
+                                <a href="{% url 'treasury_dashboard' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'treasury_dashboard' %}active{% endif %}">Tableau de bord</a>
+                                <a href="{% url 'credit_sales' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'credit_sales' or request.resolver_match.url_name == 'record_credit_payment' %}active{% endif %}">Ventes à crédit</a>
+                                <a href="{% url 'supplier_payments' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'supplier_payments' or request.resolver_match.url_name == 'add_supplier_payment' or request.resolver_match.url_name == 'record_supply_payment' %}active{% endif %}">Paiements fournisseurs</a>
+                                <a href="{% url 'invoices' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'invoices' %}active{% endif %}">Factures</a>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if 'reports' in user_modules %}
+                        <div class="nav-dropdown-section">
+                            <div class="nav-dropdown-title">Rapports</div>
+                            <div class="nav-dropdown-links">
+                                <a href="{% url 'reports' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">Centre de rapports</a>
+                                <a href="{% url 'income_statement' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'income_statement' %}active{% endif %}">Compte de résultat</a>
+                                <a href="{% url 'balance_sheet' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'balance_sheet' %}active{% endif %}">Bilan</a>
+                                <a href="{% url 'aged_balance' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'aged_balance' %}active{% endif %}">Balance âgée</a>
+                                <a href="{% url 'product_margins' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'product_margins' %}active{% endif %}">Marges produits</a>
+                                <a href="{% url 'vat_declaration' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'vat_declaration' %}active{% endif %}">Déclaration TVA</a>
+                                <a href="{% url 'bank_reconciliation' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'bank_reconciliation' %}active{% endif %}">Rapprochement bancaire</a>
+                                <a href="{% url 'exercise_closing' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'exercise_closing' %}active{% endif %}">Clôture d'exercice</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </details>
             </li>
             {% endif %}
 

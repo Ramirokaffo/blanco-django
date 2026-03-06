@@ -266,6 +266,7 @@
     border-bottom: 1px solid var(--border-color);
     z-index: 999;
     height: 60px;
+    overflow: visible;
 }
 
 .nav-container {
@@ -276,8 +277,7 @@
     display: flex;
     list-style: none;
     height: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
     gap: 5px;
 }
 
@@ -295,6 +295,7 @@
 }
 
 .nav-item {
+    position: relative;
     flex-shrink: 0;
 }
 
@@ -321,6 +322,131 @@
 .nav-link.active {
     color: var(--primary-color);
     border-bottom-color: var(--primary-color);
+}
+
+.nav-item-dropdown.active .nav-dropdown-trigger {
+    color: var(--primary-color);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary-color) 12%, var(--bg-tertiary)), var(--bg-secondary));
+    border-bottom-color: var(--primary-color);
+}
+
+.nav-dropdown {
+    position: relative;
+    height: 100%;
+
+}
+
+.nav-dropdown summary {
+    list-style: none;
+}
+
+.nav-dropdown summary::-webkit-details-marker {
+    display: none;
+}
+
+.nav-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 210px;
+    padding: 14px 18px;
+    height: 100%;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    border-radius: 14px 14px 0 0;
+    transition: all 0.25s ease;
+    background: transparent;
+}
+
+.nav-dropdown-trigger:hover,
+.nav-dropdown[open] .nav-dropdown-trigger {
+    color: var(--primary-color);
+    background: linear-gradient(180deg, var(--bg-tertiary), var(--bg-secondary));
+}
+
+.nav-dropdown-trigger-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.nav-dropdown-caret {
+    flex-shrink: 0;
+    transition: transform 0.25s ease;
+}
+
+.nav-dropdown[open] .nav-dropdown-caret {
+    transform: rotate(180deg);
+}
+
+.nav-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    left: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    width: min(760px, calc(100vw - 40px));
+    max-width: calc(100vw - 40px);
+    padding: 16px;
+    background: color-mix(in srgb, var(--bg-primary) 92%, white);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.16);
+    z-index: 1300;
+}
+
+.nav-dropdown-section {
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+    border-radius: 14px;
+    background: linear-gradient(180deg, var(--bg-primary), var(--bg-secondary));
+}
+
+.nav-dropdown-title {
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.nav-dropdown-links {
+    display: grid;
+    gap: 6px;
+}
+
+.nav-dropdown-link {
+    display: flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.nav-dropdown-link:hover {
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 10%, var(--bg-secondary));
+    transform: translateX(2px);
+}
+
+.nav-dropdown-link.active {
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 14%, var(--bg-secondary));
+    font-weight: 600;
 }
 
 .nav-icon {
@@ -509,7 +635,25 @@
     }
 
     .nav-menu {
+        overflow-x: auto;
+        overflow-y: hidden;
         justify-content: flex-start;
+    }
+
+    .nav-dropdown-trigger {
+        min-width: unset;
+        padding: 18px 15px;
+    }
+
+    .nav-dropdown-menu {
+        position: fixed;
+        left: 16px;
+        right: 16px;
+        top: 138px;
+        min-width: 0;
+        max-height: calc(100vh - 170px);
+        overflow-y: auto;
+        grid-template-columns: 1fr;
     }
 
     .main-content {
@@ -539,8 +683,16 @@
         display: none;
     }
 
+    .nav-dropdown-trigger-main span {
+        display: inline;
+    }
+
     .nav-link {
         padding: 18px 15px;
+    }
+
+    .nav-dropdown-trigger {
+        min-width: 0;
     }
 }
 
