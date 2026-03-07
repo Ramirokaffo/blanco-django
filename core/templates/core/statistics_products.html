@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Statistiques produits - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/statistics.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="statistics-products-page">
+    <div class="page-header statistics-header"><div><h1>Statistiques produits</h1><p class="text-secondary">Analysez vos ventes, votre stock et votre catalogue produit par période, avec filtres métier.</p></div><div class="statistics-header-actions"><a href="{% url 'statistics' %}" class="btn btn-secondary btn-sm">Retour aux statistiques</a><a href="{% url 'products' %}" class="btn btn-secondary btn-sm">Catalogue produits</a></div></div>
+    <div class="statistics-products-summary"><div><strong>{{ period_name }}</strong><div class="text-secondary">{{ period_label }}</div></div><div class="statistics-products-summary-meta"><span class="statistics-pill">{{ total_products }} produit{{ total_products|pluralize }}</span><span class="statistics-pill">{{ sales_count }} vente{{ sales_count|pluralize }}</span><span class="statistics-pill">Mise à jour : {{ generated_at|date:"d/m/Y H:i" }}</span></div></div>
+
+    <div class="card statistics-products-filters"><div class="card-header"><h3 class="card-title">Filtres</h3></div><div class="card-body"><form method="get" action="{% url 'product_statistics' %}" class="filters-form"><div class="filters-row"><div class="filter-group"><label class="form-label">Période</label><select name="period" class="form-control"><option value="7d" {% if current_period == '7d' %}selected{% endif %}>7 derniers jours</option><option value="30d" {% if current_period == '30d' %}selected{% endif %}>30 derniers jours</option><option value="90d" {% if current_period == '90d' %}selected{% endif %}>90 derniers jours</option><option value="365d" {% if current_period == '365d' %}selected{% endif %}>12 derniers mois</option><option value="custom" {% if current_period == 'custom' %}selected{% endif %}>Personnalisée</option></select></div><div class="filter-group"><label class="form-label">Recherche</label><input type="text" name="search" class="form-control" placeholder="Nom, code ou marque..." value="{{ current_search }}"></div><div class="filter-group"><label class="form-label">Date début</label><input type="date" name="date_from" class="form-control" value="{{ current_date_from }}"></div><div class="filter-group"><label class="form-label">Date fin</label><input type="date" name="date_to" class="form-control" value="{{ current_date_to }}"></div></div><div class="filters-row"><div class="filter-group"><label class="form-label">Catégorie</label><select name="category" class="form-control"><option value="">Toutes</option>{% for cat in categories %}<option value="{{ cat.id }}" {% if current_category == cat.id|stringformat:"d" %}selected{% endif %}>{{ cat.name }}</option>{% endfor %}</select></div><div class="filter-group"><label class="form-label">Gamme</label><select name="gamme" class="form-control"><option value="">Toutes</option>{% for g in gammes %}<option value="{{ g.id }}" {% if current_gamme == g.id|stringformat:"d" %}selected{% endif %}>{{ g.name }}</option>{% endfor %}</select></div><div class="filter-group"><label class="form-label">Rayon</label><select name="rayon" class="form-control"><option value="">Tous</option>{% for r in rayons %}<option value="{{ r.id }}" {% if current_rayon == r.id|stringformat:"d" %}selected{% endif %}>{{ r.name }}</option>{% endfor %}</select></div><div class="filters-actions"><button type="submit" class="btn btn-primary btn-sm">Filtrer</button><a href="{% url 'product_statistics' %}" class="btn btn-secondary btn-sm">Réinitialiser</a></div></div></form></div></div>
+
+    <div class="kpi-grid"><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Produits concernés</div><div class="kpi-value">{{ total_products }}</div><div class="kpi-sub">Catalogue filtré</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Chiffre d'affaires</div><div class="kpi-value">{{ total_revenue|floatformat:0 }} {{ currency }}</div><div class="kpi-sub">{{ sales_count }} vente{{ sales_count|pluralize }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Unités vendues</div><div class="kpi-value">{{ total_units_sold }}</div><div class="kpi-sub">Moyenne/vente : {{ average_sale_value|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Approvisionnements</div><div class="kpi-value">{{ total_supplied_units }}</div><div class="kpi-sub">{{ total_supplies_amount|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Stock disponible</div><div class="kpi-value">{{ total_stock_units }}</div><div class="kpi-sub">Valorisation : {{ total_stock_value|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Alertes stock</div><div class="kpi-value">{{ stock_alert_count }}</div><div class="kpi-sub">{{ out_of_stock_count }} rupture{{ out_of_stock_count|pluralize:"s" }}</div></div></div></div>
+
+    <div class="statistics-products-chart-grid"><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Tendance ventes / chiffre d'affaires</h3></div><div class="card-body"><canvas id="salesTrendChart"></canvas><p class="statistics-chart-note">Vue chronologique des quantités vendues et du chiffre d'affaires sur la période filtrée.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Top produits</h3></div><div class="card-body"><canvas id="topProductsChart"></canvas><p class="statistics-chart-note">Classement des produits les plus performants selon le chiffre d'affaires généré.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Répartition catalogue par catégorie</h3></div><div class="card-body"><canvas id="categoryChart"></canvas><p class="statistics-chart-note">Répartition du portefeuille produits après application des filtres catalogue.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Santé du stock</h3></div><div class="card-body"><canvas id="stockHealthChart"></canvas><p class="statistics-chart-note">Suivi des produits disponibles, en stock bas ou en rupture.</p></div></div></div>
+
+    <div class="statistics-products-detail-grid"><div class="card"><div class="card-header"><h3 class="card-title">Produits les plus vendus</h3></div><div class="card-body">{% if top_products %}<div class="table-responsive"><table class="table"><thead><tr><th>Produit</th><th>Catégorie</th><th class="text-right">Qté</th><th class="text-right">CA</th></tr></thead><tbody>{% for product in top_products %}<tr><td><strong>{{ product.product__name }}</strong><div class="statistics-entity-sub">{{ product.product__code }}</div></td><td>{{ product.product__category__name|default:"-" }}</td><td class="text-right">{{ product.total_quantity }}</td><td class="text-right">{{ product.total_revenue|floatformat:0 }} {{ currency }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucune vente produit sur cette période.</p></div>{% endif %}</div></div><div class="card"><div class="card-header"><h3 class="card-title">Produits en surveillance</h3></div><div class="card-body">{% if low_stock_products %}<ul class="statistics-inline-list">{% for product in low_stock_products %}<li class="statistics-inline-item"><div><strong>{{ product.name }}</strong><div class="statistics-entity-sub">{{ product.code }}{% if product.category %} · {{ product.category.name }}{% endif %}</div></div><span>{% if product.stock == 0 %}<span class="badge badge-danger">Rupture</span>{% else %}<span class="badge badge-warning">{{ product.stock }} / {{ product.stock_limit }}</span>{% endif %}</span></li>{% endfor %}</ul>{% else %}<div class="empty-state"><p>Aucune alerte stock détectée avec les filtres actuels.</p></div>{% endif %}</div></div></div>
+</div>
+
+{{ sales_trend_chart|json_script:"sales-trend-chart-data" }}
+{{ top_products_chart|json_script:"top-products-chart-data" }}
+{{ category_chart|json_script:"category-chart-data" }}
+{{ stock_health_chart|json_script:"stock-health-chart-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function readChartData(id) {
+        const node = document.getElementById(id);
+        return node ? JSON.parse(node.textContent) : { labels: [] };
+    }
+
+    function buildChart(canvasId, config) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !window.Chart) {
+            return;
+        }
+        new Chart(canvas, config);
+    }
+
+    const salesTrend = readChartData('sales-trend-chart-data');
+    buildChart('salesTrendChart', {
+        type: 'line',
+        data: { labels: salesTrend.labels, datasets: [{ label: 'CA', data: salesTrend.revenue, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.12)', yAxisID: 'y', tension: 0.35, fill: true }, { label: 'Quantités', data: salesTrend.quantity, borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.10)', yAxisID: 'y1', tension: 0.35 }] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true }, y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } } } }
+    });
+
+    const topProducts = readChartData('top-products-chart-data');
+    buildChart('topProductsChart', {
+        type: 'bar',
+        data: { labels: topProducts.labels, datasets: [{ label: 'CA', data: topProducts.revenue, backgroundColor: 'rgba(59, 130, 246, 0.75)', borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    const categories = readChartData('category-chart-data');
+    buildChart('categoryChart', {
+        type: 'doughnut',
+        data: { labels: categories.labels, datasets: [{ data: categories.counts, backgroundColor: ['#2563eb', '#7c3aed', '#ea580c', '#0f766e', '#dc2626', '#ca8a04', '#0891b2', '#4f46e5'] }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const stockHealth = readChartData('stock-health-chart-data');
+    buildChart('stockHealthChart', {
+        type: 'doughnut',
+        data: { labels: stockHealth.labels, datasets: [{ data: stockHealth.values, backgroundColor: ['#16a34a', '#f59e0b', '#dc2626'] }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+});
+</script>
+{% endblock %}

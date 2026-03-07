@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Statistiques personnel - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/statistics.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="statistics-personnel-page">
+    <div class="page-header statistics-header"><div><h1>Statistiques personnel</h1><p class="text-secondary">Suivez les effectifs, les profils et l'activité commerciale / stock du personnel avec des filtres dédiés.</p></div><div class="statistics-header-actions"><a href="{% url 'statistics' %}" class="btn btn-secondary btn-sm">Retour aux statistiques</a><a href="{% url 'contacts' %}?tab=staff" class="btn btn-secondary btn-sm">Voir le personnel</a></div></div>
+    <div class="statistics-personnel-summary"><div><strong>{{ period_name }}</strong><div class="text-secondary">{{ period_label }}</div></div><div class="statistics-personnel-summary-meta"><span class="statistics-pill">{{ total_staff }} profil{{ total_staff|pluralize }}</span><span class="statistics-pill">{{ active_contributors_count }} contributeur{{ active_contributors_count|pluralize }}</span><span class="statistics-pill">Mise à jour : {{ generated_at|date:"d/m/Y H:i" }}</span></div></div>
+
+    <div class="card statistics-personnel-filters"><div class="card-header"><h3 class="card-title">Filtres</h3></div><div class="card-body"><form method="get" action="{% url 'personnel_statistics' %}" class="filters-form"><div class="filters-row"><div class="filter-group"><label class="form-label">Période</label><select name="period" class="form-control"><option value="7d" {% if current_period == '7d' %}selected{% endif %}>7 derniers jours</option><option value="30d" {% if current_period == '30d' %}selected{% endif %}>30 derniers jours</option><option value="90d" {% if current_period == '90d' %}selected{% endif %}>90 derniers jours</option><option value="365d" {% if current_period == '365d' %}selected{% endif %}>12 derniers mois</option><option value="custom" {% if current_period == 'custom' %}selected{% endif %}>Personnalisée</option></select></div><div class="filter-group"><label class="form-label">Recherche</label><input type="text" name="search" class="form-control" placeholder="Nom, prénom, identifiant, téléphone..." value="{{ current_search }}"></div><div class="filter-group"><label class="form-label">Date début</label><input type="date" name="date_from" class="form-control" value="{{ current_date_from }}"></div><div class="filter-group"><label class="form-label">Date fin</label><input type="date" name="date_to" class="form-control" value="{{ current_date_to }}"></div></div><div class="filters-row"><div class="filter-group"><label class="form-label">Statut</label><select name="status" class="form-control"><option value="">Tous</option><option value="active" {% if current_status == 'active' %}selected{% endif %}>Actif</option><option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Inactif</option><option value="superuser" {% if current_status == 'superuser' %}selected{% endif %}>Administrateur</option></select></div><div class="filter-group"><label class="form-label">Rôle</label><select name="role" class="form-control"><option value="">Tous</option>{% for item in roles %}<option value="{{ item }}" {% if current_role == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div><div class="filter-group"><label class="form-label">Genre</label><select name="gender" class="form-control"><option value="">Tous</option>{% for item in genders %}<option value="{{ item }}" {% if current_gender == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div><div class="filter-group"><label class="form-label">Module</label><select name="module" class="form-control"><option value="">Tous</option>{% for item in modules %}<option value="{{ item.code }}" {% if current_module == item.code %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></div></div><div class="filters-actions"><button type="submit" class="btn btn-primary btn-sm">Filtrer</button><a href="{% url 'personnel_statistics' %}" class="btn btn-secondary btn-sm">Réinitialiser</a></div></form></div></div>
+
+    <div class="kpi-grid"><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Personnel concerné</div><div class="kpi-value">{{ total_staff }}</div><div class="kpi-sub">{{ distinct_roles_count }} rôle{{ distinct_roles_count|pluralize }} distinct{{ distinct_roles_count|pluralize }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Utilisateurs actifs</div><div class="kpi-value">{{ active_staff_count }}</div><div class="kpi-sub">Inactifs : {{ inactive_staff_count }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Contributeurs sur période</div><div class="kpi-value">{{ active_contributors_count }}</div><div class="kpi-sub">{{ contributor_rate }}% du personnel filtré</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Recrutements sur période</div><div class="kpi-value">{{ joined_staff_count }}</div><div class="kpi-sub">Administrateurs : {{ admin_staff_count }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Ventes gérées</div><div class="kpi-value">{{ sales_count }}</div><div class="kpi-sub">CA : {{ total_revenue|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Actions stock</div><div class="kpi-value">{{ stock_actions_count }}</div><div class="kpi-sub">Modules attribués : {{ staff_with_modules_count }}</div></div></div></div>
+
+    <div class="statistics-personnel-chart-grid"><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Tendance d'activité</h3></div><div class="card-body"><canvas id="activityTrendChart"></canvas><p class="statistics-chart-note">Évolution des ventes, approvisionnements et opérations stock réalisées par le personnel filtré.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Répartition des statuts</h3></div><div class="card-body"><canvas id="statusDistributionChart"></canvas><p class="statistics-chart-note">Part des profils actifs et inactifs dans l'effectif actuellement filtré.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Répartition par rôle</h3></div><div class="card-body"><canvas id="roleDistributionChart"></canvas><p class="statistics-chart-note">Visualisation des rôles dominants parmi les profils sélectionnés.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Top contributeurs</h3></div><div class="card-body"><canvas id="topContributorsChart"></canvas><p class="statistics-chart-note">Comparaison des actions par collaborateur entre ventes, approvisionnements et inventaires.</p></div></div></div>
+
+    <div class="statistics-personnel-detail-grid"><div class="card"><div class="card-header"><h3 class="card-title">Personnel le plus actif</h3></div><div class="card-body">{% if top_staff %}<div class="table-responsive"><table class="table"><thead><tr><th>Personnel</th><th>Rôle</th><th class="text-right">Ventes</th><th class="text-right">Appro.</th><th class="text-right">Stock</th><th class="text-right">CA</th></tr></thead><tbody>{% for member in top_staff %}<tr><td><strong>{{ member.label }}</strong><div class="statistics-entity-sub">@{{ member.username }} · {{ member.modules_label }}</div></td><td>{{ member.role }}</td><td class="text-right">{{ member.sales_count }}</td><td class="text-right">{{ member.supply_count }}</td><td class="text-right">{{ member.stock_actions }}</td><td class="text-right">{{ member.total_revenue|floatformat:0 }} {{ currency }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucune activité personnel sur cette période.</p></div>{% endif %}</div></div><div class="card"><div class="card-header"><h3 class="card-title">Derniers profils filtrés</h3></div><div class="card-body">{% if recent_staff %}<div class="table-responsive"><table class="table"><thead><tr><th>Personnel</th><th>Rôle</th><th>Genre</th><th>Statut</th><th>Modules</th><th>Arrivée</th></tr></thead><tbody>{% for member in recent_staff %}<tr><td><strong>{{ member.label }}</strong><div class="statistics-entity-sub">@{{ member.username }}</div></td><td>{{ member.role }}</td><td>{{ member.gender }}</td><td><span class="badge badge-{{ member.status_class }}">{{ member.status_label }}</span></td><td>{{ member.modules_label }}</td><td>{{ member.date_joined|date:"d/m/Y" }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucun profil ne correspond aux filtres actuels.</p></div>{% endif %}</div></div></div>
+</div>
+
+{{ activity_trend_chart|json_script:"personnel-activity-trend-data" }}
+{{ status_distribution_chart|json_script:"personnel-status-distribution-data" }}
+{{ role_distribution_chart|json_script:"personnel-role-distribution-data" }}
+{{ top_contributors_chart|json_script:"personnel-top-contributors-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function readChartData(id) {
+        const node = document.getElementById(id);
+        return node ? JSON.parse(node.textContent) : { labels: [] };
+    }
+
+    function buildChart(canvasId, config) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !window.Chart) {
+            return;
+        }
+        new Chart(canvas, config);
+    }
+
+    const activityTrend = readChartData('personnel-activity-trend-data');
+    buildChart('activityTrendChart', {
+        type: 'line',
+        data: { labels: activityTrend.labels, datasets: [{ label: 'Ventes', data: activityTrend.sales, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.12)', tension: 0.35, fill: true }, { label: 'Approvisionnements', data: activityTrend.supplies, borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.10)', tension: 0.35, fill: true }, { label: 'Actions stock', data: activityTrend.stock_actions, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.10)', tension: 0.35, fill: true }] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true } } }
+    });
+
+    const statusDistribution = readChartData('personnel-status-distribution-data');
+    buildChart('statusDistributionChart', {
+        type: 'doughnut',
+        data: { labels: statusDistribution.labels, datasets: [{ data: statusDistribution.values, backgroundColor: ['#16a34a', '#f59e0b'] }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const roleDistribution = readChartData('personnel-role-distribution-data');
+    buildChart('roleDistributionChart', {
+        type: 'bar',
+        data: { labels: roleDistribution.labels, datasets: [{ label: 'Effectif', data: roleDistribution.values, backgroundColor: 'rgba(124, 58, 237, 0.75)', borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    const topContributors = readChartData('personnel-top-contributors-data');
+    buildChart('topContributorsChart', {
+        type: 'bar',
+        data: { labels: topContributors.labels, datasets: [{ label: 'Ventes', data: topContributors.sales, backgroundColor: 'rgba(37, 99, 235, 0.75)', borderRadius: 8 }, { label: 'Approvisionnements', data: topContributors.supplies, backgroundColor: 'rgba(22, 163, 74, 0.72)', borderRadius: 8 }, { label: 'Actions stock', data: topContributors.stock_actions, backgroundColor: 'rgba(245, 158, 11, 0.72)', borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { beginAtZero: true, stacked: true } } }
+    });
+});
+</script>
+{% endblock %}

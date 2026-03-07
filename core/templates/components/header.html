@@ -1,6 +1,14 @@
 <header class="header">
     <div class="container header-container">
         <div class="header-left">
+            <button class="sidebar-toggle" id="sidebarToggle" aria-controls="appSidebar" aria-expanded="true" aria-label="Fermer la navigation latérale" title="Ouvrir / fermer la navigation">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="6" height="16" rx="1"></rect>
+                    <path d="M13 7h8"></path>
+                    <path d="M13 12h8"></path>
+                    <path d="M13 17h8"></path>
+                </svg>
+            </button>
             <div class="logo">
                 {% if system_settings.company_logo %}
                     <img src="{{ system_settings.company_logo.url }}" alt="{{ system_settings.company_name }}" class="logo-img">

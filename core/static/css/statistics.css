@@ -1,0 +1,328 @@
+.statistics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.statistics-header-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.statistics-section-heading {
+    margin: 6px 0 16px;
+}
+
+.statistics-section-heading h2 {
+    margin-bottom: 6px;
+    font-size: 1.2rem;
+}
+
+.statistics-anchor-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.statistics-anchor-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 14px;
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    background: var(--card-background, var(--bg-primary));
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.statistics-anchor-link:hover {
+    border-color: var(--primary-color, #007bff);
+    color: var(--primary-color, #007bff);
+    transform: translateY(-1px);
+}
+
+.statistics-section-grid,
+.statistics-distribution-grid,
+.statistics-details-grid {
+    display: grid;
+    gap: 24px;
+    margin-bottom: 30px;
+}
+
+.statistics-section-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statistics-distribution-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statistics-details-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statistics-card-span-2 {
+    grid-column: span 2;
+}
+
+.statistics-list {
+    display: grid;
+    gap: 12px;
+}
+
+.statistics-list-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-secondary);
+}
+
+.statistics-list-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.statistics-list-item strong {
+    color: var(--text-primary);
+    text-align: right;
+}
+
+.metric-block {
+    display: grid;
+    gap: 16px;
+}
+
+.metric-row {
+    display: grid;
+    gap: 8px;
+}
+
+.metric-row-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.metric-track {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.metric-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+}
+
+.metric-fill.success { background: #28a745; }
+.metric-fill.info { background: #007bff; }
+.metric-fill.warning { background: #f0ad4e; }
+.metric-fill.danger { background: #dc3545; }
+
+.metric-caption {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.statistics-entity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.statistics-entity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.statistics-entity-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.statistics-entity-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.statistics-entity-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.statistics-products-page,
+.statistics-sales-page,
+.statistics-personnel-page {
+    display: grid;
+    gap: 24px;
+}
+
+.statistics-products-filters .filters-row,
+.statistics-sales-filters .filters-row,
+.statistics-personnel-filters .filters-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.statistics-products-filters .filters-row + .filters-row,
+.statistics-sales-filters .filters-row + .filters-row,
+.statistics-personnel-filters .filters-row + .filters-row {
+    margin-top: 16px;
+}
+
+.statistics-products-summary,
+.statistics-sales-summary,
+.statistics-personnel-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border: 1px solid var(--border-light);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--primary-color) 6%, var(--bg-primary));
+}
+
+.statistics-products-summary-meta,
+.statistics-sales-summary-meta,
+.statistics-personnel-summary-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.statistics-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.statistics-products-chart-grid,
+.statistics-products-detail-grid,
+.statistics-sales-chart-grid,
+.statistics-sales-detail-grid,
+.statistics-personnel-chart-grid,
+.statistics-personnel-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+
+.statistics-chart-card {
+    min-height: 360px;
+}
+
+.statistics-chart-card .card-body {
+    display: grid;
+    gap: 12px;
+}
+
+.statistics-chart-card canvas {
+    width: 100% !important;
+    max-height: 280px;
+}
+
+.statistics-chart-note {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.statistics-inline-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.statistics-inline-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.statistics-inline-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.statistics-inline-item strong,
+.statistics-inline-item span:last-child {
+    text-align: right;
+}
+
+@media (max-width: 1200px) {
+    .statistics-distribution-grid,
+    .statistics-details-grid,
+    .statistics-products-chart-grid,
+    .statistics-products-detail-grid,
+    .statistics-sales-chart-grid,
+    .statistics-sales-detail-grid,
+    .statistics-personnel-chart-grid,
+    .statistics-personnel-detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .statistics-header,
+    .statistics-products-summary,
+    .statistics-sales-summary,
+    .statistics-personnel-summary,
+    .statistics-list-item,
+    .metric-row-head,
+    .statistics-entity-item,
+    .statistics-inline-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .statistics-section-grid,
+    .statistics-distribution-grid,
+    .statistics-details-grid,
+    .statistics-products-chart-grid,
+    .statistics-products-detail-grid,
+    .statistics-sales-chart-grid,
+    .statistics-sales-detail-grid,
+    .statistics-personnel-chart-grid,
+    .statistics-personnel-detail-grid,
+    .statistics-products-filters .filters-row,
+    .statistics-sales-filters .filters-row,
+    .statistics-personnel-filters .filters-row {
+        grid-template-columns: 1fr;
+    }
+
+    .statistics-card-span-2 {
+        grid-column: span 1;
+    }
+
+    .statistics-entity-meta {
+        align-items: flex-start;
+    }
+}

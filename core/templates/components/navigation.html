@@ -1,4 +1,4 @@
-<nav class="navigation">
+<nav class="navigation" id="appSidebar" aria-label="Navigation principale">
     <div class="nav-container">
         <ul class="nav-menu">
             {% if 'dashboard' in user_modules %}
@@ -11,6 +11,20 @@
                         <rect x="14" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
                     </svg>
                     <span>Tableau de bord</span>
+                </a>
+            </li>
+            {% endif %}
+
+                        {% if 'dashboard' in user_modules %}
+            <li class="nav-item">
+                <a href="{% url 'statistics' %}" class="nav-link {% if request.resolver_match.url_name == 'statistics' %}active{% endif %}">
+                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 19h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M7 16V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M12 16V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M17 16v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span>Statistiques</span>
                 </a>
             </li>
             {% endif %}
@@ -153,6 +167,7 @@
                         </div>
                         {% endif %}
 
+                        
                         {% if 'reports' in user_modules %}
                         <div class="nav-dropdown-section">
                             <div class="nav-dropdown-title">Rapports</div>
@@ -173,6 +188,9 @@
             </li>
             {% endif %}
 
+
+
+
             <!-- {% if 'settings' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'settings' %}" class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
@@ -188,3 +206,5 @@
         </ul>
     </div>
 </nav>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>

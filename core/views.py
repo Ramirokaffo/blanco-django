@@ -1,11 +1,15 @@
+from datetime import timedelta
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, F, Sum, Count
+from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from django.db import transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from core.models.sale_models import Sale, SaleProduct, CreditSale
@@ -204,6 +208,1028 @@ def dashboard(request):
         'currency': settings_obj.currency_symbol,
     }
     return render(request, 'core/dashboard.html', context)
+
+
+@login_required
+@module_required('dashboard')
+def statistics(request):
+    """Vue structurée des statistiques globales du système."""
+    from core.models.settings_models import SystemSettings
+
+    def to_percentage(value, total):
+        return round((value / total) * 100, 1) if total else 0
+
+    settings_obj = SystemSettings.get_settings()
+    current_daily = DailyService.get_or_create_active_daily()
+    today = timezone.localdate()
+
+    sales_queryset = Sale.objects.filter(delete_at__isnull=True)
+    sale_products_queryset = SaleProduct.objects.filter(
+        delete_at__isnull=True,
+        sale__delete_at__isnull=True,
+    )
+    products_queryset = Product.objects.filter(delete_at__isnull=True)
+    supplies_queryset = Supply.objects.filter(delete_at__isnull=True)
+    expenses_queryset = DailyExpense.objects.filter(delete_at__isnull=True)
+    recipes_queryset = DailyRecipe.objects.filter(delete_at__isnull=True)
+    credit_sales_queryset = CreditSale.objects.filter(delete_at__isnull=True, sale__delete_at__isnull=True)
+    credit_supplies_queryset = CreditSupply.objects.filter(delete_at__isnull=True, supply__delete_at__isnull=True)
+    invoices_queryset = Invoice.objects.filter(delete_at__isnull=True)
+    payments_queryset = Payment.objects.filter(delete_at__isnull=True)
+    supplier_payments_queryset = SupplierPayment.objects.filter(delete_at__isnull=True)
+    inventories_queryset = Inventory.objects.filter(delete_at__isnull=True)
+    overdue_schedules = PaymentSchedule.objects.filter(
+        delete_at__isnull=True,
+        due_date__lt=today,
+    ).exclude(status='PAID').select_related(
+        'credit_sale__sale__client',
+        'credit_supply__supply__supplier',
+    ).order_by('due_date')[:6]
+
+    today_sales = sales_queryset.filter(daily=current_daily) if current_daily else Sale.objects.none()
+    today_supplies = supplies_queryset.filter(daily=current_daily) if current_daily else Supply.objects.none()
+    today_expenses_queryset = expenses_queryset.filter(daily=current_daily) if current_daily else DailyExpense.objects.none()
+    today_recipes_queryset = recipes_queryset.filter(daily=current_daily) if current_daily else DailyRecipe.objects.none()
+
+    total_revenue = sales_queryset.aggregate(total=Sum('total'))['total'] or 0
+    sales_count = sales_queryset.count()
+    products_sold_count = sale_products_queryset.aggregate(total=Sum('quantity'))['total'] or 0
+    average_ticket = (total_revenue / sales_count) if sales_count else 0
+    paid_sales_count = sales_queryset.filter(is_paid=True).count()
+    credit_sales_count = sales_queryset.filter(is_credit=True).count()
+    unpaid_sales_count = sales_queryset.filter(is_paid=False).count()
+
+    total_expenses = expenses_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    total_recipes = recipes_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    net_result = total_revenue + total_recipes - total_expenses
+
+    total_supplies = supplies_queryset.aggregate(total=Sum('total_price'))['total'] or 0
+    supplies_count = supplies_queryset.count()
+    receivables_total = credit_sales_queryset.aggregate(total=Sum('amount_remaining'))['total'] or 0
+    supplier_debt_total = credit_supplies_queryset.aggregate(total=Sum('amount_remaining'))['total'] or 0
+    payments_received_total = payments_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    supplier_payments_total = supplier_payments_queryset.aggregate(total=Sum('amount'))['total'] or 0
+
+    total_products = products_queryset.count()
+    in_stock_count = products_queryset.filter(stock__gt=0).count()
+    out_of_stock_count = products_queryset.filter(stock=0).count()
+    low_stock_queryset = products_queryset.filter(stock__lte=F('stock_limit')).exclude(stock_limit__isnull=True)
+    low_stock_count = low_stock_queryset.filter(stock__gt=0).count()
+    stock_alert_count = low_stock_queryset.count()
+    total_stock_units = products_queryset.aggregate(total=Sum('stock'))['total'] or 0
+    categories_count = Category.objects.filter(delete_at__isnull=True).count()
+    gammes_count = Gamme.objects.filter(delete_at__isnull=True).count()
+    rayons_count = Rayon.objects.filter(delete_at__isnull=True).count()
+    products_with_category_count = products_queryset.filter(
+        category__isnull=False,
+        category__delete_at__isnull=True,
+    ).count()
+    products_with_gamme_count = products_queryset.filter(
+        gamme__isnull=False,
+        gamme__delete_at__isnull=True,
+    ).count()
+    products_with_rayon_count = products_queryset.filter(
+        rayon__isnull=False,
+        rayon__delete_at__isnull=True,
+    ).count()
+
+    clients_count = Client.objects.filter(delete_at__isnull=True).count()
+    staff_count = CustomUser.objects.filter(delete_at__isnull=True).count()
+    suppliers_count = Supplier.objects.filter(delete_at__isnull=True).count()
+    active_users_count = CustomUser.objects.filter(delete_at__isnull=True, is_active=True).count()
+    inactive_users_count = CustomUser.objects.filter(delete_at__isnull=True, is_active=False).count()
+    open_dailies_count = Daily.objects.filter(delete_at__isnull=True, end_date__isnull=True).count()
+    inventory_sessions_count = inventories_queryset.count()
+    valid_inventory_units = inventories_queryset.aggregate(total=Sum('valid_product_count'))['total'] or 0
+    invalid_inventory_units = inventories_queryset.aggregate(total=Sum('invalid_product_count'))['total'] or 0
+    inventory_snapshot_count = InventorySnapshot.objects.filter(delete_at__isnull=True).count()
+
+    today_revenue = today_sales.aggregate(total=Sum('total'))['total'] or 0
+    today_sales_count = today_sales.count()
+    today_products_sold = sale_products_queryset.filter(sale__daily=current_daily).aggregate(total=Sum('quantity'))['total'] or 0
+    today_expenses = today_expenses_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    today_recipes = today_recipes_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    today_supplies_count = today_supplies.count()
+    today_supplies_total = today_supplies.aggregate(total=Sum('total_price'))['total'] or 0
+    today_net = today_revenue + today_recipes - today_expenses
+
+    invoice_total = invoices_queryset.count()
+    paid_invoices_count = invoices_queryset.filter(status='PAID').count()
+    sent_invoices_count = invoices_queryset.filter(status='SENT').count()
+    draft_invoices_count = invoices_queryset.filter(status='DRAFT').count()
+    cancelled_invoices_count = invoices_queryset.filter(status='CANCELLED').count()
+
+    recent_sales = sales_queryset.select_related('client', 'staff').order_by('-create_at')[:6]
+    low_stock_products = low_stock_queryset.order_by('stock', 'name')[:6]
+    top_products = products_queryset.filter(
+        sale_products__delete_at__isnull=True,
+        sale_products__sale__delete_at__isnull=True,
+    ).annotate(
+        total_quantity=Sum('sale_products__quantity'),
+        sales_frequency=Count('sale_products__sale', distinct=True),
+    ).order_by('-total_quantity', 'name')[:6]
+
+    context = {
+        'page_title': 'Statistiques',
+        'currency': settings_obj.currency_symbol,
+        'generated_at': timezone.now(),
+        'current_daily': current_daily,
+        'total_revenue': total_revenue,
+        'sales_count': sales_count,
+        'products_sold_count': products_sold_count,
+        'average_ticket': average_ticket,
+        'paid_sales_count': paid_sales_count,
+        'credit_sales_count': credit_sales_count,
+        'unpaid_sales_count': unpaid_sales_count,
+        'total_expenses': total_expenses,
+        'total_recipes': total_recipes,
+        'net_result': net_result,
+        'total_supplies': total_supplies,
+        'supplies_count': supplies_count,
+        'receivables_total': receivables_total,
+        'supplier_debt_total': supplier_debt_total,
+        'payments_received_total': payments_received_total,
+        'supplier_payments_total': supplier_payments_total,
+        'total_products': total_products,
+        'in_stock_count': in_stock_count,
+        'out_of_stock_count': out_of_stock_count,
+        'low_stock_count': low_stock_count,
+        'stock_alert_count': stock_alert_count,
+        'total_stock_units': total_stock_units,
+        'categories_count': categories_count,
+        'gammes_count': gammes_count,
+        'rayons_count': rayons_count,
+        'products_with_category_count': products_with_category_count,
+        'products_with_gamme_count': products_with_gamme_count,
+        'products_with_rayon_count': products_with_rayon_count,
+        'clients_count': clients_count,
+        'staff_count': staff_count,
+        'suppliers_count': suppliers_count,
+        'active_users_count': active_users_count,
+        'inactive_users_count': inactive_users_count,
+        'open_dailies_count': open_dailies_count,
+        'inventory_sessions_count': inventory_sessions_count,
+        'valid_inventory_units': valid_inventory_units,
+        'invalid_inventory_units': invalid_inventory_units,
+        'inventory_snapshot_count': inventory_snapshot_count,
+        'today_revenue': today_revenue,
+        'today_sales_count': today_sales_count,
+        'today_products_sold': today_products_sold,
+        'today_expenses': today_expenses,
+        'today_recipes': today_recipes,
+        'today_supplies_count': today_supplies_count,
+        'today_supplies_total': today_supplies_total,
+        'today_net': today_net,
+        'invoice_total': invoice_total,
+        'paid_invoices_count': paid_invoices_count,
+        'sent_invoices_count': sent_invoices_count,
+        'draft_invoices_count': draft_invoices_count,
+        'cancelled_invoices_count': cancelled_invoices_count,
+        'sales_paid_rate': to_percentage(paid_sales_count, sales_count),
+        'sales_credit_rate': to_percentage(credit_sales_count, sales_count),
+        'sales_unpaid_rate': to_percentage(unpaid_sales_count, sales_count),
+        'stock_available_rate': to_percentage(in_stock_count, total_products),
+        'stock_alert_rate': to_percentage(stock_alert_count, total_products),
+        'stock_out_rate': to_percentage(out_of_stock_count, total_products),
+        'invoice_paid_rate': to_percentage(paid_invoices_count, invoice_total),
+        'invoice_sent_rate': to_percentage(sent_invoices_count, invoice_total),
+        'invoice_draft_rate': to_percentage(draft_invoices_count, invoice_total),
+        'invoice_cancelled_rate': to_percentage(cancelled_invoices_count, invoice_total),
+        'recent_sales': recent_sales,
+        'low_stock_products': low_stock_products,
+        'top_products': top_products,
+        'overdue_schedules': overdue_schedules,
+    }
+    return render(request, 'core/statistics.html', context)
+
+
+@login_required
+@module_required('dashboard')
+def product_statistics(request):
+    """Vue détaillée des statistiques produits avec filtres et graphiques."""
+    from core.models.settings_models import SystemSettings
+
+    def format_period_label(start, end):
+        if start and end:
+            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+        if start:
+            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+        if end:
+            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
+        return "Toutes les données disponibles"
+
+    def chart_bucket_for_range(start, end):
+        if not start and not end:
+            return TruncMonth('sale__create_at'), 'month'
+
+        effective_end = end or timezone.localdate()
+        effective_start = start or (effective_end - timedelta(days=180))
+        span_days = max((effective_end - effective_start).days + 1, 1)
+
+        if span_days <= 31:
+            return TruncDate('sale__create_at'), 'day'
+        if span_days <= 120:
+            return TruncWeek('sale__create_at'), 'week'
+        return TruncMonth('sale__create_at'), 'month'
+
+    def format_bucket_label(bucket_value, bucket_kind):
+        if hasattr(bucket_value, 'date'):
+            bucket_date = timezone.localtime(bucket_value).date() if timezone.is_aware(bucket_value) else bucket_value.date()
+        else:
+            bucket_date = bucket_value
+
+        if bucket_kind == 'month':
+            return bucket_date.strftime('%b %Y')
+        if bucket_kind == 'week':
+            week_end = bucket_date + timedelta(days=6)
+            return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
+        return bucket_date.strftime('%d/%m')
+
+    settings_obj = SystemSettings.get_settings()
+    today = timezone.localdate()
+
+    period = request.GET.get('period', '30d')
+    search = request.GET.get('search', '').strip()
+    category_id = request.GET.get('category', '')
+    gamme_id = request.GET.get('gamme', '')
+    rayon_id = request.GET.get('rayon', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    parsed_date_from = parse_date(date_from) if date_from else None
+    parsed_date_to = parse_date(date_to) if date_to else None
+
+    if parsed_date_from and parsed_date_to and parsed_date_from > parsed_date_to:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        date_from = parsed_date_from.isoformat()
+        date_to = parsed_date_to.isoformat()
+
+    period_options = {
+        '7d': ('7 derniers jours', 6),
+        '30d': ('30 derniers jours', 29),
+        '90d': ('90 derniers jours', 89),
+        '365d': ('12 derniers mois', 364),
+    }
+
+    if date_from or date_to:
+        period = 'custom'
+    elif period not in period_options:
+        period = '30d'
+
+    if period == 'custom':
+        period_name = 'Période personnalisée'
+        range_start = parsed_date_from
+        range_end = parsed_date_to
+    else:
+        period_name, days_back = period_options[period]
+        range_end = today
+        range_start = today - timedelta(days=days_back)
+
+    products_queryset = Product.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('category', 'gamme', 'rayon')
+
+    if search:
+        products_queryset = products_queryset.filter(
+            Q(name__icontains=search) | Q(code__icontains=search) | Q(brand__icontains=search)
+        )
+    if category_id:
+        products_queryset = products_queryset.filter(category_id=category_id)
+    if gamme_id:
+        products_queryset = products_queryset.filter(gamme_id=gamme_id)
+    if rayon_id:
+        products_queryset = products_queryset.filter(rayon_id=rayon_id)
+
+    product_ids = products_queryset.values('id')
+
+    sales_queryset = SaleProduct.objects.filter(
+        delete_at__isnull=True,
+        sale__delete_at__isnull=True,
+        product_id__in=product_ids,
+    ).select_related('sale', 'product', 'product__category', 'product__gamme', 'product__rayon')
+
+    supplies_queryset = Supply.objects.filter(
+        delete_at__isnull=True,
+        product_id__in=product_ids,
+    ).select_related('product', 'supplier')
+
+    if range_start:
+        sales_queryset = sales_queryset.filter(sale__create_at__date__gte=range_start)
+        supplies_queryset = supplies_queryset.filter(create_at__date__gte=range_start)
+    if range_end:
+        sales_queryset = sales_queryset.filter(sale__create_at__date__lte=range_end)
+        supplies_queryset = supplies_queryset.filter(create_at__date__lte=range_end)
+
+    sales_queryset = sales_queryset.annotate(line_total=F('quantity') * F('unit_price'))
+
+    total_products = products_queryset.count()
+    total_stock_units = products_queryset.aggregate(total=Sum('stock'))['total'] or 0
+    total_stock_value = products_queryset.annotate(
+        stock_value=F('stock') * F('actual_price')
+    ).aggregate(total=Sum('stock_value'))['total'] or 0
+
+    total_revenue = sales_queryset.aggregate(total=Sum('line_total'))['total'] or 0
+    total_units_sold = sales_queryset.aggregate(total=Sum('quantity'))['total'] or 0
+    sales_count = sales_queryset.values('sale_id').distinct().count()
+    average_sale_value = (total_revenue / sales_count) if sales_count else 0
+
+    total_supplied_units = supplies_queryset.aggregate(total=Sum('quantity'))['total'] or 0
+    total_supplies_amount = supplies_queryset.aggregate(total=Sum('total_price'))['total'] or 0
+
+    out_of_stock_count = products_queryset.filter(stock=0).count()
+    low_stock_count = products_queryset.filter(
+        stock__gt=0,
+        stock__lte=F('stock_limit'),
+    ).exclude(stock_limit__isnull=True).count()
+    healthy_stock_count = max(total_products - low_stock_count - out_of_stock_count, 0)
+    stock_alert_count = low_stock_count + out_of_stock_count
+
+    top_products = sales_queryset.values(
+        'product_id',
+        'product__code',
+        'product__name',
+        'product__category__name',
+        'product__rayon__name',
+        'product__gamme__name',
+    ).annotate(
+        total_quantity=Sum('quantity'),
+        total_revenue=Sum('line_total'),
+        sales_frequency=Count('sale_id', distinct=True),
+    ).order_by('-total_revenue', '-total_quantity', 'product__name')[:8]
+
+    low_stock_products = products_queryset.filter(
+        Q(stock=0) | Q(stock__lte=F('stock_limit')),
+    ).exclude(
+        Q(stock__gt=0) & Q(stock_limit__isnull=True)
+    ).order_by('stock', 'name')[:8]
+
+    chart_bucket, bucket_kind = chart_bucket_for_range(range_start, range_end)
+    sales_trend_rows = sales_queryset.annotate(
+        bucket=chart_bucket,
+    ).values('bucket').annotate(
+        total_revenue=Sum('line_total'),
+        total_quantity=Sum('quantity'),
+    ).order_by('bucket')
+
+    sales_trend_chart = {
+        'labels': [format_bucket_label(row['bucket'], bucket_kind) for row in sales_trend_rows],
+        'revenue': [float(row['total_revenue'] or 0) for row in sales_trend_rows],
+        'quantity': [int(row['total_quantity'] or 0) for row in sales_trend_rows],
+    }
+
+    top_products_chart = {
+        'labels': [row['product__name'] for row in top_products],
+        'revenue': [float(row['total_revenue'] or 0) for row in top_products],
+        'quantity': [int(row['total_quantity'] or 0) for row in top_products],
+    }
+
+    category_rows = list(
+        products_queryset.values('category__name').annotate(
+            product_count=Count('id'),
+            stock_units=Sum('stock'),
+        ).order_by('-product_count', '-stock_units', 'category__name')[:8]
+    )
+    category_chart = {
+        'labels': [row['category__name'] or 'Sans catégorie' for row in category_rows],
+        'counts': [int(row['product_count'] or 0) for row in category_rows],
+        'stock': [int(row['stock_units'] or 0) for row in category_rows],
+    }
+
+    stock_health_chart = {
+        'labels': ['Disponible', 'Stock bas', 'Rupture'],
+        'values': [healthy_stock_count, low_stock_count, out_of_stock_count],
+    }
+
+    categories = Category.objects.filter(delete_at__isnull=True).order_by('name')
+    gammes = Gamme.objects.filter(delete_at__isnull=True).order_by('name')
+    rayons = Rayon.objects.filter(delete_at__isnull=True).order_by('name')
+
+    context = {
+        'page_title': 'Statistiques produits',
+        'currency': settings_obj.currency_symbol,
+        'generated_at': timezone.now(),
+        'period_name': period_name,
+        'period_label': format_period_label(range_start, range_end),
+        'categories': categories,
+        'gammes': gammes,
+        'rayons': rayons,
+        'current_period': period,
+        'current_search': search,
+        'current_category': category_id,
+        'current_gamme': gamme_id,
+        'current_rayon': rayon_id,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'total_products': total_products,
+        'total_stock_units': total_stock_units,
+        'total_stock_value': total_stock_value,
+        'total_revenue': total_revenue,
+        'total_units_sold': total_units_sold,
+        'sales_count': sales_count,
+        'average_sale_value': average_sale_value,
+        'total_supplied_units': total_supplied_units,
+        'total_supplies_amount': total_supplies_amount,
+        'healthy_stock_count': healthy_stock_count,
+        'low_stock_count': low_stock_count,
+        'out_of_stock_count': out_of_stock_count,
+        'stock_alert_count': stock_alert_count,
+        'top_products': top_products,
+        'low_stock_products': low_stock_products,
+        'sales_trend_chart': sales_trend_chart,
+        'top_products_chart': top_products_chart,
+        'category_chart': category_chart,
+        'stock_health_chart': stock_health_chart,
+    }
+    return render(request, 'core/statistics_products.html', context)
+
+
+@login_required
+@module_required('dashboard')
+def sales_statistics(request):
+    """Vue détaillée des statistiques ventes avec filtres et graphiques."""
+    from core.models.settings_models import SystemSettings
+
+    def format_period_label(start, end):
+        if start and end:
+            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+        if start:
+            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+        if end:
+            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
+        return "Toutes les données disponibles"
+
+    def chart_bucket_for_range(start, end):
+        if not start and not end:
+            return TruncMonth('create_at'), 'month'
+
+        effective_end = end or timezone.localdate()
+        effective_start = start or (effective_end - timedelta(days=180))
+        span_days = max((effective_end - effective_start).days + 1, 1)
+
+        if span_days <= 31:
+            return TruncDate('create_at'), 'day'
+        if span_days <= 120:
+            return TruncWeek('create_at'), 'week'
+        return TruncMonth('create_at'), 'month'
+
+    def format_bucket_label(bucket_value, bucket_kind):
+        if hasattr(bucket_value, 'date'):
+            bucket_date = timezone.localtime(bucket_value).date() if timezone.is_aware(bucket_value) else bucket_value.date()
+        else:
+            bucket_date = bucket_value
+
+        if bucket_kind == 'month':
+            return bucket_date.strftime('%b %Y')
+        if bucket_kind == 'week':
+            week_end = bucket_date + timedelta(days=6)
+            return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
+        return bucket_date.strftime('%d/%m')
+
+    def format_person_label(firstname, lastname, fallback):
+        full_name = f"{firstname or ''} {lastname or ''}".strip()
+        return full_name or fallback
+
+    settings_obj = SystemSettings.get_settings()
+    today = timezone.localdate()
+
+    period = request.GET.get('period', '30d')
+    search = request.GET.get('search', '').strip()
+    client_id = request.GET.get('client', '')
+    staff_id = request.GET.get('staff', '')
+    sale_type = request.GET.get('type', '')
+    payment_status = request.GET.get('status', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    parsed_date_from = parse_date(date_from) if date_from else None
+    parsed_date_to = parse_date(date_to) if date_to else None
+
+    if parsed_date_from and parsed_date_to and parsed_date_from > parsed_date_to:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        date_from = parsed_date_from.isoformat()
+        date_to = parsed_date_to.isoformat()
+
+    period_options = {
+        '7d': ('7 derniers jours', 6),
+        '30d': ('30 derniers jours', 29),
+        '90d': ('90 derniers jours', 89),
+        '365d': ('12 derniers mois', 364),
+    }
+
+    if date_from or date_to:
+        period = 'custom'
+    elif period not in period_options:
+        period = '30d'
+
+    if period == 'custom':
+        period_name = 'Période personnalisée'
+        range_start = parsed_date_from
+        range_end = parsed_date_to
+    else:
+        period_name, days_back = period_options[period]
+        range_end = today
+        range_start = today - timedelta(days=days_back)
+
+    sales_queryset = Sale.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('client', 'staff', 'daily')
+
+    if search:
+        sales_queryset = sales_queryset.filter(
+            Q(client__firstname__icontains=search)
+            | Q(client__lastname__icontains=search)
+            | Q(staff__firstname__icontains=search)
+            | Q(staff__lastname__icontains=search)
+            | Q(id__icontains=search)
+        )
+    if client_id:
+        sales_queryset = sales_queryset.filter(client_id=client_id)
+    if staff_id:
+        sales_queryset = sales_queryset.filter(staff_id=staff_id)
+    if sale_type == 'cash':
+        sales_queryset = sales_queryset.filter(is_credit=False)
+    elif sale_type == 'credit':
+        sales_queryset = sales_queryset.filter(is_credit=True)
+    if payment_status == 'paid':
+        sales_queryset = sales_queryset.filter(is_paid=True)
+    elif payment_status == 'unpaid':
+        sales_queryset = sales_queryset.filter(is_paid=False)
+    if range_start:
+        sales_queryset = sales_queryset.filter(create_at__date__gte=range_start)
+    if range_end:
+        sales_queryset = sales_queryset.filter(create_at__date__lte=range_end)
+
+    sale_ids = sales_queryset.values('id')
+    sale_products_queryset = SaleProduct.objects.filter(
+        delete_at__isnull=True,
+        sale__delete_at__isnull=True,
+        sale_id__in=sale_ids,
+    )
+    credit_sales_queryset = CreditSale.objects.filter(
+        delete_at__isnull=True,
+        sale__delete_at__isnull=True,
+        sale_id__in=sale_ids,
+    )
+
+    total_revenue = sales_queryset.aggregate(total=Sum('total'))['total'] or 0
+    sales_count = sales_queryset.count()
+    products_sold_count = sale_products_queryset.aggregate(total=Sum('quantity'))['total'] or 0
+    average_ticket = (total_revenue / sales_count) if sales_count else 0
+    paid_sales_count = sales_queryset.filter(is_paid=True).count()
+    unpaid_sales_count = sales_queryset.filter(is_paid=False).count()
+    credit_sales_count = sales_queryset.filter(is_credit=True).count()
+    cash_sales_count = max(sales_count - credit_sales_count, 0)
+    paid_revenue = sales_queryset.filter(is_paid=True).aggregate(total=Sum('total'))['total'] or 0
+    unpaid_revenue = sales_queryset.filter(is_paid=False).aggregate(total=Sum('total'))['total'] or 0
+    outstanding_total = credit_sales_queryset.aggregate(total=Sum('amount_remaining'))['total'] or 0
+    anonymous_sales_count = sales_queryset.filter(client__isnull=True).count()
+
+    chart_bucket, bucket_kind = chart_bucket_for_range(range_start, range_end)
+    sales_trend_rows = sales_queryset.annotate(
+        bucket=chart_bucket,
+    ).values('bucket').annotate(
+        total_revenue=Sum('total'),
+        total_sales=Count('id'),
+    ).order_by('bucket')
+    sales_trend_chart = {
+        'labels': [format_bucket_label(row['bucket'], bucket_kind) for row in sales_trend_rows],
+        'revenue': [float(row['total_revenue'] or 0) for row in sales_trend_rows],
+        'sales': [int(row['total_sales'] or 0) for row in sales_trend_rows],
+    }
+
+    payment_status_chart = {
+        'labels': ['Payées', 'Non payées'],
+        'values': [paid_sales_count, unpaid_sales_count],
+    }
+
+    sale_type_chart = {
+        'labels': ['Comptant', 'Crédit'],
+        'values': [cash_sales_count, credit_sales_count],
+    }
+
+    staff_rows = list(
+        sales_queryset.values(
+            'staff_id',
+            'staff__firstname',
+            'staff__lastname',
+        ).annotate(
+            total_revenue=Sum('total'),
+            total_sales=Count('id'),
+        ).order_by('-total_revenue', '-total_sales')[:8]
+    )
+    staff_performance_chart = {
+        'labels': [
+            format_person_label(row['staff__firstname'], row['staff__lastname'], 'Non assigné')
+            for row in staff_rows
+        ],
+        'revenue': [float(row['total_revenue'] or 0) for row in staff_rows],
+        'sales': [int(row['total_sales'] or 0) for row in staff_rows],
+    }
+
+    top_client_rows = list(
+        sales_queryset.values(
+            'client_id',
+            'client__firstname',
+            'client__lastname',
+        ).annotate(
+            total_revenue=Sum('total'),
+            total_sales=Count('id'),
+        ).order_by('-total_revenue', '-total_sales')[:8]
+    )
+    top_clients = [
+        {
+            'label': format_person_label(row['client__firstname'], row['client__lastname'], 'Client comptoir'),
+            'total_revenue': row['total_revenue'] or 0,
+            'total_sales': row['total_sales'] or 0,
+        }
+        for row in top_client_rows
+    ]
+
+    recent_sales = sales_queryset.order_by('-create_at')[:8]
+    clients = Client.objects.filter(delete_at__isnull=True).order_by('firstname', 'lastname')
+    staff_members = CustomUser.objects.filter(delete_at__isnull=True, is_active=True).order_by('firstname', 'lastname')
+
+    context = {
+        'page_title': 'Statistiques ventes',
+        'currency': settings_obj.currency_symbol,
+        'generated_at': timezone.now(),
+        'period_name': period_name,
+        'period_label': format_period_label(range_start, range_end),
+        'clients': clients,
+        'staff_members': staff_members,
+        'current_period': period,
+        'current_search': search,
+        'current_client': client_id,
+        'current_staff': staff_id,
+        'current_type': sale_type,
+        'current_status': payment_status,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'sales_count': sales_count,
+        'total_revenue': total_revenue,
+        'products_sold_count': products_sold_count,
+        'average_ticket': average_ticket,
+        'paid_sales_count': paid_sales_count,
+        'unpaid_sales_count': unpaid_sales_count,
+        'credit_sales_count': credit_sales_count,
+        'cash_sales_count': cash_sales_count,
+        'paid_revenue': paid_revenue,
+        'unpaid_revenue': unpaid_revenue,
+        'outstanding_total': outstanding_total,
+        'anonymous_sales_count': anonymous_sales_count,
+        'top_clients': top_clients,
+        'recent_sales': recent_sales,
+        'sales_trend_chart': sales_trend_chart,
+        'payment_status_chart': payment_status_chart,
+        'sale_type_chart': sale_type_chart,
+        'staff_performance_chart': staff_performance_chart,
+    }
+    return render(request, 'core/statistics_sales.html', context)
+
+
+@login_required
+@module_required('dashboard')
+def personnel_statistics(request):
+    """Vue détaillée des statistiques personnel avec filtres et graphiques."""
+    from core.models.settings_models import SystemSettings, AppModule
+
+    def format_period_label(start, end):
+        if start and end:
+            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+        if start:
+            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+        if end:
+            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
+        return "Toutes les données disponibles"
+
+    def chart_bucket_for_range(field_name, start, end):
+        if not start and not end:
+            return TruncMonth(field_name), 'month'
+
+        effective_end = end or timezone.localdate()
+        effective_start = start or (effective_end - timedelta(days=180))
+        span_days = max((effective_end - effective_start).days + 1, 1)
+
+        if span_days <= 31:
+            return TruncDate(field_name), 'day'
+        if span_days <= 120:
+            return TruncWeek(field_name), 'week'
+        return TruncMonth(field_name), 'month'
+
+    def format_bucket_label(bucket_value, bucket_kind):
+        if hasattr(bucket_value, 'date'):
+            bucket_date = timezone.localtime(bucket_value).date() if timezone.is_aware(bucket_value) else bucket_value.date()
+        else:
+            bucket_date = bucket_value
+
+        if bucket_kind == 'month':
+            return bucket_date.strftime('%b %Y')
+        if bucket_kind == 'week':
+            week_end = bucket_date + timedelta(days=6)
+            return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
+        return bucket_date.strftime('%d/%m')
+
+    def format_person_label(firstname, lastname, username):
+        full_name = f"{firstname or ''} {lastname or ''}".strip()
+        return full_name or username or 'Utilisateur'
+
+    settings_obj = SystemSettings.get_settings()
+    today = timezone.localdate()
+
+    period = request.GET.get('period', '30d')
+    search = request.GET.get('search', '').strip()
+    status = request.GET.get('status', '')
+    role = request.GET.get('role', '').strip()
+    gender = request.GET.get('gender', '').strip()
+    module_code = request.GET.get('module', '').strip()
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    parsed_date_from = parse_date(date_from) if date_from else None
+    parsed_date_to = parse_date(date_to) if date_to else None
+
+    if parsed_date_from and parsed_date_to and parsed_date_from > parsed_date_to:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        date_from = parsed_date_from.isoformat()
+        date_to = parsed_date_to.isoformat()
+
+    period_options = {
+        '7d': ('7 derniers jours', 6),
+        '30d': ('30 derniers jours', 29),
+        '90d': ('90 derniers jours', 89),
+        '365d': ('12 derniers mois', 364),
+    }
+
+    if date_from or date_to:
+        period = 'custom'
+    elif period not in period_options:
+        period = '30d'
+
+    if period == 'custom':
+        period_name = 'Période personnalisée'
+        range_start = parsed_date_from
+        range_end = parsed_date_to
+    else:
+        period_name, days_back = period_options[period]
+        range_end = today
+        range_start = today - timedelta(days=days_back)
+
+    base_staff_queryset = CustomUser.objects.filter(
+        delete_at__isnull=True,
+    ).prefetch_related('allowed_modules')
+
+    roles = list(
+        base_staff_queryset.exclude(role__isnull=True).exclude(role='').values_list('role', flat=True).distinct().order_by('role')
+    )
+    genders = list(
+        base_staff_queryset.exclude(gender__isnull=True).exclude(gender='').values_list('gender', flat=True).distinct().order_by('gender')
+    )
+    modules = AppModule.objects.filter(is_active=True).order_by('order', 'name')
+
+    staff_queryset = base_staff_queryset
+    if search:
+        staff_queryset = staff_queryset.filter(
+            Q(username__icontains=search)
+            | Q(firstname__icontains=search)
+            | Q(lastname__icontains=search)
+            | Q(email__icontains=search)
+            | Q(phone_number__icontains=search)
+        )
+    if status == 'active':
+        staff_queryset = staff_queryset.filter(is_active=True)
+    elif status == 'inactive':
+        staff_queryset = staff_queryset.filter(is_active=False)
+    elif status == 'superuser':
+        staff_queryset = staff_queryset.filter(is_superuser=True)
+    if role:
+        staff_queryset = staff_queryset.filter(role=role)
+    if gender:
+        staff_queryset = staff_queryset.filter(gender=gender)
+    if module_code:
+        staff_queryset = staff_queryset.filter(allowed_modules__code=module_code, allowed_modules__is_active=True)
+
+    staff_queryset = staff_queryset.distinct()
+    staff_ids = list(staff_queryset.values_list('id', flat=True))
+
+    if staff_ids:
+        sales_queryset = Sale.objects.filter(delete_at__isnull=True, staff_id__in=staff_ids)
+        supplies_queryset = Supply.objects.filter(delete_at__isnull=True, staff_id__in=staff_ids)
+        inventories_queryset = Inventory.objects.filter(delete_at__isnull=True, staff_id__in=staff_ids)
+        daily_inventories_queryset = DailyInventory.objects.filter(delete_at__isnull=True, staff_id__in=staff_ids)
+    else:
+        sales_queryset = Sale.objects.none()
+        supplies_queryset = Supply.objects.none()
+        inventories_queryset = Inventory.objects.none()
+        daily_inventories_queryset = DailyInventory.objects.none()
+
+    if range_start:
+        sales_queryset = sales_queryset.filter(create_at__date__gte=range_start)
+        supplies_queryset = supplies_queryset.filter(create_at__date__gte=range_start)
+        inventories_queryset = inventories_queryset.filter(create_at__date__gte=range_start)
+        daily_inventories_queryset = daily_inventories_queryset.filter(create_at__date__gte=range_start)
+    if range_end:
+        sales_queryset = sales_queryset.filter(create_at__date__lte=range_end)
+        supplies_queryset = supplies_queryset.filter(create_at__date__lte=range_end)
+        inventories_queryset = inventories_queryset.filter(create_at__date__lte=range_end)
+        daily_inventories_queryset = daily_inventories_queryset.filter(create_at__date__lte=range_end)
+
+    total_staff = staff_queryset.count()
+    active_staff_count = staff_queryset.filter(is_active=True).count()
+    inactive_staff_count = staff_queryset.filter(is_active=False).count()
+    admin_staff_count = staff_queryset.filter(is_superuser=True).count()
+    distinct_roles_count = staff_queryset.exclude(role__isnull=True).exclude(role='').values('role').distinct().count()
+    staff_with_modules_count = staff_queryset.filter(allowed_modules__is_active=True).distinct().count()
+
+    joined_staff_queryset = staff_queryset
+    if range_start:
+        joined_staff_queryset = joined_staff_queryset.filter(date_joined__date__gte=range_start)
+    if range_end:
+        joined_staff_queryset = joined_staff_queryset.filter(date_joined__date__lte=range_end)
+    joined_staff_count = joined_staff_queryset.count()
+
+    sales_count = sales_queryset.count()
+    total_revenue = sales_queryset.aggregate(total=Sum('total'))['total'] or 0
+    supplies_count = supplies_queryset.count()
+    inventory_sessions_count = inventories_queryset.count()
+    daily_inventory_count = daily_inventories_queryset.count()
+    stock_actions_count = supplies_count + inventory_sessions_count + daily_inventory_count
+
+    active_contributor_ids = set(sales_queryset.exclude(staff_id__isnull=True).values_list('staff_id', flat=True))
+    active_contributor_ids.update(supplies_queryset.exclude(staff_id__isnull=True).values_list('staff_id', flat=True))
+    active_contributor_ids.update(inventories_queryset.exclude(staff_id__isnull=True).values_list('staff_id', flat=True))
+    active_contributor_ids.update(daily_inventories_queryset.exclude(staff_id__isnull=True).values_list('staff_id', flat=True))
+    active_contributors_count = len(active_contributor_ids)
+    contributor_rate = round((active_contributors_count / total_staff) * 100, 1) if total_staff else 0
+
+    status_distribution_chart = {
+        'labels': ['Actifs', 'Inactifs'],
+        'values': [active_staff_count, inactive_staff_count],
+    }
+
+    role_rows = list(
+        staff_queryset.values('role').annotate(total_users=Count('id')).order_by('-total_users', 'role')[:8]
+    )
+    role_distribution_chart = {
+        'labels': [row['role'] or 'Non renseigné' for row in role_rows],
+        'values': [int(row['total_users'] or 0) for row in role_rows],
+    }
+
+    sales_bucket, bucket_kind = chart_bucket_for_range('create_at', range_start, range_end)
+    supplies_bucket, _ = chart_bucket_for_range('create_at', range_start, range_end)
+    inventories_bucket, _ = chart_bucket_for_range('create_at', range_start, range_end)
+    daily_bucket, _ = chart_bucket_for_range('create_at', range_start, range_end)
+
+    sales_trend_rows = list(
+        sales_queryset.annotate(bucket=sales_bucket).values('bucket').annotate(total_sales=Count('id')).order_by('bucket')
+    )
+    supplies_trend_rows = list(
+        supplies_queryset.annotate(bucket=supplies_bucket).values('bucket').annotate(total_supplies=Count('id')).order_by('bucket')
+    )
+    inventories_trend_rows = list(
+        inventories_queryset.annotate(bucket=inventories_bucket).values('bucket').annotate(total_inventories=Count('id')).order_by('bucket')
+    )
+    daily_trend_rows = list(
+        daily_inventories_queryset.annotate(bucket=daily_bucket).values('bucket').annotate(total_daily=Count('id')).order_by('bucket')
+    )
+
+    sales_trend_map = {row['bucket']: int(row['total_sales'] or 0) for row in sales_trend_rows if row['bucket'] is not None}
+    supplies_trend_map = {row['bucket']: int(row['total_supplies'] or 0) for row in supplies_trend_rows if row['bucket'] is not None}
+    inventories_trend_map = {row['bucket']: int(row['total_inventories'] or 0) for row in inventories_trend_rows if row['bucket'] is not None}
+    daily_trend_map = {row['bucket']: int(row['total_daily'] or 0) for row in daily_trend_rows if row['bucket'] is not None}
+    trend_buckets = sorted(
+        set(sales_trend_map.keys())
+        | set(supplies_trend_map.keys())
+        | set(inventories_trend_map.keys())
+        | set(daily_trend_map.keys())
+    )
+    activity_trend_chart = {
+        'labels': [format_bucket_label(bucket, bucket_kind) for bucket in trend_buckets],
+        'sales': [sales_trend_map.get(bucket, 0) for bucket in trend_buckets],
+        'supplies': [supplies_trend_map.get(bucket, 0) for bucket in trend_buckets],
+        'stock_actions': [inventories_trend_map.get(bucket, 0) + daily_trend_map.get(bucket, 0) for bucket in trend_buckets],
+    }
+
+    sales_activity_rows = list(
+        sales_queryset.exclude(staff_id__isnull=True).values(
+            'staff_id',
+            'staff__firstname',
+            'staff__lastname',
+            'staff__username',
+        ).annotate(
+            total_revenue=Sum('total'),
+            total_sales=Count('id'),
+        ).order_by('-total_revenue', '-total_sales')
+    )
+    supplies_activity_rows = list(
+        supplies_queryset.exclude(staff_id__isnull=True).values('staff_id').annotate(total_supplies=Count('id'))
+    )
+    inventories_activity_rows = list(
+        inventories_queryset.exclude(staff_id__isnull=True).values('staff_id').annotate(total_inventories=Count('id'))
+    )
+    daily_activity_rows = list(
+        daily_inventories_queryset.exclude(staff_id__isnull=True).values('staff_id').annotate(total_daily=Count('id'))
+    )
+
+    sales_activity_map = {
+        row['staff_id']: {
+            'label': format_person_label(row['staff__firstname'], row['staff__lastname'], row['staff__username']),
+            'total_revenue': float(row['total_revenue'] or 0),
+            'sales_count': int(row['total_sales'] or 0),
+        }
+        for row in sales_activity_rows
+    }
+    supplies_activity_map = {row['staff_id']: int(row['total_supplies'] or 0) for row in supplies_activity_rows}
+    inventories_activity_map = {row['staff_id']: int(row['total_inventories'] or 0) for row in inventories_activity_rows}
+    daily_activity_map = {row['staff_id']: int(row['total_daily'] or 0) for row in daily_activity_rows}
+
+    top_staff = []
+    for member in staff_queryset.order_by('firstname', 'lastname', 'username'):
+        active_modules = [module.name for module in member.allowed_modules.all() if module.is_active]
+        sales_data = sales_activity_map.get(member.id, {})
+        supply_count = supplies_activity_map.get(member.id, 0)
+        stock_count = inventories_activity_map.get(member.id, 0) + daily_activity_map.get(member.id, 0)
+        sales_total = int(sales_data.get('sales_count', 0))
+        total_actions = sales_total + supply_count + stock_count
+        top_staff.append({
+            'label': sales_data.get('label') or member.get_full_name() or member.username,
+            'username': member.username,
+            'role': member.role or 'Non renseigné',
+            'status_label': 'Actif' if member.is_active else 'Inactif',
+            'sales_count': sales_total,
+            'supply_count': supply_count,
+            'stock_actions': stock_count,
+            'total_actions': total_actions,
+            'total_revenue': sales_data.get('total_revenue', 0),
+            'module_count': len(active_modules),
+            'modules_label': ', '.join(active_modules) or 'Aucun module',
+        })
+
+    top_staff = sorted(
+        top_staff,
+        key=lambda row: (row['total_actions'], row['total_revenue'], row['sales_count']),
+        reverse=True,
+    )[:8]
+    top_contributors_chart = {
+        'labels': [row['label'] for row in top_staff],
+        'sales': [row['sales_count'] for row in top_staff],
+        'supplies': [row['supply_count'] for row in top_staff],
+        'stock_actions': [row['stock_actions'] for row in top_staff],
+    }
+
+    recent_staff = []
+    for member in staff_queryset.order_by('-date_joined', '-id')[:8]:
+        active_modules = [module.name for module in member.allowed_modules.all() if module.is_active]
+        recent_staff.append({
+            'label': member.get_full_name() or member.username,
+            'username': member.username,
+            'role': member.role or 'Non renseigné',
+            'gender': member.gender or 'Non renseigné',
+            'status_label': 'Actif' if member.is_active else 'Inactif',
+            'status_class': 'success' if member.is_active else 'warning',
+            'modules_label': ', '.join(active_modules) or 'Aucun module',
+            'date_joined': member.date_joined,
+        })
+
+    context = {
+        'page_title': 'Statistiques personnel',
+        'currency': settings_obj.currency_symbol,
+        'generated_at': timezone.now(),
+        'period_name': period_name,
+        'period_label': format_period_label(range_start, range_end),
+        'roles': roles,
+        'genders': genders,
+        'modules': modules,
+        'current_period': period,
+        'current_search': search,
+        'current_status': status,
+        'current_role': role,
+        'current_gender': gender,
+        'current_module': module_code,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'total_staff': total_staff,
+        'active_staff_count': active_staff_count,
+        'inactive_staff_count': inactive_staff_count,
+        'admin_staff_count': admin_staff_count,
+        'distinct_roles_count': distinct_roles_count,
+        'staff_with_modules_count': staff_with_modules_count,
+        'joined_staff_count': joined_staff_count,
+        'active_contributors_count': active_contributors_count,
+        'contributor_rate': contributor_rate,
+        'sales_count': sales_count,
+        'total_revenue': total_revenue,
+        'supplies_count': supplies_count,
+        'inventory_sessions_count': inventory_sessions_count,
+        'daily_inventory_count': daily_inventory_count,
+        'stock_actions_count': stock_actions_count,
+        'status_distribution_chart': status_distribution_chart,
+        'role_distribution_chart': role_distribution_chart,
+        'activity_trend_chart': activity_trend_chart,
+        'top_contributors_chart': top_contributors_chart,
+        'top_staff': top_staff,
+        'recent_staff': recent_staff,
+    }
+    return render(request, 'core/statistics_personnel.html', context)
 
 
 @login_required

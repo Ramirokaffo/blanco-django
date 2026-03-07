@@ -7,6 +7,9 @@
 
 :root {
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --header-height: 70px;
+    --sidebar-width: 280px;
+    --sidebar-collapsed-width: 96px;
 }
 
 body {
@@ -15,6 +18,7 @@ body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden;
 }
 
 .container {
@@ -25,9 +29,15 @@ body {
 
 /* Layout principal */
 .main-content {
-    margin-top: 140px; /* Header + Navigation */
-    min-height: calc(100vh - 200px);
+    margin-top: var(--header-height);
+    margin-left: var(--sidebar-width);
+    min-height: calc(100vh - var(--header-height) - 60px);
     padding: 30px 0;
+    transition: margin-left 0.3s ease, padding 0.3s ease;
+}
+
+body.sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-collapsed-width);
 }
 
 /* Footer */
@@ -37,6 +47,12 @@ body {
     text-align: center;
     border-top: 1px solid var(--border-color);
     margin-top: 50px;
+    margin-left: var(--sidebar-width);
+    transition: margin-left 0.3s ease;
+}
+
+body.sidebar-collapsed .footer {
+    margin-left: var(--sidebar-collapsed-width);
 }
 
 .footer p {
@@ -58,4 +74,17 @@ body {
 
 .hidden {
     display: none !important;
+}
+
+@media (max-width: 768px) {
+    .main-content,
+    body.sidebar-collapsed .main-content,
+    .footer,
+    body.sidebar-collapsed .footer {
+        margin-left: 0;
+    }
+
+    .main-content {
+        padding: 20px 0;
+    }
 }

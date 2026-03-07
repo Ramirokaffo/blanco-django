@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Statistiques ventes - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/statistics.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="statistics-sales-page">
+    <div class="page-header statistics-header"><div><h1>Statistiques ventes</h1><p class="text-secondary">Analysez les performances commerciales, les encaissements et les profils de vente avec des filtres métier.</p></div><div class="statistics-header-actions"><a href="{% url 'statistics' %}" class="btn btn-secondary btn-sm">Retour aux statistiques</a><a href="{% url 'sales_history' %}" class="btn btn-secondary btn-sm">Historique des ventes</a></div></div>
+    <div class="statistics-sales-summary"><div><strong>{{ period_name }}</strong><div class="text-secondary">{{ period_label }}</div></div><div class="statistics-sales-summary-meta"><span class="statistics-pill">{{ sales_count }} vente{{ sales_count|pluralize }}</span><span class="statistics-pill">{{ paid_sales_count }} réglée{{ paid_sales_count|pluralize }}</span><span class="statistics-pill">Mise à jour : {{ generated_at|date:"d/m/Y H:i" }}</span></div></div>
+
+    <div class="card statistics-sales-filters"><div class="card-header"><h3 class="card-title">Filtres</h3></div><div class="card-body"><form method="get" action="{% url 'sales_statistics' %}" class="filters-form"><div class="filters-row"><div class="filter-group"><label class="form-label">Période</label><select name="period" class="form-control"><option value="7d" {% if current_period == '7d' %}selected{% endif %}>7 derniers jours</option><option value="30d" {% if current_period == '30d' %}selected{% endif %}>30 derniers jours</option><option value="90d" {% if current_period == '90d' %}selected{% endif %}>90 derniers jours</option><option value="365d" {% if current_period == '365d' %}selected{% endif %}>12 derniers mois</option><option value="custom" {% if current_period == 'custom' %}selected{% endif %}>Personnalisée</option></select></div><div class="filter-group"><label class="form-label">Recherche</label><input type="text" name="search" class="form-control" placeholder="Client, vendeur, n° vente..." value="{{ current_search }}"></div><div class="filter-group"><label class="form-label">Date début</label><input type="date" name="date_from" class="form-control" value="{{ current_date_from }}"></div><div class="filter-group"><label class="form-label">Date fin</label><input type="date" name="date_to" class="form-control" value="{{ current_date_to }}"></div></div><div class="filters-row"><div class="filter-group"><label class="form-label">Client</label><select name="client" class="form-control"><option value="">Tous les clients</option>{% for client in clients %}<option value="{{ client.id }}" {% if current_client == client.id|stringformat:"d" %}selected{% endif %}>{{ client.firstname }} {{ client.lastname }}</option>{% endfor %}</select></div><div class="filter-group"><label class="form-label">Vendeur</label><select name="staff" class="form-control"><option value="">Tous les vendeurs</option>{% for member in staff_members %}<option value="{{ member.id }}" {% if current_staff == member.id|stringformat:"d" %}selected{% endif %}>{{ member.get_full_name }}</option>{% endfor %}</select></div><div class="filter-group"><label class="form-label">Type</label><select name="type" class="form-control"><option value="">Tous</option><option value="cash" {% if current_type == 'cash' %}selected{% endif %}>Comptant</option><option value="credit" {% if current_type == 'credit' %}selected{% endif %}>Crédit</option></select></div><div class="filter-group"><label class="form-label">Statut</label><select name="status" class="form-control"><option value="">Tous</option><option value="paid" {% if current_status == 'paid' %}selected{% endif %}>Payé</option><option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>Non payé</option></select></div></div><div class="filters-actions"><button type="submit" class="btn btn-primary btn-sm">Filtrer</button><a href="{% url 'sales_statistics' %}" class="btn btn-secondary btn-sm">Réinitialiser</a></div></form></div></div>
+
+    <div class="kpi-grid"><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Ventes concernées</div><div class="kpi-value">{{ sales_count }}</div><div class="kpi-sub">{{ anonymous_sales_count }} client comptoir</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Chiffre d'affaires</div><div class="kpi-value">{{ total_revenue|floatformat:0 }} {{ currency }}</div><div class="kpi-sub">Réglé : {{ paid_revenue|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Produits vendus</div><div class="kpi-value">{{ products_sold_count }}</div><div class="kpi-sub">Panier moyen : {{ average_ticket|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Ventes à crédit</div><div class="kpi-value">{{ credit_sales_count }}</div><div class="kpi-sub">Comptant : {{ cash_sales_count }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Non réglé</div><div class="kpi-value">{{ unpaid_sales_count }}</div><div class="kpi-sub">Montant : {{ unpaid_revenue|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Encours client</div><div class="kpi-value">{{ outstanding_total|floatformat:0 }} {{ currency }}</div><div class="kpi-sub">Crédit restant dû</div></div></div></div>
+
+    <div class="statistics-sales-chart-grid"><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Tendance chiffre d'affaires / volume</h3></div><div class="card-body"><canvas id="salesTrendChart"></canvas><p class="statistics-chart-note">Suivi chronologique du chiffre d'affaires et du nombre de ventes sur la période filtrée.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Répartition des paiements</h3></div><div class="card-body"><canvas id="paymentStatusChart"></canvas><p class="statistics-chart-note">Part des ventes déjà réglées versus encore non soldées.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Répartition des types de vente</h3></div><div class="card-body"><canvas id="saleTypeChart"></canvas><p class="statistics-chart-note">Équilibre entre ventes au comptant et ventes à crédit.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Performance vendeurs</h3></div><div class="card-body"><canvas id="staffPerformanceChart"></canvas><p class="statistics-chart-note">Classement des vendeurs selon le chiffre d'affaires généré.</p></div></div></div>
+
+    <div class="statistics-sales-detail-grid"><div class="card"><div class="card-header"><h3 class="card-title">Meilleurs clients</h3></div><div class="card-body">{% if top_clients %}<div class="table-responsive"><table class="table"><thead><tr><th>Client</th><th class="text-right">Ventes</th><th class="text-right">CA</th></tr></thead><tbody>{% for client in top_clients %}<tr><td><strong>{{ client.label }}</strong></td><td class="text-right">{{ client.total_sales }}</td><td class="text-right">{{ client.total_revenue|floatformat:0 }} {{ currency }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucune vente client sur cette période.</p></div>{% endif %}</div></div><div class="card"><div class="card-header"><h3 class="card-title">Dernières ventes filtrées</h3></div><div class="card-body">{% if recent_sales %}<div class="table-responsive"><table class="table"><thead><tr><th>#</th><th>Client</th><th>Vendeur</th><th class="text-right">Montant</th><th>Statut</th></tr></thead><tbody>{% for sale in recent_sales %}<tr><td>{{ sale.id }}</td><td>{% if sale.client %}{{ sale.client }}{% else %}Client comptoir{% endif %}</td><td>{% if sale.staff %}{{ sale.staff.get_full_name }}{% else %}Non assigné{% endif %}</td><td class="text-right">{{ sale.total|floatformat:0 }} {{ currency }}</td><td>{% if sale.is_paid %}<span class="badge badge-success">Payée</span>{% else %}<span class="badge badge-warning">Non payée</span>{% endif %} · {% if sale.is_credit %}Crédit{% else %}Comptant{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucune vente trouvée avec les filtres actuels.</p></div>{% endif %}</div></div></div>
+</div>
+
+{{ sales_trend_chart|json_script:"sales-statistics-trend-data" }}
+{{ payment_status_chart|json_script:"sales-statistics-payment-data" }}
+{{ sale_type_chart|json_script:"sales-statistics-type-data" }}
+{{ staff_performance_chart|json_script:"sales-statistics-staff-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function readChartData(id) {
+        const node = document.getElementById(id);
+        return node ? JSON.parse(node.textContent) : { labels: [] };
+    }
+
+    function buildChart(canvasId, config) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !window.Chart) {
+            return;
+        }
+        new Chart(canvas, config);
+    }
+
+    const salesTrend = readChartData('sales-statistics-trend-data');
+    buildChart('salesTrendChart', {
+        type: 'line',
+        data: { labels: salesTrend.labels, datasets: [{ label: 'CA', data: salesTrend.revenue, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.12)', yAxisID: 'y', tension: 0.35, fill: true }, { label: 'Ventes', data: salesTrend.sales, borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.10)', yAxisID: 'y1', tension: 0.35 }] },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true }, y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } } } }
+    });
+
+    const paymentStatus = readChartData('sales-statistics-payment-data');
+    buildChart('paymentStatusChart', {
+        type: 'doughnut',
+        data: { labels: paymentStatus.labels, datasets: [{ data: paymentStatus.values, backgroundColor: ['#16a34a', '#f59e0b'] }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const saleTypes = readChartData('sales-statistics-type-data');
+    buildChart('saleTypeChart', {
+        type: 'doughnut',
+        data: { labels: saleTypes.labels, datasets: [{ data: saleTypes.values, backgroundColor: ['#2563eb', '#7c3aed'] }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const staffPerformance = readChartData('sales-statistics-staff-data');
+    buildChart('staffPerformanceChart', {
+        type: 'bar',
+        data: { labels: staffPerformance.labels, datasets: [{ label: 'CA', data: staffPerformance.revenue, backgroundColor: 'rgba(59, 130, 246, 0.75)', borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+});
+</script>
+{% endblock %}

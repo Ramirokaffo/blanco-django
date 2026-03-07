@@ -1,5 +1,77 @@
+// Restaurer l'état de la sidebar le plus tôt possible
+try {
+    const savedSidebarState = localStorage.getItem('sidebarCollapsed');
+    const shouldCollapse = savedSidebarState === null
+        ? window.matchMedia('(max-width: 768px)').matches
+        : savedSidebarState === 'true';
+
+    if (shouldCollapse) {
+        document.body.classList.add('sidebar-collapsed');
+    }
+} catch (error) {
+    if (window.matchMedia('(max-width: 768px)').matches) {
+        document.body.classList.add('sidebar-collapsed');
+    }
+}
+
 // Fonctions JavaScript principales
 document.addEventListener('DOMContentLoaded', function() {
+    const body = document.body;
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const sidebarStorageKey = 'sidebarCollapsed';
+    const mobileQuery = window.matchMedia('(max-width: 768px)');
+
+    function setSidebarCollapsed(collapsed) {
+        body.classList.toggle('sidebar-collapsed', collapsed);
+
+        if (sidebarToggle) {
+            sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+            sidebarToggle.setAttribute(
+                'aria-label',
+                collapsed ? 'Ouvrir la navigation latérale' : 'Fermer la navigation latérale'
+            );
+        }
+
+        if (sidebarBackdrop) {
+            sidebarBackdrop.setAttribute('aria-hidden', collapsed ? 'true' : 'false');
+        }
+
+        try {
+            localStorage.setItem(sidebarStorageKey, collapsed ? 'true' : 'false');
+        } catch (error) {
+            console.warn('Impossible de sauvegarder l\'état de la sidebar :', error);
+        }
+    }
+
+    setSidebarCollapsed(body.classList.contains('sidebar-collapsed'));
+
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function () {
+            setSidebarCollapsed(!body.classList.contains('sidebar-collapsed'));
+        });
+    }
+
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', function () {
+            setSidebarCollapsed(true);
+        });
+    }
+
+    document.querySelectorAll('.navigation .nav-link').forEach(function (link) {
+        link.addEventListener('click', function () {
+            if (mobileQuery.matches) {
+                setSidebarCollapsed(true);
+            }
+        });
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && mobileQuery.matches && !body.classList.contains('sidebar-collapsed')) {
+            setSidebarCollapsed(true);
+        }
+    });
+
     
     // ── Recherche de fonctionnalités (command palette) ──────────
     const globalSearchInput = document.getElementById('globalSearchInput');
