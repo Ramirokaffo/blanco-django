@@ -125,6 +125,104 @@
     align-items: center;
 }
 
+/* Actions ventes */
+.action-buttons {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sale-actions-menu {
+    position: relative;
+}
+
+.sale-actions-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 180px;
+    padding: 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.14);
+    z-index: 30;
+}
+
+.sale-actions-menu.open .sale-actions-dropdown {
+    display: grid;
+    gap: 6px;
+}
+
+.sale-actions-item {
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    text-decoration: none;
+    font: inherit;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sale-actions-item:hover {
+    background: var(--bg-secondary);
+}
+
+.sale-actions-item-danger {
+    color: var(--danger-color);
+}
+
+.sale-actions-item-danger:hover {
+    background: color-mix(in srgb, var(--danger-color) 10%, var(--bg-secondary));
+}
+
+.sale-action-modal-content {
+    max-width: 680px;
+}
+
+.sale-action-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.sale-action-lines {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.sale-action-line {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.85rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+}
+
+.sale-action-line-label {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.sale-action-fields {
+    display: grid;
+    gap: 1rem;
+}
+
+.sale-action-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
 /* Pagination */
 .pagination-container {
     display: flex;
@@ -187,6 +285,19 @@
 
     .header-buttons {
         flex-direction: column;
+        width: 100%;
+    }
+
+    .sale-actions-dropdown {
+        right: auto;
+        left: 0;
+    }
+
+    .sale-action-form-actions {
+        flex-direction: column-reverse;
+    }
+
+    .sale-action-form-actions .btn {
         width: 100%;
     }
 

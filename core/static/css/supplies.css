@@ -139,7 +139,112 @@
 .supply-form {
     display: flex;
     flex-direction: column;
-    gap: 25px;
+    gap: 24px;
+}
+
+.supply-card {
+    overflow: hidden;
+}
+
+.supply-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.card-subtitle {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.card-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--primary-color);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.form-section {
+    padding: 22px;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+}
+
+.section-heading {
+    margin-bottom: 18px;
+}
+
+.section-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.section-subtitle {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.product-reference-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    border-radius: 14px;
+    border: 1px solid rgba(59, 130, 246, 0.16);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(16, 185, 129, 0.08));
+}
+
+.product-reference-card.has-product {
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.product-reference-empty {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.product-reference-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.reference-item {
+    padding: 14px 16px;
+    border-radius: 12px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+}
+
+.reference-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.reference-item strong {
+    font-size: 18px;
+    color: var(--text-primary);
 }
 
 .form-grid {
@@ -148,10 +253,33 @@
     gap: 20px;
 }
 
+.form-grid-compact {
+    gap: 18px;
+}
+
 .form-group {
     display: flex;
     flex-direction: column;
     gap: 5px;
+}
+
+.checkbox-inline-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background-color: var(--bg-primary);
+}
+
+.checkbox-inline-group .form-label {
+    margin: 0;
+}
+
+.hidden-field {
+    display: none;
 }
 
 .required {
@@ -168,11 +296,18 @@
     margin-bottom: 10px;
 }
 
+.form-help {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
 .supply-summary {
-    background-color: var(--bg-secondary);
-    border-radius: 10px;
-    padding: 15px 20px;
-    border-left: 4px solid var(--primary-color);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.06), rgba(99, 102, 241, 0.08));
+    border-radius: 14px;
+    padding: 18px 20px;
+    border: 1px solid rgba(59, 130, 246, 0.14);
 }
 
 .supply-summary h4 {
@@ -189,6 +324,12 @@
     font-size: 16px;
 }
 
+.summary-row + .summary-row {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+}
+
 .summary-row strong {
     color: var(--primary-color);
     font-size: 18px;
@@ -197,6 +338,7 @@
 .form-actions {
     display: flex;
     gap: 10px;
+    justify-content: flex-end;
     padding-top: 10px;
     border-top: 1px solid var(--border-color);
 }
@@ -241,12 +383,26 @@
         flex-direction: column;
     }
 
+    .page-header .header-content,
+    .supply-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     .filter-group {
         min-width: 100%;
     }
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .product-reference-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-section {
+        padding: 18px;
     }
 
     .form-actions {

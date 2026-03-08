@@ -35,13 +35,12 @@
 {% endif %}
 
 <!-- Formulaire -->
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Informations de l'approvisionnement</h3>
-    </div>
+<div class="card supply-card">
+    
     <div class="card-body">
         <form method="post" action="{% url 'add_supply' %}" class="supply-form" id="supplyForm">
             {% csrf_token %}
+            <div id="formFeedback"></div>
 
             {% if form.non_field_errors %}
             <div class="form-errors">
@@ -51,96 +50,134 @@
             </div>
             {% endif %}
 
-            <div class="form-grid">
-                <!-- Produit -->
-                <div class="form-group">
-                    <label class="form-label" for="id_product">{{ form.product.label }} <span class="required">*</span></label>
-                    {{ form.product }}
-                    {% if form.product.errors %}
-                    <div class="field-error">{{ form.product.errors.0 }}</div>
-                    {% endif %}
+            <div class="form-section">
+                <div class="section-heading">
+                    <div>
+                        <h4 class="section-title">Produit et tarification</h4>
+                    </div>
                 </div>
 
-                <!-- Fournisseur -->
-                <div class="form-group">
-                    <label class="form-label" for="id_supplier">{{ form.supplier.label }}</label>
-                    {{ form.supplier }}
-                    {% if form.supplier.errors %}
-                    <div class="field-error">{{ form.supplier.errors.0 }}</div>
-                    {% endif %}
+                <div class="product-reference-card" id="productReferenceCard">
+                    <div class="product-reference-empty" id="productReferenceEmpty">
+                        Sélectionnez un produit pour afficher ses valeurs de référence.
+                    </div>
+
+                    <div class="product-reference-grid" id="productReferenceGrid" style="display:none;">
+                        <div class="reference-item">
+                            <span class="reference-label">Prix de vente actuel</span>
+                            <strong id="currentSellingPrice">Non renseigné</strong>
+                        </div>
+                        <div class="reference-item">
+                            <span class="reference-label">Dernier coût d'achat</span>
+                            <strong id="lastPurchaseCost">Non renseigné</strong>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Quantité -->
-                <div class="form-group">
-                    <label class="form-label" for="id_quantity">{{ form.quantity.label }} <span class="required">*</span></label>
-                    {{ form.quantity }}
-                    {% if form.quantity.errors %}
-                    <div class="field-error">{{ form.quantity.errors.0 }}</div>
-                    {% endif %}
+                <div class="form-grid">
+                    <!-- Produit -->
+                    <div class="form-group">
+                        <label class="form-label" for="id_product">{{ form.product.label }} <span class="required">*</span></label>
+                        {{ form.product }}
+                        {% if form.product.errors %}
+                        <div class="field-error">{{ form.product.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Fournisseur -->
+                    <div class="form-group">
+                        <label class="form-label" for="id_supplier">{{ form.supplier.label }}</label>
+                        {{ form.supplier }}
+                        {% if form.supplier.errors %}
+                        <div class="field-error">{{ form.supplier.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Quantité -->
+                    <div class="form-group">
+                        <label class="form-label" for="id_quantity">{{ form.quantity.label }} <span class="required">*</span></label>
+                        {{ form.quantity }}
+                        {% if form.quantity.errors %}
+                        <div class="field-error">{{ form.quantity.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Prix d'achat unitaire -->
+                    <div class="form-group">
+                        <label class="form-label" for="id_purchase_cost">{{ form.purchase_cost.label }} <span class="required">*</span></label>
+                        {{ form.purchase_cost }}
+                        {% if form.purchase_cost.errors %}
+                        <div class="field-error">{{ form.purchase_cost.errors.0 }}</div>
+                        {% endif %}
+                        <small class="form-help">Prérempli avec le dernier coût d'achat unitaire connu du produit sélectionné.</small>
+                    </div>
+
+                    <!-- Prix de vente -->
+                    <div class="form-group">
+                        <label class="form-label" for="id_selling_price">{{ form.selling_price.label }}</label>
+                        {{ form.selling_price }}
+                        {% if form.selling_price.errors %}
+                        <div class="field-error">{{ form.selling_price.errors.0 }}</div>
+                        {% endif %}
+                        <small class="form-help">Prérempli avec le prix de vente actuel du produit pour une modification rapide si nécessaire.</small>
+                    </div>
+
+                    <!-- Date d'expiration -->
+                    <div class="form-group">
+                        <label class="form-label" for="id_expiration_date">{{ form.expiration_date.label }}</label>
+                        {{ form.expiration_date }}
+                        {% if form.expiration_date.errors %}
+                        <div class="field-error">{{ form.expiration_date.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-heading">
+                    <div>
+                        <h4 class="section-title">Règlement et comptabilisation</h4>
+                        <p class="section-subtitle">Renseignez le mode de règlement et les informations comptables associées.</p>
+                    </div>
                 </div>
 
-                <!-- Prix d'achat unitaire -->
-                <div class="form-group">
-                    <label class="form-label" for="id_unit_price">{{ form.purchase_cost.label }} <span class="required">*</span></label>
-                    {{ form.purchase_cost }}
-                    {% if form.purchase_cost.errors %}
-                    <div class="field-error">{{ form.purchase_cost.errors.0 }}</div>
-                    {% endif %}
-                </div>
+                <div class="form-grid form-grid-compact">
+                    <!-- Mode de paiement -->
+                    <div class="form-group">
+                        <label class="form-label" for="id_payment_method">{{ form.payment_method.label }}</label>
+                        {{ form.payment_method }}
+                        {% if form.payment_method.errors %}
+                        <div class="field-error">{{ form.payment_method.errors.0 }}</div>
+                        {% endif %}
+                    </div>
 
-                <!-- Prix de vente -->
-                <div class="form-group">
-                    <label class="form-label" for="id_selling_price">{{ form.selling_price.label }}</label>
-                    {{ form.selling_price }}
-                    {% if form.selling_price.errors %}
-                    <div class="field-error">{{ form.selling_price.errors.0 }}</div>
-                    {% endif %}
-                </div>
+                    <!-- Achat à crédit -->
+                    <div class="form-group checkbox-inline-group">
+                        {{ form.is_credit }}
+                        <label class="form-label" for="id_is_credit">{{ form.is_credit.label }}</label>
+                        {% if form.is_credit.errors %}
+                        <div class="field-error">{{ form.is_credit.errors.0 }}</div>
+                        {% endif %}
+                    </div>
 
-                <!-- Date d'expiration -->
-                <div class="form-group">
-                    <label class="form-label" for="id_expiration_date">{{ form.expiration_date.label }}</label>
-                    {{ form.expiration_date }}
-                    {% if form.expiration_date.errors %}
-                    <div class="field-error">{{ form.expiration_date.errors.0 }}</div>
-                    {% endif %}
-                </div>
+                    <!-- Taux de TVA -->
+                    <div class="form-group hidden-field" id="taxRateGroup">
+                        <label class="form-label" for="id_tax_rate">{{ form.tax_rate.label }}</label>
+                        {{ form.tax_rate }}
+                        {% if form.tax_rate.errors %}
+                        <div class="field-error">{{ form.tax_rate.errors.0 }}</div>
+                        {% endif %}
+                    </div>
 
-                <!-- Mode de paiement -->
-                <div class="form-group">
-                    <label class="form-label" for="id_payment_method">{{ form.payment_method.label }}</label>
-                    {{ form.payment_method }}
-                    {% if form.payment_method.errors %}
-                    <div class="field-error">{{ form.payment_method.errors.0 }}</div>
-                    {% endif %}
-                </div>
-
-                <!-- Achat à crédit -->
-                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
-                    {{ form.is_credit }}
-                    <label class="form-label" for="id_is_credit" style="margin: 0;">{{ form.is_credit.label }}</label>
-                    {% if form.is_credit.errors %}
-                    <div class="field-error">{{ form.is_credit.errors.0 }}</div>
-                    {% endif %}
-                </div>
-
-                <!-- Taux de TVA -->
-                <div class="form-group" id="taxRateGroup" style="display:none;">
-                    <label class="form-label" for="id_tax_rate">{{ form.tax_rate.label }}</label>
-                    {{ form.tax_rate }}
-                    {% if form.tax_rate.errors %}
-                    <div class="field-error">{{ form.tax_rate.errors.0 }}</div>
-                    {% endif %}
-                </div>
-
-                <!-- Type de dépense -->
-                <div class="form-group">
-                    <label class="form-label" for="id_expense_type">{{ form.expense_type.label }} <span class="required">*</span></label>
-                    {{ form.expense_type }}
-                    {% if form.expense_type.errors %}
-                    <div class="field-error">{{ form.expense_type.errors.0 }}</div>
-                    {% endif %}
-                    <small class="form-help">{{ form.expense_type.help_text }}</small>
+                    <!-- Type de dépense -->
+                    <div class="form-group">
+                        <label class="form-label" for="id_expense_type">{{ form.expense_type.label }} <span class="required">*</span></label>
+                        {{ form.expense_type }}
+                        {% if form.expense_type.errors %}
+                        <div class="field-error">{{ form.expense_type.errors.0 }}</div>
+                        {% endif %}
+                        <small class="form-help">{{ form.expense_type.help_text }}</small>
+                    </div>
                 </div>
             </div>
 
@@ -179,10 +216,10 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const qtyInput = document.getElementById('id_quantity');
-    const priceInput = document.getElementById('id_unit_price');
+    const purchaseCostInput = document.getElementById('id_purchase_cost');
+    const sellingPriceInput = document.getElementById('id_selling_price');
     const taxRateSelect = document.getElementById('id_tax_rate');
     const taxRateGroup = document.getElementById('taxRateGroup');
-    const expenseTypeSelect = document.getElementById('id_expense_type');
     const summary = document.getElementById('supplySummary');
     const totalCost = document.getElementById('totalCost');
     const vatRow = document.getElementById('vatRow');
@@ -190,13 +227,114 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalWithVatRow = document.getElementById('totalWithVatRow');
     const totalWithVat = document.getElementById('totalWithVat');
     const supplyForm = document.getElementById('supplyForm');
+    const productSelect = document.getElementById('id_product');
+    const formFeedback = document.getElementById('formFeedback');
+    const productReferenceCard = document.getElementById('productReferenceCard');
+    const productReferenceEmpty = document.getElementById('productReferenceEmpty');
+    const productReferenceGrid = document.getElementById('productReferenceGrid');
+    const currentSellingPrice = document.getElementById('currentSellingPrice');
+    const lastPurchaseCost = document.getElementById('lastPurchaseCost');
+    const productMetaMap = JSON.parse(productSelect.dataset.productMetaMap || '{}');
+
+    function formatCurrency(value, withDecimals = false) {
+        if (value === null || value === undefined || value === '') {
+            return 'Non renseigné';
+        }
+
+        const numericValue = parseFloat(typeof value === 'string' ? value.replace(',', '.') : value);
+        if (Number.isNaN(numericValue)) {
+            return 'Non renseigné';
+        }
+
+        const options = withDecimals
+            ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            : { maximumFractionDigits: 0 };
+
+        return numericValue.toLocaleString('fr-FR', options) + ' FCFA';
+    }
+
+    function clearFormErrors() {
+        document.querySelectorAll('.ajax-field-error').forEach((errorNode) => errorNode.remove());
+        formFeedback.innerHTML = '';
+    }
+
+    function renderFormErrors(errors = {}, nonFieldErrors = []) {
+        clearFormErrors();
+
+        if (nonFieldErrors.length) {
+            formFeedback.innerHTML = nonFieldErrors
+                .map((message) => `<div class="alert alert-error">${message}</div>`)
+                .join('');
+        }
+
+        Object.entries(errors).forEach(([fieldName, messages]) => {
+            const field = supplyForm.querySelector(`[name="${fieldName}"]`);
+            const fieldGroup = field ? field.closest('.form-group') : null;
+
+            if (!fieldGroup || !messages.length) {
+                return;
+            }
+
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'field-error ajax-field-error';
+            errorDiv.textContent = messages.join(' ');
+            fieldGroup.appendChild(errorDiv);
+        });
+    }
+
+    function updateProductReference(productMeta) {
+        const hasSelectedProduct = Boolean(productSelect.value && productMeta);
+
+        if (productReferenceCard) {
+            productReferenceCard.classList.toggle('has-product', hasSelectedProduct);
+        }
+
+        if (productReferenceEmpty) {
+            productReferenceEmpty.style.display = hasSelectedProduct ? 'none' : 'block';
+        }
+
+        if (productReferenceGrid) {
+            productReferenceGrid.style.display = hasSelectedProduct ? 'grid' : 'none';
+        }
+
+        if (currentSellingPrice) {
+            currentSellingPrice.textContent = formatCurrency(productMeta ? productMeta.selling_price : '');
+        }
+
+        if (lastPurchaseCost) {
+            lastPurchaseCost.textContent = formatCurrency(productMeta ? productMeta.purchase_cost : '');
+        }
+    }
+
+    function applyProductDefaults(force = false) {
+        const productMeta = productMetaMap[productSelect.value] || null;
+        updateProductReference(productMeta);
+
+        if (!productMeta) {
+            if (force) {
+                purchaseCostInput.value = '';
+                sellingPriceInput.value = '';
+            }
+            updateSummary();
+            return;
+        }
+
+        if (force || !purchaseCostInput.value) {
+            purchaseCostInput.value = productMeta.purchase_cost || '';
+        }
+
+        if (force || !sellingPriceInput.value) {
+            sellingPriceInput.value = productMeta.selling_price || '';
+        }
+
+        updateSummary();
+    }
 
     function updateSummary() {
         const qty = parseInt(qtyInput.value) || 0;
-        const price = parseFloat(priceInput.value) || 0;
+        const price = parseFloat(purchaseCostInput.value) || 0;
         const total = qty * price;
-        const selectedTaxRate = taxRateSelect.value;
-        
+
         // Get the rate from the selected option
         let taxRate = 0;
         const selectedOption = taxRateSelect.options[taxRateSelect.selectedIndex];
@@ -226,29 +364,43 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     qtyInput.addEventListener('input', updateSummary);
-    priceInput.addEventListener('input', updateSummary);
+    purchaseCostInput.addEventListener('input', updateSummary);
     taxRateSelect.addEventListener('change', updateSummary);
-    updateSummary();
 
     // Gérer l'affichage du champ TVA selon le produit sélectionné
-    const productSelect = document.getElementById('id_product');
     function updateTaxRateVisibility() {
-        const hasVatMap = JSON.parse(productSelect.dataset.hasVatMap || '{}');
-        const selectedId = productSelect.value;
-        const hasVat = hasVatMap[selectedId] || false;
+        const productMeta = productMetaMap[productSelect.value] || null;
+        const hasVat = Boolean(productMeta && productMeta.has_vat);
         if (hasVat) {
-            taxRateGroup.style.display = 'block';
+            taxRateGroup.style.display = 'flex';
         } else {
             taxRateGroup.style.display = 'none';
             taxRateSelect.value = '';  // Réinitialiser si masqué
         }
     }
-    productSelect.addEventListener('change', updateTaxRateVisibility);
-    updateTaxRateVisibility();  // Initialiser au chargement
+
+    function resetFormState() {
+        supplyForm.reset();
+        clearFormErrors();
+        applyProductDefaults(false);
+        updateTaxRateVisibility();
+        summary.style.display = 'none';
+    }
+
+    productSelect.addEventListener('change', function() {
+        clearFormErrors();
+        applyProductDefaults(true);
+        updateTaxRateVisibility();
+    });
+
+    applyProductDefaults(false);
+    updateTaxRateVisibility();
+    updateSummary();
 
     // Intercepter la soumission du formulaire
     supplyForm.addEventListener('submit', function(e) {
         e.preventDefault();
+        clearFormErrors();
 
         // Créer FormData à partir du formulaire
         const formData = new FormData(supplyForm);
@@ -261,113 +413,117 @@ document.addEventListener('DOMContentLoaded', function() {
                 'X-Requested-With': 'XMLHttpRequest',
             }
         })
-        .then(response => response.json())
+        .then(async response => {
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw data;
+            }
+            return data;
+        })
         .then(data => {
-            if (data.success) {
-                // Afficher un message de succès
-                const totalPrice = parseFloat(data.total_price);
-                const vatAmountValue = parseFloat(data.vat_amount || 0);
-                const expenseTypeId = data.expense_type_id;
-                const amount = totalPrice.toFixed(2);
+            // Afficher un message de succès
+            const totalPrice = parseFloat(data.total_price);
+            const vatAmountValue = parseFloat(data.vat_amount || 0);
+            const expenseTypeId = data.expense_type_id;
+            const amount = totalPrice.toFixed(2);
 
-                // Check if we should auto-create expense
-                if (expenseTypeId) {
-                    // Automatically create the expense
-                    const expenseData = new FormData();
-                    expenseData.append('expense_type', expenseTypeId);
-                    expenseData.append('amount', (totalPrice + vatAmountValue).toFixed(2));
-                    expenseData.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price}FCFA)`);
-                    expenseData.append('payment_method', data.payment_method || 'CASH');
-                    expenseData.append('csrfmiddlewaretoken', formData.get('csrfmiddlewaretoken'));
+            // Check if we should auto-create expense
+            if (expenseTypeId) {
+                // Automatically create the expense
+                const expenseData = new FormData();
+                expenseData.append('expense_type', expenseTypeId);
+                expenseData.append('amount', (totalPrice + vatAmountValue).toFixed(2));
+                expenseData.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price}FCFA)`);
+                expenseData.append('payment_method', data.payment_method || 'CASH');
+                expenseData.append('csrfmiddlewaretoken', formData.get('csrfmiddlewaretoken'));
 
-                    fetch("{% url 'add_expense_ajax' %}", {
-                        method: 'POST',
-                        body: expenseData,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                        }
-                    })
-                    .then(expResponse => expResponse.json())
-                    .then(expData => {
-                        let message = data.message;
-                        if (expData.success) {
-                            message += '<br><small>La dépense a été créée automatiquement.</small>';
-                        } else {
-                            message += '<br><small>Attention: La dépense automatique n\'a pas pu être créée.</small>';
-                        }
-                        
-                        const messageDiv = document.createElement('div');
-                        messageDiv.className = 'alert alert-success';
-                        messageDiv.style.marginBottom = '20px';
-                        messageDiv.innerHTML = `<strong>✓ Succès!</strong> ${message}`;
-
-                        const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
-                        if (messagesContainer) {
-                            messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
-                        }
-
-                        // Réinitialiser le formulaire
-                        supplyForm.reset();
-                        summary.style.display = 'none';
-
-                        // Rediriger vers la liste des approvisionnements après un court délai
-                        setTimeout(() => {
-                            window.location.href = "{% url 'supplies' %}";
-                        }, 1500);
-                    })
-                    .catch(expError => {
-                        console.error('Erreur création dépense:', expError);
-                        // Continue anyway, show success message
-                        const messageDiv = document.createElement('div');
-                        messageDiv.className = 'alert alert-success';
-                        messageDiv.style.marginBottom = '20px';
-                        messageDiv.innerHTML = `<strong>✓ Succès!</strong> ${data.message}<br><small>La création automatique de la dépense a échoué. Vous pouvez la créer manuellement.</small>`;
-
-                        const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
-                        if (messagesContainer) {
-                            messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
-                        }
-
-                        supplyForm.reset();
-                        summary.style.display = 'none';
-
-                        setTimeout(() => {
-                            window.location.href = "{% url 'supplies' %}";
-                        }, 1500);
-                    });
-                } else {
-                    // Old behavior: redirect to expense page
-                    const expenseUrl = new URL("{% url 'add_expense' %}", window.location.origin);
-                    expenseUrl.searchParams.append('amount', amount);
-                    expenseUrl.searchParams.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price}FCFA)`);
-                    expenseUrl.searchParams.append('expense_type', 'approvisionnement');
-
-                    window.open(expenseUrl.toString(), '_blank');
+                fetch("{% url 'add_expense_ajax' %}", {
+                    method: 'POST',
+                    body: expenseData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                })
+                .then(expResponse => expResponse.json())
+                .then(expData => {
+                    let message = data.message;
+                    if (expData.success) {
+                        message += '<br><small>La dépense a été créée automatiquement.</small>';
+                    } else {
+                        message += '<br><small>Attention: La dépense automatique n\'a pas pu être créée.</small>';
+                    }
 
                     const messageDiv = document.createElement('div');
                     messageDiv.className = 'alert alert-success';
                     messageDiv.style.marginBottom = '20px';
-                    messageDiv.innerHTML = `
-                        <strong>✓ Succès!</strong> ${data.message}<br>
-                        <small>La page d'ajout de dépenses a été ouverte dans un nouvel onglet.</small>
-                    `;
+                    messageDiv.innerHTML = `<strong>✓ Succès!</strong> ${message}`;
 
                     const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
                     if (messagesContainer) {
                         messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
                     }
 
-                    supplyForm.reset();
-                    summary.style.display = 'none';
+                    resetFormState();
+
+                    // Rediriger vers la liste des approvisionnements après un court délai
+                    setTimeout(() => {
+                        window.location.href = "{% url 'supplies' %}";
+                    }, 1500);
+                })
+                .catch(expError => {
+                    console.error('Erreur création dépense:', expError);
+                    // Continue anyway, show success message
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'alert alert-success';
+                    messageDiv.style.marginBottom = '20px';
+                    messageDiv.innerHTML = `<strong>✓ Succès!</strong> ${data.message}<br><small>La création automatique de la dépense a échoué. Vous pouvez la créer manuellement.</small>`;
+
+                    const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
+                    if (messagesContainer) {
+                        messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+                    }
+
+                    resetFormState();
 
                     setTimeout(() => {
                         window.location.href = "{% url 'supplies' %}";
                     }, 1500);
+                });
+            } else {
+                // Old behavior: redirect to expense page
+                const expenseUrl = new URL("{% url 'add_expense' %}", window.location.origin);
+                expenseUrl.searchParams.append('amount', amount);
+                expenseUrl.searchParams.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price}FCFA)`);
+                expenseUrl.searchParams.append('expense_type', 'approvisionnement');
+
+                window.open(expenseUrl.toString(), '_blank');
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'alert alert-success';
+                messageDiv.style.marginBottom = '20px';
+                messageDiv.innerHTML = `
+                    <strong>✓ Succès!</strong> ${data.message}<br>
+                    <small>La page d'ajout de dépenses a été ouverte dans un nouvel onglet.</small>
+                `;
+
+                const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
+                if (messagesContainer) {
+                    messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
                 }
+
+                resetFormState();
+
+                setTimeout(() => {
+                    window.location.href = "{% url 'supplies' %}";
+                }, 1500);
             }
         })
         .catch(error => {
             console.error('Erreur:', error);
+            if (error && (error.errors || error.non_field_errors)) {
+                renderFormErrors(error.errors || {}, error.non_field_errors || []);
+                return;
+            }
             alert('Une erreur est survenue lors de l\'enregistrement.');
         });
     });

@@ -170,6 +170,10 @@
 
 .statistics-products-page,
 .statistics-sales-page,
+.statistics-expenses-page,
+.statistics-supplies-page,
+.statistics-clients-page,
+.statistics-suppliers-page,
 .statistics-personnel-page {
     display: grid;
     gap: 24px;
@@ -177,6 +181,10 @@
 
 .statistics-products-filters .filters-row,
 .statistics-sales-filters .filters-row,
+.statistics-expenses-filters .filters-row,
+.statistics-supplies-filters .filters-row,
+.statistics-clients-filters .filters-row,
+.statistics-suppliers-filters .filters-row,
 .statistics-personnel-filters .filters-row {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -185,12 +193,20 @@
 
 .statistics-products-filters .filters-row + .filters-row,
 .statistics-sales-filters .filters-row + .filters-row,
+.statistics-expenses-filters .filters-row + .filters-row,
+.statistics-supplies-filters .filters-row + .filters-row,
+.statistics-clients-filters .filters-row + .filters-row,
+.statistics-suppliers-filters .filters-row + .filters-row,
 .statistics-personnel-filters .filters-row + .filters-row {
     margin-top: 16px;
 }
 
 .statistics-products-summary,
 .statistics-sales-summary,
+.statistics-expenses-summary,
+.statistics-supplies-summary,
+.statistics-clients-summary,
+.statistics-suppliers-summary,
 .statistics-personnel-summary {
     display: flex;
     justify-content: space-between;
@@ -204,6 +220,10 @@
 
 .statistics-products-summary-meta,
 .statistics-sales-summary-meta,
+.statistics-expenses-summary-meta,
+.statistics-supplies-summary-meta,
+.statistics-clients-summary-meta,
+.statistics-suppliers-summary-meta,
 .statistics-personnel-summary-meta {
     display: flex;
     flex-wrap: wrap;
@@ -225,6 +245,14 @@
 .statistics-products-detail-grid,
 .statistics-sales-chart-grid,
 .statistics-sales-detail-grid,
+.statistics-expenses-chart-grid,
+.statistics-expenses-detail-grid,
+.statistics-supplies-chart-grid,
+.statistics-supplies-detail-grid,
+.statistics-clients-chart-grid,
+.statistics-clients-detail-grid,
+.statistics-suppliers-chart-grid,
+.statistics-suppliers-detail-grid,
 .statistics-personnel-chart-grid,
 .statistics-personnel-detail-grid {
     display: grid;
@@ -277,6 +305,10 @@
     text-align: right;
 }
 
+.table-responsive {
+    overflow-x: scroll !important;
+}
+
 @media (max-width: 1200px) {
     .statistics-distribution-grid,
     .statistics-details-grid,
@@ -284,6 +316,14 @@
     .statistics-products-detail-grid,
     .statistics-sales-chart-grid,
     .statistics-sales-detail-grid,
+    .statistics-expenses-chart-grid,
+    .statistics-expenses-detail-grid,
+    .statistics-supplies-chart-grid,
+    .statistics-supplies-detail-grid,
+.statistics-clients-chart-grid,
+.statistics-clients-detail-grid,
+    .statistics-suppliers-chart-grid,
+    .statistics-suppliers-detail-grid,
     .statistics-personnel-chart-grid,
     .statistics-personnel-detail-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -294,6 +334,10 @@
     .statistics-header,
     .statistics-products-summary,
     .statistics-sales-summary,
+	.statistics-expenses-summary,
+	.statistics-supplies-summary,
+.statistics-clients-summary,
+    .statistics-suppliers-summary,
     .statistics-personnel-summary,
     .statistics-list-item,
     .metric-row-head,
@@ -310,10 +354,22 @@
     .statistics-products-detail-grid,
     .statistics-sales-chart-grid,
     .statistics-sales-detail-grid,
+	.statistics-expenses-chart-grid,
+	.statistics-expenses-detail-grid,
+	.statistics-supplies-chart-grid,
+	.statistics-supplies-detail-grid,
+.statistics-clients-chart-grid,
+.statistics-clients-detail-grid,
+    .statistics-suppliers-chart-grid,
+    .statistics-suppliers-detail-grid,
     .statistics-personnel-chart-grid,
     .statistics-personnel-detail-grid,
     .statistics-products-filters .filters-row,
     .statistics-sales-filters .filters-row,
+	.statistics-expenses-filters .filters-row,
+	.statistics-supplies-filters .filters-row,
+.statistics-clients-filters .filters-row,
+    .statistics-suppliers-filters .filters-row,
     .statistics-personnel-filters .filters-row {
         grid-template-columns: 1fr;
     }

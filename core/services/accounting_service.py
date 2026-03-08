@@ -137,6 +137,424 @@ class AccountingService:
         tva = amount_ttc - ht
         return ht, tva
 
+    @classmethod
+    def record_sale_cancellation(
+        cls,
+        sale,
+        daily,
+        exercise,
+        refund_payment_method='CASH',
+        refund_amount=None,
+    ):
+        """
+        Enregistre les écritures d'annulation d'une vente.
+
+        - Vente comptant : contrepassation directe avec sortie de trésorerie.
+        - Vente à crédit : contrepassation sur 411, puis remboursement séparé
+          du montant déjà encaissé le cas échéant.
+        """
+        amount = Decimal(str(sale.total or 0))
+        if amount <= 0:
+            return []
+
+        if refund_amount is None:
+            refund_amount = amount if not getattr(sale, 'is_credit', False) else Decimal('0')
+        refund_amount = Decimal(str(refund_amount or 0))
+
+        recognized_tva = bool(getattr(sale, 'has_vat', False) and getattr(sale, 'tva_accounting_created', False))
+        tax_rate = cls.get_default_tax_rate() if recognized_tva else None
+        revenue_amount, tva_amount = cls.compute_tax(amount, tax_rate)
+
+        entries = []
+
+        with transaction.atomic():
+            reversal_entry = JournalEntry.objects.create(
+                reference=cls._generate_reference('VE'),
+                date=timezone.now().date(),
+                description=f"Annulation vente #{sale.id}",
+                journal='VE',
+                exercise=exercise,
+                daily=daily,
+                sale=sale,
+            )
+
+            reversal_lines = [
+                JournalEntryLine(
+                    entry=reversal_entry,
+                    account=cls.get_account('701'),
+                    debit=revenue_amount,
+                    credit=0,
+                    description=f"Contrepassation vente #{sale.id}",
+                ),
+            ]
+
+            if tva_amount > 0:
+                reversal_lines.append(JournalEntryLine(
+                    entry=reversal_entry,
+                    account=cls.get_account('4431'),
+                    debit=tva_amount,
+                    credit=0,
+                    description=f"Contrepassation TVA collectée – vente #{sale.id}",
+                ))
+
+            if getattr(sale, 'is_credit', False):
+                credit_account = cls.get_account('411')
+                credit_desc = f"Annulation créance client – vente #{sale.id}"
+            else:
+                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                credit_account = cls.get_account(account_code)
+                credit_desc = f"Remboursement client – vente #{sale.id}"
+
+            reversal_lines.append(JournalEntryLine(
+                entry=reversal_entry,
+                account=credit_account,
+                debit=0,
+                credit=amount,
+                description=credit_desc,
+            ))
+            JournalEntryLine.objects.bulk_create(reversal_lines)
+            entries.append(reversal_entry)
+
+            if getattr(sale, 'is_credit', False) and refund_amount > 0:
+                refund_entry = JournalEntry.objects.create(
+                    reference=cls._generate_reference('CA'),
+                    date=timezone.now().date(),
+                    description=f"Remboursement client – annulation vente #{sale.id}",
+                    journal='CA',
+                    exercise=exercise,
+                    daily=daily,
+                    sale=sale,
+                )
+                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                JournalEntryLine.objects.bulk_create([
+                    JournalEntryLine(
+                        entry=refund_entry,
+                        account=cls.get_account('411'),
+                        debit=refund_amount,
+                        credit=0,
+                        description=f"Extinction avoir client – vente #{sale.id}",
+                    ),
+                    JournalEntryLine(
+                        entry=refund_entry,
+                        account=cls.get_account(account_code),
+                        debit=0,
+                        credit=refund_amount,
+                        description=f"Sortie trésorerie – vente #{sale.id}",
+                    ),
+                ])
+                entries.append(refund_entry)
+
+        return entries
+
+    @classmethod
+    def record_partial_sale_return(
+        cls,
+        sale,
+        amount,
+        daily,
+        exercise,
+        refund_payment_method='CASH',
+        refund_amount=None,
+    ):
+        """Enregistre les écritures d'un retour partiel de vente."""
+        amount = Decimal(str(amount or 0))
+        if amount <= 0:
+            return []
+
+        refund_amount = Decimal(str(refund_amount or 0))
+        recognized_tva = bool(getattr(sale, 'has_vat', False) and getattr(sale, 'tva_accounting_created', False))
+        tax_rate = cls.get_default_tax_rate() if recognized_tva else None
+        revenue_amount, tva_amount = cls.compute_tax(amount, tax_rate)
+
+        entries = []
+
+        with transaction.atomic():
+            reversal_entry = JournalEntry.objects.create(
+                reference=cls._generate_reference('VE'),
+                date=timezone.now().date(),
+                description=f"Retour partiel vente #{sale.id}",
+                journal='VE',
+                exercise=exercise,
+                daily=daily,
+                sale=sale,
+            )
+
+            reversal_lines = [
+                JournalEntryLine(
+                    entry=reversal_entry,
+                    account=cls.get_account('701'),
+                    debit=revenue_amount,
+                    credit=0,
+                    description=f"Contrepassation retour partiel – vente #{sale.id}",
+                ),
+            ]
+
+            if tva_amount > 0:
+                reversal_lines.append(JournalEntryLine(
+                    entry=reversal_entry,
+                    account=cls.get_account('4431'),
+                    debit=tva_amount,
+                    credit=0,
+                    description=f"Contrepassation TVA – retour partiel vente #{sale.id}",
+                ))
+
+            if getattr(sale, 'is_credit', False):
+                credit_account = cls.get_account('411')
+                credit_desc = f"Réduction créance client – vente #{sale.id}"
+            else:
+                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                credit_account = cls.get_account(account_code)
+                credit_desc = f"Remboursement client – retour partiel vente #{sale.id}"
+
+            reversal_lines.append(JournalEntryLine(
+                entry=reversal_entry,
+                account=credit_account,
+                debit=0,
+                credit=amount,
+                description=credit_desc,
+            ))
+            JournalEntryLine.objects.bulk_create(reversal_lines)
+            entries.append(reversal_entry)
+
+            if getattr(sale, 'is_credit', False) and refund_amount > 0:
+                refund_entry = JournalEntry.objects.create(
+                    reference=cls._generate_reference('CA'),
+                    date=timezone.now().date(),
+                    description=f"Remboursement client – retour partiel vente #{sale.id}",
+                    journal='CA',
+                    exercise=exercise,
+                    daily=daily,
+                    sale=sale,
+                )
+                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                JournalEntryLine.objects.bulk_create([
+                    JournalEntryLine(
+                        entry=refund_entry,
+                        account=cls.get_account('411'),
+                        debit=refund_amount,
+                        credit=0,
+                        description=f"Extinction avoir client – retour partiel vente #{sale.id}",
+                    ),
+                    JournalEntryLine(
+                        entry=refund_entry,
+                        account=cls.get_account(account_code),
+                        debit=0,
+                        credit=refund_amount,
+                        description=f"Sortie trésorerie – retour partiel vente #{sale.id}",
+                    ),
+                ])
+                entries.append(refund_entry)
+
+        return entries
+
+    @classmethod
+    def record_supply_cancellation(
+        cls,
+        supply,
+        daily,
+        exercise,
+        refund_payment_method='CASH',
+        refund_amount=None,
+    ):
+        """
+        Enregistre les écritures d'annulation d'un approvisionnement.
+
+        - Achat comptant : contrepassation directe avec entrée de trésorerie.
+        - Achat à crédit : réduction de la dette fournisseur sur 401, puis
+          remboursement séparé du montant déjà payé le cas échéant.
+        """
+        amount = Decimal(str(supply.total_price or 0))
+        if amount <= 0:
+            return []
+
+        if refund_amount is None:
+            refund_amount = amount if not getattr(supply, 'is_credit', False) else Decimal('0')
+        refund_amount = Decimal(str(refund_amount or 0))
+
+        tax_rate = getattr(supply, 'tax_rate', None)
+        purchase_amount, tva_amount = cls.compute_tax(amount, tax_rate)
+
+        entries = []
+
+        with transaction.atomic():
+            reversal_entry = JournalEntry.objects.create(
+                reference=cls._generate_reference('AC'),
+                date=timezone.now().date(),
+                description=f"Annulation approvisionnement #{supply.id}",
+                journal='AC',
+                exercise=exercise,
+                daily=daily,
+                supply=supply,
+            )
+
+            reversal_lines = [
+                JournalEntryLine(
+                    entry=reversal_entry,
+                    account=cls.get_account('601'),
+                    debit=0,
+                    credit=purchase_amount,
+                    description=f"Contrepassation achat – appro. #{supply.id}",
+                ),
+            ]
+
+            if tva_amount > 0:
+                reversal_lines.append(JournalEntryLine(
+                    entry=reversal_entry,
+                    account=cls.get_account('4451'),
+                    debit=0,
+                    credit=tva_amount,
+                    description=f"Contrepassation TVA déductible – appro. #{supply.id}",
+                ))
+
+            if getattr(supply, 'is_credit', False):
+                debit_account = cls.get_account('401')
+                debit_desc = f"Annulation dette fournisseur – appro. #{supply.id}"
+            else:
+                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                debit_account = cls.get_account(account_code)
+                debit_desc = f"Remboursement fournisseur – appro. #{supply.id}"
+
+            reversal_lines.append(JournalEntryLine(
+                entry=reversal_entry,
+                account=debit_account,
+                debit=amount,
+                credit=0,
+                description=debit_desc,
+            ))
+            JournalEntryLine.objects.bulk_create(reversal_lines)
+            entries.append(reversal_entry)
+
+            if getattr(supply, 'is_credit', False) and refund_amount > 0:
+                reimbursement_entry = JournalEntry.objects.create(
+                    reference=cls._generate_reference('CA'),
+                    date=timezone.now().date(),
+                    description=f"Remboursement fournisseur – annulation approvisionnement #{supply.id}",
+                    journal='CA',
+                    exercise=exercise,
+                    daily=daily,
+                    supply=supply,
+                )
+                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                JournalEntryLine.objects.bulk_create([
+                    JournalEntryLine(
+                        entry=reimbursement_entry,
+                        account=cls.get_account(account_code),
+                        debit=refund_amount,
+                        credit=0,
+                        description=f"Entrée trésorerie – appro. #{supply.id}",
+                    ),
+                    JournalEntryLine(
+                        entry=reimbursement_entry,
+                        account=cls.get_account('401'),
+                        debit=0,
+                        credit=refund_amount,
+                        description=f"Extinction avoir fournisseur – appro. #{supply.id}",
+                    ),
+                ])
+                entries.append(reimbursement_entry)
+
+        return entries
+
+    @classmethod
+    def record_partial_supply_return(
+        cls,
+        supply,
+        amount,
+        daily,
+        exercise,
+        refund_payment_method='CASH',
+        refund_amount=None,
+    ):
+        """Enregistre les écritures d'un retour partiel fournisseur."""
+        amount = Decimal(str(amount or 0))
+        if amount <= 0:
+            return []
+
+        refund_amount = Decimal(str(refund_amount or 0))
+        tax_rate = getattr(supply, 'tax_rate', None)
+        purchase_amount, tva_amount = cls.compute_tax(amount, tax_rate)
+
+        entries = []
+
+        with transaction.atomic():
+            reversal_entry = JournalEntry.objects.create(
+                reference=cls._generate_reference('AC'),
+                date=timezone.now().date(),
+                description=f"Retour partiel approvisionnement #{supply.id}",
+                journal='AC',
+                exercise=exercise,
+                daily=daily,
+                supply=supply,
+            )
+
+            reversal_lines = [
+                JournalEntryLine(
+                    entry=reversal_entry,
+                    account=cls.get_account('601'),
+                    debit=0,
+                    credit=purchase_amount,
+                    description=f"Contrepassation retour partiel – appro. #{supply.id}",
+                ),
+            ]
+
+            if tva_amount > 0:
+                reversal_lines.append(JournalEntryLine(
+                    entry=reversal_entry,
+                    account=cls.get_account('4451'),
+                    debit=0,
+                    credit=tva_amount,
+                    description=f"Contrepassation TVA – retour partiel appro. #{supply.id}",
+                ))
+
+            if getattr(supply, 'is_credit', False):
+                debit_account = cls.get_account('401')
+                debit_desc = f"Réduction dette fournisseur – appro. #{supply.id}"
+            else:
+                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                debit_account = cls.get_account(account_code)
+                debit_desc = f"Remboursement fournisseur – retour partiel appro. #{supply.id}"
+
+            reversal_lines.append(JournalEntryLine(
+                entry=reversal_entry,
+                account=debit_account,
+                debit=amount,
+                credit=0,
+                description=debit_desc,
+            ))
+            JournalEntryLine.objects.bulk_create(reversal_lines)
+            entries.append(reversal_entry)
+
+            if getattr(supply, 'is_credit', False) and refund_amount > 0:
+                reimbursement_entry = JournalEntry.objects.create(
+                    reference=cls._generate_reference('CA'),
+                    date=timezone.now().date(),
+                    description=f"Remboursement fournisseur – retour partiel approvisionnement #{supply.id}",
+                    journal='CA',
+                    exercise=exercise,
+                    daily=daily,
+                    supply=supply,
+                )
+                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                JournalEntryLine.objects.bulk_create([
+                    JournalEntryLine(
+                        entry=reimbursement_entry,
+                        account=cls.get_account(account_code),
+                        debit=refund_amount,
+                        credit=0,
+                        description=f"Entrée trésorerie – retour partiel appro. #{supply.id}",
+                    ),
+                    JournalEntryLine(
+                        entry=reimbursement_entry,
+                        account=cls.get_account('401'),
+                        debit=0,
+                        credit=refund_amount,
+                        description=f"Extinction avoir fournisseur – retour partiel appro. #{supply.id}",
+                    ),
+                ])
+                entries.append(reimbursement_entry)
+
+        return entries
+
     # ── Écriture pour une VENTE ───────────────────────────────────────
 
     @classmethod
@@ -207,6 +625,9 @@ class AccountingService:
                 ))
 
             JournalEntryLine.objects.bulk_create(lines)
+            if tva > 0 and not getattr(sale, 'tva_accounting_created', False):
+                sale.tva_accounting_created = True
+                sale.save(update_fields=['tva_accounting_created'])
         return entry
 
     # ── Écritures TVA différées pour un Daily ─────────────────────────────
@@ -265,14 +686,22 @@ class AccountingService:
                         sale=sale,
                     )
                     
-                    # Créditer le compte de TVA collectée
-                    JournalEntryLine.objects.create(
-                        entry=entry,
-                        account=cls.get_account('4431'),
-                        debit=0,
-                        credit=tva,
-                        description=f"TVA collectée – vente #{sale.id}",
-                    )
+                    JournalEntryLine.objects.bulk_create([
+                        JournalEntryLine(
+                            entry=entry,
+                            account=cls.get_account('701'),
+                            debit=tva,
+                            credit=0,
+                            description=f"Constatation TVA différée – vente #{sale.id}",
+                        ),
+                        JournalEntryLine(
+                            entry=entry,
+                            account=cls.get_account('4431'),
+                            debit=0,
+                            credit=tva,
+                            description=f"TVA collectée – vente #{sale.id}",
+                        ),
+                    ])
                     
                     # Marquer la vente comme ayant ses écritures TVA créées
                     sale.tva_accounting_created = True

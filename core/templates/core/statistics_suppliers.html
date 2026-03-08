@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Statistiques fournisseurs - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/statistics.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="statistics-suppliers-page">
+    <div class="page-header statistics-header"><div><h1>Statistiques fournisseurs</h1><p class="text-secondary">Analysez votre portefeuille fournisseurs, le volume des approvisionnements et le suivi des règlements associés.</p></div><div class="statistics-header-actions"><a href="{% url 'statistics' %}" class="btn btn-secondary btn-sm">Retour aux statistiques</a><a href="{% url 'suppliers' %}" class="btn btn-secondary btn-sm">Voir les fournisseurs</a></div></div>
+    <div class="statistics-suppliers-summary"><div><strong>{{ period_name }}</strong><div class="text-secondary">{{ period_label }}</div></div><div class="statistics-suppliers-summary-meta"><span class="statistics-pill">{{ total_suppliers }} fournisseur{{ total_suppliers|pluralize }}</span><span class="statistics-pill">{{ suppliers_with_supplies_count }} actif{{ suppliers_with_supplies_count|pluralize }}</span><span class="statistics-pill">Mise à jour : {{ generated_at|date:"d/m/Y H:i" }}</span></div></div>
+
+    <div class="card statistics-suppliers-filters"><div class="card-header"><h3 class="card-title">Filtres</h3></div><div class="card-body"><form method="get" action="{% url 'supplier_statistics' %}" class="filters-form"><div class="filters-row"><div class="filter-group"><label class="form-label">Période</label><select name="period" class="form-control"><option value="7d" {% if current_period == '7d' %}selected{% endif %}>7 derniers jours</option><option value="30d" {% if current_period == '30d' %}selected{% endif %}>30 derniers jours</option><option value="90d" {% if current_period == '90d' %}selected{% endif %}>90 derniers jours</option><option value="365d" {% if current_period == '365d' %}selected{% endif %}>12 derniers mois</option><option value="custom" {% if current_period == 'custom' %}selected{% endif %}>Personnalisée</option></select></div><div class="filter-group"><label class="form-label">Recherche</label><input type="text" name="search" class="form-control" placeholder="Nom, téléphone, e-mail, NIU..." value="{{ current_search }}"></div><div class="filter-group"><label class="form-label">Date début</label><input type="date" name="date_from" class="form-control" value="{{ current_date_from }}"></div><div class="filter-group"><label class="form-label">Date fin</label><input type="date" name="date_to" class="form-control" value="{{ current_date_to }}"></div></div><div class="filters-row"><div class="filter-group"><label class="form-label">Activité</label><select name="activity" class="form-control"><option value="">Toutes</option><option value="active" {% if current_activity == 'active' %}selected{% endif %}>Fournisseurs actifs</option><option value="inactive" {% if current_activity == 'inactive' %}selected{% endif %}>Sans approvisionnement</option><option value="debtors" {% if current_activity == 'debtors' %}selected{% endif %}>À régler</option></select></div><div class="filter-group"><label class="form-label">Téléphone renseigné</label><div class="form-control">{{ suppliers_with_phone_count }} fournisseur{{ suppliers_with_phone_count|pluralize }}</div></div><div class="filter-group"><label class="form-label">Email renseigné</label><div class="form-control">{{ suppliers_with_email_count }} fournisseur{{ suppliers_with_email_count|pluralize }}</div></div><div class="filters-actions"><button type="submit" class="btn btn-primary btn-sm">Filtrer</button><a href="{% url 'supplier_statistics' %}" class="btn btn-secondary btn-sm">Réinitialiser</a></div></div></form></div></div>
+
+    <div class="kpi-grid"><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Fournisseurs concernés</div><div class="kpi-value">{{ total_suppliers }}</div><div class="kpi-sub">Nouveaux : {{ new_suppliers_count }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Fournisseurs actifs</div><div class="kpi-value">{{ suppliers_with_supplies_count }}</div><div class="kpi-sub">Sans activité : {{ inactive_suppliers_count }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Montant approvisionné</div><div class="kpi-value">{{ total_supplies_amount|floatformat:0 }} {{ currency }}</div><div class="kpi-sub">Moyenne/fournisseur : {{ average_supply_per_supplier|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Approvisionnements</div><div class="kpi-value">{{ supplies_count }}</div><div class="kpi-sub">Paiements : {{ supplier_payments_total|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Fournisseurs à régler</div><div class="kpi-value">{{ creditor_suppliers_count }}</div><div class="kpi-sub">{{ credit_supplies_count }} approvisionnement{{ credit_supplies_count|pluralize }} à crédit</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Dette fournisseur</div><div class="kpi-value">{{ supplier_debt_total|floatformat:0 }} {{ currency }}</div><div class="kpi-sub">{{ overdue_schedules_count }} échéance{{ overdue_schedules_count|pluralize }} en retard</div></div></div></div>
+
+    <div class="statistics-suppliers-chart-grid"><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Acquisition fournisseurs</h3></div><div class="card-body"><canvas id="supplierGrowthChart"></canvas><p class="statistics-chart-note">Évolution du nombre de nouveaux fournisseurs créés sur la période filtrée.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Tendance approvisionnements / montant</h3></div><div class="card-body"><canvas id="supplierSuppliesTrendChart"></canvas><p class="statistics-chart-note">Suivi chronologique du volume d'approvisionnements et des montants engagés.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Répartition des paiements par mode</h3></div><div class="card-body"><canvas id="supplierPaymentMethodsChart"></canvas><p class="statistics-chart-note">Montants réglés selon les modes de paiement utilisés pour les fournisseurs sélectionnés.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Top fournisseurs</h3></div><div class="card-body"><canvas id="topSuppliersChart"></canvas><p class="statistics-chart-note">Comparaison des fournisseurs les plus sollicités et de leur encours restant à régler.</p></div></div></div>
+
+    <div class="statistics-suppliers-detail-grid"><div class="card"><div class="card-header"><h3 class="card-title">Fournisseurs les plus sollicités</h3></div><div class="card-body">{% if top_suppliers %}<div class="table-responsive"><table class="table"><thead><tr><th>Fournisseur</th><th class="text-right">Appro.</th><th class="text-right">Montant</th><th class="text-right">Dette</th></tr></thead><tbody>{% for supplier in top_suppliers %}<tr><td><strong>{{ supplier.label }}</strong><div class="statistics-entity-sub">Paiements : {{ supplier.payments_total|floatformat:0 }} {{ currency }} · Crédit : {{ supplier.credit_supplies_count }} · Retards : {{ supplier.overdue_count }}</div></td><td class="text-right">{{ supplier.total_supplies }}</td><td class="text-right">{{ supplier.total_amount|floatformat:0 }} {{ currency }}</td><td class="text-right">{{ supplier.outstanding_total|floatformat:0 }} {{ currency }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucun approvisionnement fournisseur sur cette période.</p></div>{% endif %}</div></div><div class="card"><div class="card-header"><h3 class="card-title">Derniers fournisseurs filtrés</h3></div><div class="card-body">{% if recent_suppliers %}<div class="table-responsive"><table class="table"><thead><tr><th>Fournisseur</th><th>Contact</th><th>NIU</th><th>Dernier appro.</th><th>Statut</th></tr></thead><tbody>{% for supplier in recent_suppliers %}<tr><td><strong>{{ supplier.label }}</strong><div class="statistics-entity-sub">Créé le {{ supplier.create_at|date:"d/m/Y" }}</div></td><td>{{ supplier.phone_number }}<div class="statistics-entity-sub">{{ supplier.email }}</div></td><td>{{ supplier.niu }}</td><td>{% if supplier.last_supply_at %}{{ supplier.last_supply_at|date:"d/m/Y H:i" }}<div class="statistics-entity-sub">{{ supplier.total_supplies }} approvisionnement{{ supplier.total_supplies|pluralize }}</div>{% else %}-{% endif %}</td><td><span class="badge badge-{{ supplier.status_class }}">{{ supplier.status_label }}</span>{% if supplier.outstanding_total %}<div class="statistics-entity-sub">{{ supplier.outstanding_total|floatformat:0 }} {{ currency }} · {{ supplier.overdue_count }} retard{{ supplier.overdue_count|pluralize }}</div>{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucun fournisseur ne correspond aux filtres actuels.</p></div>{% endif %}</div></div></div>
+</div>
+
+{{ supplier_growth_chart|json_script:"supplier-statistics-growth-data" }}
+{{ supplies_trend_chart|json_script:"supplier-statistics-supplies-data" }}
+{{ payment_methods_chart|json_script:"supplier-statistics-payments-data" }}
+{{ top_suppliers_chart|json_script:"supplier-statistics-top-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function readChartData(id) {
+        const node = document.getElementById(id);
+        return node ? JSON.parse(node.textContent) : { labels: [] };
+    }
+
+    function buildChart(canvasId, config) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !window.Chart) {
+            return;
+        }
+        new Chart(canvas, config);
+    }
+
+    const supplierGrowth = readChartData('supplier-statistics-growth-data');
+    buildChart('supplierGrowthChart', { type: 'bar', data: { labels: supplierGrowth.labels, datasets: [{ label: 'Nouveaux fournisseurs', data: supplierGrowth.values, backgroundColor: 'rgba(37, 99, 235, 0.75)', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } });
+
+    const supplierSupplies = readChartData('supplier-statistics-supplies-data');
+    buildChart('supplierSuppliesTrendChart', { type: 'line', data: { labels: supplierSupplies.labels, datasets: [{ label: 'Montant', data: supplierSupplies.amounts, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.12)', yAxisID: 'y', tension: 0.35, fill: true }, { label: 'Approvisionnements', data: supplierSupplies.supplies, borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.10)', yAxisID: 'y1', tension: 0.35 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true }, y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } } } } });
+
+    const paymentMethods = readChartData('supplier-statistics-payments-data');
+    buildChart('supplierPaymentMethodsChart', { type: 'doughnut', data: { labels: paymentMethods.labels, datasets: [{ data: paymentMethods.values, backgroundColor: ['#2563eb', '#7c3aed', '#16a34a', '#ea580c', '#0f766e', '#dc2626'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+
+    const topSuppliers = readChartData('supplier-statistics-top-data');
+    buildChart('topSuppliersChart', { type: 'bar', data: { labels: topSuppliers.labels, datasets: [{ label: 'Montant approvisionné', data: topSuppliers.amounts, backgroundColor: 'rgba(59, 130, 246, 0.78)', borderRadius: 8 }, { label: 'Dette restante', data: topSuppliers.outstanding, backgroundColor: 'rgba(245, 158, 11, 0.72)', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: false }, y: { beginAtZero: true } } } });
+});
+</script>
+{% endblock %}

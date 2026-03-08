@@ -65,6 +65,27 @@ class Supply(SoftDeleteModel):
         return self.quantity * self.purchase_cost
 
 
+class SupplyReturn(SoftDeleteModel):
+    """Trace d'un retour partiel fournisseur sur un approvisionnement."""
+
+    supply = models.ForeignKey(Supply, on_delete=models.CASCADE, related_name='supply_returns')
+    quantity = models.IntegerField(default=1, verbose_name="Quantité retournée")
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Coût unitaire")
+    total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Montant retourné")
+    reason = models.TextField(null=True, blank=True, verbose_name="Motif")
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Remboursement reçu")
+    refund_payment_method = models.CharField(max_length=20, null=True, blank=True, verbose_name="Mode de remboursement")
+
+    class Meta:
+        db_table = 'supply_return'
+        verbose_name = 'Retour fournisseur'
+        verbose_name_plural = 'Retours fournisseurs'
+        ordering = ['-create_at']
+
+    def __str__(self):
+        return f"Retour {self.total} pour Appro. #{self.supply_id}"
+
+
 class Inventory(SoftDeleteModel):
     """
     Inventory count model.

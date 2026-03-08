@@ -43,7 +43,12 @@ class SupplyForm(forms.ModelForm):
         min_value=0,
         max_digits=10,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 1500', 'step': '1'}),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Prérempli selon le produit sélectionné',
+            'step': '1',
+            'id': 'id_purchase_cost',
+        }),
     )
 
     selling_price = forms.DecimalField(
@@ -52,7 +57,12 @@ class SupplyForm(forms.ModelForm):
         max_digits=10,
         decimal_places=2,
         required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Laisser vide pour garder le prix actuel', 'step': '1', "id": "id_unit_price"}),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Prérempli avec le prix de vente actuel du produit',
+            'step': '1',
+            'id': 'id_selling_price',
+        }),
     )
 
     expiration_date = forms.DateField(
@@ -97,6 +107,16 @@ class SupplyForm(forms.ModelForm):
         help_text='Ce type de dépense sera utilisé pour créer automatiquement la dépense liée à cet approvisionnement'
     )
 
+    @staticmethod
+    def _format_decimal_for_input(value):
+        if value is None:
+            return ''
+
+        normalized = format(value, 'f')
+        if '.' in normalized:
+            normalized = normalized.rstrip('0').rstrip('.')
+        return normalized
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Pré-remplir le type de dépense depuis les paramètres système
@@ -104,15 +124,23 @@ class SupplyForm(forms.ModelForm):
         settings = SystemSettings.get_settings()
         if settings.default_supply_expense_type:
             self.initial['expense_type'] = settings.default_supply_expense_type
-        
-        # Ajouter data-has-vat aux options du produit
-        self.fields['product'].widget.attrs['data-has-vat-map'] = json.dumps(
-            {str(p.id): p.has_vat for p in Product.objects.filter(delete_at__isnull=True)}
+
+        # Ajouter les métadonnées du produit pour le préremplissage et la TVA.
+        active_products = Product.objects.filter(delete_at__isnull=True).only(
+            'id', 'has_vat', 'actual_price', 'last_purchase_price'
         )
+        self.fields['product'].widget.attrs['data-product-meta-map'] = json.dumps({
+            str(product.id): {
+                'has_vat': product.has_vat,
+                'selling_price': self._format_decimal_for_input(product.actual_price),
+                'purchase_cost': self._format_decimal_for_input(product.last_purchase_price),
+            }
+            for product in active_products
+        })
 
     class Meta:
         model = Supply
-        fields = ['product', 'supplier', 'quantity', 'purchase_cost', 'expiration_date', 'is_credit', 'tax_rate', 'expense_type']
+        fields = ['product', 'supplier', 'quantity', 'purchase_cost', 'selling_price', 'expiration_date', 'is_credit', 'tax_rate', 'expense_type']
 
     def clean_expiration_date(self):
         exp_date = self.cleaned_data.get('expiration_date')
@@ -523,6 +551,235 @@ class PaymentForm(forms.ModelForm):
                     f"Le montant dépasse le solde restant ({self.credit_sale.amount_remaining:,.0f} FCFA)."
                 )
         return amount
+
+
+class SaleCancellationForm(forms.Form):
+    """Formulaire minimal d'annulation totale d'une vente."""
+
+    reason = forms.CharField(
+        label="Motif d'annulation",
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Ex: retour client / erreur de caisse',
+        }),
+    )
+
+    refund_payment_method = forms.ChoiceField(
+        label='Mode de remboursement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    def __init__(self, *args, sale=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sale = sale
+
+    def clean_reason(self):
+        reason = (self.cleaned_data.get('reason') or '').strip()
+        if not reason:
+            raise forms.ValidationError("Veuillez préciser le motif d'annulation.")
+        return reason
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.sale and self.sale.delete_at is not None:
+            raise forms.ValidationError("Cette vente est déjà annulée.")
+        return cleaned_data
+
+
+class SalePartialReturnForm(forms.Form):
+    """Formulaire dynamique de retour partiel par ligne de vente."""
+
+    reason = forms.CharField(
+        label="Motif du retour",
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Ex: produit abîmé / retour partiel client',
+        }),
+    )
+
+    refund_payment_method = forms.ChoiceField(
+        label='Mode de remboursement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    def __init__(self, *args, sale=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sale = sale
+        self.sale_lines = []
+
+        if sale is not None:
+            self.sale_lines = list(
+                sale.sale_products.filter(delete_at__isnull=True, quantity__gt=0).select_related('product')
+            )
+            for sale_product in self.sale_lines:
+                field_name = f'return_quantity_{sale_product.id}'
+                self.fields[field_name] = forms.IntegerField(
+                    required=False,
+                    min_value=0,
+                    initial=0,
+                    label=f"{sale_product.product.name} (max {sale_product.quantity})",
+                    widget=forms.NumberInput(attrs={
+                        'class': 'form-control',
+                        'min': 0,
+                        'max': sale_product.quantity,
+                        'step': 1,
+                    }),
+                )
+
+    def clean_reason(self):
+        reason = (self.cleaned_data.get('reason') or '').strip()
+        if not reason:
+            raise forms.ValidationError("Veuillez préciser le motif du retour.")
+        return reason
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.sale and self.sale.delete_at is not None:
+            raise forms.ValidationError("Cette vente est déjà annulée.")
+        if not self.sale_lines:
+            raise forms.ValidationError("Aucune ligne active n'est disponible pour ce retour.")
+
+        returned_items = []
+        remaining_quantity_exists = False
+
+        for sale_product in self.sale_lines:
+            field_name = f'return_quantity_{sale_product.id}'
+            quantity = cleaned_data.get(field_name) or 0
+
+            if quantity > sale_product.quantity:
+                self.add_error(field_name, f"Maximum autorisé : {sale_product.quantity}.")
+                continue
+
+            if quantity > 0:
+                returned_items.append({
+                    'sale_product': sale_product,
+                    'quantity': quantity,
+                })
+
+            if sale_product.quantity - quantity > 0:
+                remaining_quantity_exists = True
+
+        if self.errors:
+            return cleaned_data
+
+        if not returned_items:
+            raise forms.ValidationError("Veuillez renseigner au moins une quantité à retourner.")
+        if not remaining_quantity_exists:
+            raise forms.ValidationError("Ce retour couvre toute la vente. Utilisez l'annulation totale.")
+
+        cleaned_data['returned_items'] = returned_items
+        return cleaned_data
+
+
+class SupplyCancellationForm(forms.Form):
+    """Formulaire minimal d'annulation totale d'un approvisionnement."""
+
+    reason = forms.CharField(
+        label="Motif d'annulation",
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Ex: retour fournisseur / erreur de réception',
+        }),
+    )
+
+    refund_payment_method = forms.ChoiceField(
+        label='Mode de remboursement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    def __init__(self, *args, supply=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.supply = supply
+
+    def clean_reason(self):
+        reason = (self.cleaned_data.get('reason') or '').strip()
+        if not reason:
+            raise forms.ValidationError("Veuillez préciser le motif d'annulation.")
+        return reason
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.supply and self.supply.delete_at is not None:
+            raise forms.ValidationError("Cet approvisionnement est déjà annulé.")
+        return cleaned_data
+
+
+class SupplyPartialReturnForm(forms.Form):
+    """Formulaire de retour partiel d'un approvisionnement fournisseur."""
+
+    returned_quantity = forms.IntegerField(
+        label='Quantité à retourner',
+        min_value=1,
+        initial=1,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': 1,
+            'step': 1,
+        }),
+    )
+
+    reason = forms.CharField(
+        label="Motif du retour",
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Ex: marchandise défectueuse / écart de livraison',
+        }),
+    )
+
+    refund_payment_method = forms.ChoiceField(
+        label='Mode de remboursement',
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    def __init__(self, *args, supply=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.supply = supply
+
+        if supply is not None:
+            self.fields['returned_quantity'].label = (
+                f"Quantité à retourner (max {max(supply.quantity - 1, 1)})"
+            )
+            self.fields['returned_quantity'].widget.attrs['max'] = max(supply.quantity - 1, 1)
+
+    def clean_reason(self):
+        reason = (self.cleaned_data.get('reason') or '').strip()
+        if not reason:
+            raise forms.ValidationError("Veuillez préciser le motif du retour.")
+        return reason
+
+    def clean(self):
+        cleaned_data = super().clean()
+        returned_quantity = cleaned_data.get('returned_quantity') or 0
+
+        if self.supply and self.supply.delete_at is not None:
+            raise forms.ValidationError("Cet approvisionnement est déjà annulé.")
+        if self.supply and self.supply.quantity <= 1:
+            raise forms.ValidationError(
+                "Ce retour couvre tout l'approvisionnement. Utilisez l'annulation totale."
+            )
+        if self.supply and returned_quantity > self.supply.quantity:
+            self.add_error('returned_quantity', f"Maximum autorisé : {self.supply.quantity}.")
+        if self.supply and returned_quantity >= self.supply.quantity:
+            raise forms.ValidationError(
+                "Ce retour couvre tout l'approvisionnement. Utilisez l'annulation totale."
+            )
+        return cleaned_data
 
 
 class SupplierPaymentForm(forms.ModelForm):

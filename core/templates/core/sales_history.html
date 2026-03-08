@@ -43,6 +43,22 @@
     </div>
 </div>
 
+{% if messages %}
+<div style="display: grid; gap: 0.75rem; margin-bottom: 1rem;">
+    {% for message in messages %}
+    {% if message.tags == 'success' %}
+    <div class="card" style="border-left: 4px solid #16a34a;">
+    {% else %}
+    <div class="card" style="border-left: 4px solid #dc2626;">
+    {% endif %}
+        <div class="card-body" style="padding: 0.9rem 1rem;">
+            {{ message }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <!-- Barre de filtres -->
 <div class="card filters-card">
     <form method="get" action="{% url 'sales_history' %}" class="filters-form" id="filtersForm">
@@ -99,6 +115,7 @@
                     <option value="">Tous</option>
                     <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>Payé</option>
                     <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>Non payé</option>
+                    <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>Annulé</option>
                 </select>
             </div>
 
@@ -186,7 +203,9 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if sp.sale.is_paid %}
+                            {% if sp.sale.delete_at %}
+                                <span class="badge badge-danger">Annulée</span>
+                            {% elif sp.sale.is_paid %}
                                 <span class="badge badge-success">Payé</span>
                             {% else %}
                                 <span class="badge badge-danger">Non payé</span>
@@ -280,7 +299,12 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if sale.is_paid %}
+                            {% if sale.delete_at %}
+                                <span class="badge badge-danger">Annulée</span>
+                                <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.25rem;">
+                                    le {{ sale.delete_at|date:"d/m/Y H:i" }}
+                                </div>
+                            {% elif sale.is_paid %}
                                 <span class="badge badge-success">Payé</span>
                             {% else %}
                                 <span class="badge badge-danger">Non payé</span>
@@ -288,15 +312,44 @@
                         </td>
                         <td>
                             <div class="action-buttons">
-                                {% if sale.is_credit and sale.credit_info and not sale.credit_info.is_fully_paid %}
-                                <a href="{% url 'record_credit_payment' sale.credit_info.id %}" class="btn btn-primary btn-sm" title="Enregistrer un paiement">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                    </svg>
-                                    Payer
-                                </a>
+                                {% if not sale.delete_at %}
+                                <div class="sale-actions-menu">
+                                    <button
+                                        type="button"
+                                        class="btn-icon js-sale-actions-toggle"
+                                        title="Actions sur la vente"
+                                        aria-label="Ouvrir les actions de la vente"
+                                        aria-expanded="false"
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <circle cx="12" cy="5" r="1.75" fill="currentColor"/>
+                                            <circle cx="12" cy="12" r="1.75" fill="currentColor"/>
+                                            <circle cx="12" cy="19" r="1.75" fill="currentColor"/>
+                                        </svg>
+                                    </button>
+                                    <div class="sale-actions-dropdown">
+                                        {% if sale.is_credit and sale.credit_info and not sale.credit_info.is_fully_paid %}
+                                        <a href="{% url 'record_credit_payment' sale.credit_info.id %}" class="sale-actions-item">
+                                            Payer
+                                        </a>
+                                        {% endif %}
+                                        <button type="button" class="sale-actions-item js-open-sale-modal" data-modal-target="partialReturnModal{{ sale.id }}">
+                                            Retour partiel
+                                        </button>
+                                        <button type="button" class="sale-actions-item sale-actions-item-danger js-open-sale-modal" data-modal-target="cancelSaleModal{{ sale.id }}">
+                                            Annuler
+                                        </button>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <span class="text-secondary" style="font-size: 0.85rem;">Annulation enregistrée</span>
                                 {% endif %}
-                                <button class="btn-icon" onclick="printSale({{ sale.id }})" title="Imprimer la facture">
+                                {% if sale.sale_returns.all|length %}
+                                <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.35rem;">
+                                    {{ sale.sale_returns.all|length }} retour{{ sale.sale_returns.all|length|pluralize }} partiel{{ sale.sale_returns.all|length|pluralize }} enregistré{{ sale.sale_returns.all|length|pluralize }}
+                                </div>
+                                {% endif %}
+                                <button class="btn-icon js-print-sale" data-sale-id="{{ sale.id }}" title="Imprimer la facture">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                         <path d="M4 5V2h8v3M4 11H2V7h12v4h-2" stroke="currentColor" stroke-width="1.5"/>
                                         <rect x="4" y="9" width="8" height="5" stroke="currentColor" stroke-width="1.5"/>
@@ -315,6 +368,106 @@
         </div>
     </div>
 </div>
+
+{% for sale in sales %}
+    {% if not sale.delete_at %}
+    <div class="modal sale-action-modal" id="partialReturnModal{{ sale.id }}">
+        <div class="modal-content sale-action-modal-content">
+            <div class="modal-header">
+                <h3>Retour partiel — Vente #{{ sale.id }}</h3>
+                <button type="button" class="modal-close js-close-sale-modal" aria-label="Fermer">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{% url 'partial_return_sale' sale.id %}" class="sale-action-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ current_full_path }}">
+
+                    <div class="sale-action-lines">
+                        {% for sale_product in sale.sale_products.all %}
+                            {% if not sale_product.delete_at and sale_product.quantity > 0 %}
+                            <div class="sale-action-line">
+                                <div class="sale-action-line-label">
+                                    <strong>{{ sale_product.product.name }}</strong>
+                                    <span class="text-secondary">Reste {{ sale_product.quantity }} × {{ sale_product.unit_price|floatformat:0 }} FCFA</span>
+                                </div>
+                                <input
+                                    type="number"
+                                    name="return_quantity_{{ sale_product.id }}"
+                                    class="form-control"
+                                    min="0"
+                                    max="{{ sale_product.quantity }}"
+                                    step="1"
+                                    value="0"
+                                >
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+
+                    <div class="sale-action-fields">
+                        <div class="form-group">
+                            <label class="form-label">Mode de remboursement</label>
+                            <select name="refund_payment_method" class="form-control">
+                                {% for value, label in payment_method_choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Motif</label>
+                            <textarea name="reason" class="form-control" rows="3" required placeholder="Motif du retour partiel / avoir client"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="sale-action-form-actions">
+                        <button type="button" class="btn btn-secondary js-close-sale-modal">Fermer</button>
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('Confirmer le retour partiel de cette vente ?');">
+                            Valider le retour
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal sale-action-modal" id="cancelSaleModal{{ sale.id }}">
+        <div class="modal-content sale-action-modal-content">
+            <div class="modal-header">
+                <h3>Annuler la vente #{{ sale.id }}</h3>
+                <button type="button" class="modal-close js-close-sale-modal" aria-label="Fermer">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{% url 'cancel_sale' sale.id %}" class="sale-action-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ current_full_path }}">
+
+                    <div class="sale-action-fields">
+                        <div class="form-group">
+                            <label class="form-label">Mode de remboursement</label>
+                            <select name="refund_payment_method" class="form-control">
+                                {% for value, label in payment_method_choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Motif</label>
+                            <textarea name="reason" class="form-control" rows="3" required placeholder="Motif d'annulation / retour client"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="sale-action-form-actions">
+                        <button type="button" class="btn btn-secondary js-close-sale-modal">Fermer</button>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Confirmer l\'annulation de cette vente ?');">
+                            Confirmer l'annulation
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endfor %}
 
 <!-- Pagination pour le mode ventes -->
 {% if page_obj.paginator.num_pages > 1 %}
@@ -361,6 +514,89 @@
         currencySymbol: "{{ system_settings.currency_symbol|escapejs }}",
         receiptFooter: "{{ system_settings.receipt_footer|escapejs }}",
     };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        function closeAllSaleActionMenus() {
+            document.querySelectorAll('.sale-actions-menu.open').forEach(function (menu) {
+                menu.classList.remove('open');
+                const toggle = menu.querySelector('.js-sale-actions-toggle');
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
+        function closeSaleModal(modal) {
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+
+        document.querySelectorAll('.js-sale-actions-toggle').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                const menu = button.closest('.sale-actions-menu');
+                const isOpen = menu.classList.contains('open');
+                closeAllSaleActionMenus();
+                if (!isOpen) {
+                    menu.classList.add('open');
+                    button.setAttribute('aria-expanded', 'true');
+                }
+            });
+        });
+
+        document.querySelectorAll('.sale-actions-dropdown').forEach(function (dropdown) {
+            dropdown.addEventListener('click', function (event) {
+                event.stopPropagation();
+            });
+        });
+
+        document.querySelectorAll('.js-open-sale-modal').forEach(function (button) {
+            button.addEventListener('click', function () {
+                closeAllSaleActionMenus();
+                const modal = document.getElementById(button.dataset.modalTarget);
+                if (modal) {
+                    modal.classList.add('active');
+                }
+            });
+        });
+
+        document.querySelectorAll('.js-close-sale-modal').forEach(function (button) {
+            button.addEventListener('click', function () {
+                closeSaleModal(button.closest('.modal'));
+            });
+        });
+
+        document.querySelectorAll('.sale-action-modal').forEach(function (modal) {
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) {
+                    closeSaleModal(modal);
+                }
+            });
+        });
+
+        document.addEventListener('click', function () {
+            closeAllSaleActionMenus();
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeAllSaleActionMenus();
+                document.querySelectorAll('.sale-action-modal.active').forEach(function (modal) {
+                    closeSaleModal(modal);
+                });
+            }
+        });
+
+        document.querySelectorAll('.js-print-sale').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const saleId = Number(button.dataset.saleId);
+                if (!Number.isNaN(saleId) && typeof printSale === 'function') {
+                    printSale(saleId);
+                }
+            });
+        });
+    });
 </script>
 <script src="{% static 'js/sales.js' %}"></script>
 {% endblock %}

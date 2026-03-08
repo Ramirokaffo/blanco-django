@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q, F, Sum, Count
+from django.db.models import Q, F, Sum, Count, Max
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from django.db import transaction
 from django.utils import timezone
@@ -17,7 +17,7 @@ from core.models.user_models import Client, Supplier, CustomUser
 from core.models.accounting_models import (
     Daily, DailyExpense, DailyRecipe, ExpenseType, Exercise,
     Account, Payment, RecipeType, SupplierPayment, Invoice,
-    TaxRate, BankStatement, ExerciseClosing,
+    TaxRate, BankStatement, ExerciseClosing, PAYMENT_METHOD_CHOICES,
 )
 from core.models.product_models import Product, Category, Gamme, Rayon
 from core.models.inventory_models import Supply, Inventory, InventorySnapshot, DailyInventory, CreditSupply, PaymentSchedule
@@ -25,9 +25,13 @@ from core.services.daily_service import DailyService
 from core.forms import (
     SupplyForm, ExpenseForm, ClientForm, SupplierForm, InventoryForm,
     DataMigrationForm, PaymentForm, SupplierPaymentForm,
+    SaleCancellationForm, SalePartialReturnForm,
+    SupplyCancellationForm, SupplyPartialReturnForm,
 )
 from core.services.excercise_service import ExerciseService
 from core.services.accounting_service import AccountingService
+from core.services.sale_service import SaleService
+from core.services.supply_service import SupplyService
 from core.decorators import module_required
 
 
@@ -889,6 +893,1263 @@ def sales_statistics(request):
 
 @login_required
 @module_required('dashboard')
+def client_statistics(request):
+    """Vue détaillée des statistiques clients avec filtres et graphiques."""
+    from core.models.settings_models import SystemSettings
+
+    def format_period_label(start, end):
+        if start and end:
+            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+        if start:
+            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+        if end:
+            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
+        return "Toutes les données disponibles"
+
+    def chart_bucket_for_range(field_name, start, end):
+        if not start and not end:
+            return TruncMonth(field_name), 'month'
+
+        effective_end = end or timezone.localdate()
+        effective_start = start or (effective_end - timedelta(days=180))
+        span_days = max((effective_end - effective_start).days + 1, 1)
+
+        if span_days <= 31:
+            return TruncDate(field_name), 'day'
+        if span_days <= 120:
+            return TruncWeek(field_name), 'week'
+        return TruncMonth(field_name), 'month'
+
+    def format_bucket_label(bucket_value, bucket_kind):
+        if hasattr(bucket_value, 'date'):
+            bucket_date = timezone.localtime(bucket_value).date() if timezone.is_aware(bucket_value) else bucket_value.date()
+        else:
+            bucket_date = bucket_value
+
+        if bucket_kind == 'month':
+            return bucket_date.strftime('%b %Y')
+        if bucket_kind == 'week':
+            week_end = bucket_date + timedelta(days=6)
+            return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
+        return bucket_date.strftime('%d/%m')
+
+    def format_person_label(firstname, lastname, fallback):
+        full_name = f"{firstname or ''} {lastname or ''}".strip()
+        return full_name or fallback
+
+    settings_obj = SystemSettings.get_settings()
+    today = timezone.localdate()
+
+    period = request.GET.get('period', '30d')
+    search = request.GET.get('search', '').strip()
+    gender = request.GET.get('gender', '').strip()
+    activity = request.GET.get('activity', '').strip()
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    parsed_date_from = parse_date(date_from) if date_from else None
+    parsed_date_to = parse_date(date_to) if date_to else None
+
+    if parsed_date_from and parsed_date_to and parsed_date_from > parsed_date_to:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        date_from = parsed_date_from.isoformat()
+        date_to = parsed_date_to.isoformat()
+
+    period_options = {
+        '7d': ('7 derniers jours', 6),
+        '30d': ('30 derniers jours', 29),
+        '90d': ('90 derniers jours', 89),
+        '365d': ('12 derniers mois', 364),
+    }
+
+    if date_from or date_to:
+        period = 'custom'
+    elif period not in period_options:
+        period = '30d'
+
+    if period == 'custom':
+        period_name = 'Période personnalisée'
+        range_start = parsed_date_from
+        range_end = parsed_date_to
+    else:
+        period_name, days_back = period_options[period]
+        range_end = today
+        range_start = today - timedelta(days=days_back)
+
+    base_clients_queryset = Client.objects.filter(delete_at__isnull=True)
+    genders = list(
+        base_clients_queryset.exclude(gender__isnull=True).exclude(gender='').values_list('gender', flat=True).distinct().order_by('gender')
+    )
+
+    clients_queryset = base_clients_queryset
+    if search:
+        clients_queryset = clients_queryset.filter(
+            Q(firstname__icontains=search)
+            | Q(lastname__icontains=search)
+            | Q(email__icontains=search)
+            | Q(phone_number__icontains=search)
+        )
+    if gender:
+        clients_queryset = clients_queryset.filter(gender=gender)
+    if activity == 'active':
+        clients_queryset = clients_queryset.filter(sales__delete_at__isnull=True).distinct()
+    elif activity == 'inactive':
+        clients_queryset = clients_queryset.exclude(sales__delete_at__isnull=True).distinct()
+    elif activity == 'debtors':
+        clients_queryset = clients_queryset.filter(
+            sales__delete_at__isnull=True,
+            sales__credit_info__delete_at__isnull=True,
+            sales__credit_info__amount_remaining__gt=0,
+        ).distinct()
+
+    clients_queryset = clients_queryset.distinct()
+    client_ids = list(clients_queryset.values_list('id', flat=True))
+
+    if client_ids:
+        sales_queryset = Sale.objects.filter(
+            delete_at__isnull=True,
+            client_id__in=client_ids,
+        ).select_related('client', 'staff')
+        credit_sales_queryset = CreditSale.objects.filter(
+            delete_at__isnull=True,
+            sale__delete_at__isnull=True,
+            sale__client_id__in=client_ids,
+        ).select_related('sale__client')
+        payments_queryset = Payment.objects.filter(
+            delete_at__isnull=True,
+            credit_sale__delete_at__isnull=True,
+            credit_sale__sale__delete_at__isnull=True,
+            credit_sale__sale__client_id__in=client_ids,
+        ).select_related('credit_sale__sale__client')
+        schedules_queryset = PaymentSchedule.objects.filter(
+            delete_at__isnull=True,
+            schedule_type='CLIENT',
+            credit_sale__delete_at__isnull=True,
+            credit_sale__sale__delete_at__isnull=True,
+            credit_sale__sale__client_id__in=client_ids,
+        ).select_related('credit_sale__sale__client')
+    else:
+        sales_queryset = Sale.objects.none()
+        credit_sales_queryset = CreditSale.objects.none()
+        payments_queryset = Payment.objects.none()
+        schedules_queryset = PaymentSchedule.objects.none()
+
+    if range_start:
+        sales_queryset = sales_queryset.filter(create_at__date__gte=range_start)
+        payments_queryset = payments_queryset.filter(payment_date__gte=range_start)
+        schedules_queryset = schedules_queryset.filter(due_date__gte=range_start)
+    if range_end:
+        sales_queryset = sales_queryset.filter(create_at__date__lte=range_end)
+        payments_queryset = payments_queryset.filter(payment_date__lte=range_end)
+        schedules_queryset = schedules_queryset.filter(due_date__lte=range_end)
+
+    clients_created_queryset = clients_queryset
+    if range_start:
+        clients_created_queryset = clients_created_queryset.filter(create_at__date__gte=range_start)
+    if range_end:
+        clients_created_queryset = clients_created_queryset.filter(create_at__date__lte=range_end)
+
+    total_clients = clients_queryset.count()
+    new_clients_count = clients_created_queryset.count()
+    clients_with_sales_count = sales_queryset.values('client_id').distinct().count()
+    inactive_clients_count = max(total_clients - clients_with_sales_count, 0)
+    clients_with_phone_count = clients_queryset.exclude(phone_number__isnull=True).exclude(phone_number='').count()
+    clients_with_email_count = clients_queryset.exclude(email__isnull=True).exclude(email='').count()
+
+    total_revenue = sales_queryset.aggregate(total=Sum('total'))['total'] or 0
+    sales_count = sales_queryset.count()
+    average_revenue_per_client = (total_revenue / clients_with_sales_count) if clients_with_sales_count else 0
+    credit_sales_count = credit_sales_queryset.count()
+    credit_clients_count = credit_sales_queryset.values('sale__client_id').distinct().count()
+    receivables_total = credit_sales_queryset.aggregate(total=Sum('amount_remaining'))['total'] or 0
+    payments_received_total = payments_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    overdue_schedules_count = schedules_queryset.exclude(status='PAID').filter(due_date__lt=today).count()
+
+    client_bucket, client_bucket_kind = chart_bucket_for_range('create_at', range_start, range_end)
+    new_clients_rows = clients_created_queryset.annotate(bucket=client_bucket).values('bucket').annotate(
+        total_clients=Count('id')
+    ).order_by('bucket')
+    client_growth_chart = {
+        'labels': [format_bucket_label(row['bucket'], client_bucket_kind) for row in new_clients_rows],
+        'values': [int(row['total_clients'] or 0) for row in new_clients_rows],
+    }
+
+    sales_bucket, sales_bucket_kind = chart_bucket_for_range('create_at', range_start, range_end)
+    client_sales_rows = sales_queryset.annotate(bucket=sales_bucket).values('bucket').annotate(
+        total_revenue=Sum('total'),
+        total_sales=Count('id'),
+    ).order_by('bucket')
+    sales_trend_chart = {
+        'labels': [format_bucket_label(row['bucket'], sales_bucket_kind) for row in client_sales_rows],
+        'revenue': [float(row['total_revenue'] or 0) for row in client_sales_rows],
+        'sales': [int(row['total_sales'] or 0) for row in client_sales_rows],
+    }
+
+    gender_rows = list(
+        clients_queryset.values('gender').annotate(total_clients=Count('id')).order_by('-total_clients', 'gender')
+    )
+    gender_distribution_chart = {
+        'labels': [row['gender'] or 'Non renseigné' for row in gender_rows],
+        'values': [int(row['total_clients'] or 0) for row in gender_rows],
+    }
+
+    top_client_rows = list(
+        sales_queryset.values('client_id', 'client__firstname', 'client__lastname').annotate(
+            total_revenue=Sum('total'),
+            total_sales=Count('id'),
+        ).order_by('-total_revenue', '-total_sales')[:8]
+    )
+    outstanding_rows = list(
+        credit_sales_queryset.values('sale__client_id').annotate(
+            total_outstanding=Sum('amount_remaining'),
+            total_credit_sales=Count('id'),
+        )
+    )
+    payment_rows = list(
+        payments_queryset.values('credit_sale__sale__client_id').annotate(total_payments=Sum('amount'))
+    )
+    sales_activity_rows = list(
+        sales_queryset.values('client_id').annotate(
+            total_sales=Count('id'),
+            last_sale_at=Max('create_at'),
+        )
+    )
+
+    outstanding_map = {
+        row['sale__client_id']: {
+            'total_outstanding': row['total_outstanding'] or 0,
+            'total_credit_sales': int(row['total_credit_sales'] or 0),
+        }
+        for row in outstanding_rows
+    }
+    payment_map = {
+        row['credit_sale__sale__client_id']: row['total_payments'] or 0
+        for row in payment_rows
+    }
+    sales_activity_map = {
+        row['client_id']: {
+            'total_sales': int(row['total_sales'] or 0),
+            'last_sale_at': row['last_sale_at'],
+        }
+        for row in sales_activity_rows
+    }
+
+    top_clients = []
+    for row in top_client_rows:
+        client_id = row['client_id']
+        debt_data = outstanding_map.get(client_id, {})
+        top_clients.append({
+            'label': format_person_label(row['client__firstname'], row['client__lastname'], 'Client comptoir'),
+            'total_revenue': row['total_revenue'] or 0,
+            'total_sales': int(row['total_sales'] or 0),
+            'outstanding_total': debt_data.get('total_outstanding', 0),
+            'payments_total': payment_map.get(client_id, 0),
+            'credit_sales_count': debt_data.get('total_credit_sales', 0),
+        })
+
+    top_clients_chart = {
+        'labels': [row['label'] for row in top_clients],
+        'revenue': [float(row['total_revenue']) for row in top_clients],
+        'outstanding': [float(row['outstanding_total']) for row in top_clients],
+    }
+
+    recent_clients = []
+    for client in clients_queryset.order_by('-create_at', '-id')[:8]:
+        activity_data = sales_activity_map.get(client.id, {})
+        debt_data = outstanding_map.get(client.id, {})
+        has_sales = activity_data.get('total_sales', 0) > 0
+        has_debt = debt_data.get('total_outstanding', 0) > 0
+        if has_debt:
+            status_label = 'Débiteur'
+            status_class = 'warning'
+        elif has_sales:
+            status_label = 'Actif'
+            status_class = 'success'
+        else:
+            status_label = 'Inactif'
+            status_class = 'secondary'
+
+        recent_clients.append({
+            'label': client.get_full_name() or f'Client #{client.id}',
+            'phone_number': client.phone_number or '-',
+            'email': client.email or '-',
+            'gender': client.gender or 'Non renseigné',
+            'create_at': client.create_at,
+            'last_sale_at': activity_data.get('last_sale_at'),
+            'total_sales': activity_data.get('total_sales', 0),
+            'outstanding_total': debt_data.get('total_outstanding', 0),
+            'status_label': status_label,
+            'status_class': status_class,
+        })
+
+    context = {
+        'page_title': 'Statistiques clients',
+        'currency': settings_obj.currency_symbol,
+        'generated_at': timezone.now(),
+        'period_name': period_name,
+        'period_label': format_period_label(range_start, range_end),
+        'genders': genders,
+        'current_period': period,
+        'current_search': search,
+        'current_gender': gender,
+        'current_activity': activity,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'total_clients': total_clients,
+        'new_clients_count': new_clients_count,
+        'clients_with_sales_count': clients_with_sales_count,
+        'inactive_clients_count': inactive_clients_count,
+        'clients_with_phone_count': clients_with_phone_count,
+        'clients_with_email_count': clients_with_email_count,
+        'sales_count': sales_count,
+        'total_revenue': total_revenue,
+        'average_revenue_per_client': average_revenue_per_client,
+        'credit_sales_count': credit_sales_count,
+        'credit_clients_count': credit_clients_count,
+        'receivables_total': receivables_total,
+        'payments_received_total': payments_received_total,
+        'overdue_schedules_count': overdue_schedules_count,
+        'client_growth_chart': client_growth_chart,
+        'sales_trend_chart': sales_trend_chart,
+        'gender_distribution_chart': gender_distribution_chart,
+        'top_clients_chart': top_clients_chart,
+        'top_clients': top_clients,
+        'recent_clients': recent_clients,
+    }
+    return render(request, 'core/statistics_clients.html', context)
+
+
+@login_required
+@module_required('dashboard')
+def supplier_statistics(request):
+    """Vue détaillée des statistiques fournisseurs avec filtres et graphiques."""
+    from core.models.settings_models import SystemSettings
+
+    def format_period_label(start, end):
+        if start and end:
+            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+        if start:
+            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+        if end:
+            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
+        return "Toutes les données disponibles"
+
+    def chart_bucket_for_range(field_name, start, end):
+        if not start and not end:
+            return TruncMonth(field_name), 'month'
+
+        effective_end = end or timezone.localdate()
+        effective_start = start or (effective_end - timedelta(days=180))
+        span_days = max((effective_end - effective_start).days + 1, 1)
+
+        if span_days <= 31:
+            return TruncDate(field_name), 'day'
+        if span_days <= 120:
+            return TruncWeek(field_name), 'week'
+        return TruncMonth(field_name), 'month'
+
+    def format_bucket_label(bucket_value, bucket_kind):
+        if hasattr(bucket_value, 'date'):
+            bucket_date = timezone.localtime(bucket_value).date() if timezone.is_aware(bucket_value) else bucket_value.date()
+        else:
+            bucket_date = bucket_value
+
+        if bucket_kind == 'month':
+            return bucket_date.strftime('%b %Y')
+        if bucket_kind == 'week':
+            week_end = bucket_date + timedelta(days=6)
+            return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
+        return bucket_date.strftime('%d/%m')
+
+    settings_obj = SystemSettings.get_settings()
+    today = timezone.localdate()
+    payment_method_labels = dict(SupplierPayment._meta.get_field('payment_method').choices)
+
+    period = request.GET.get('period', '30d')
+    search = request.GET.get('search', '').strip()
+    activity = request.GET.get('activity', '').strip()
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    parsed_date_from = parse_date(date_from) if date_from else None
+    parsed_date_to = parse_date(date_to) if date_to else None
+
+    if parsed_date_from and parsed_date_to and parsed_date_from > parsed_date_to:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        date_from = parsed_date_from.isoformat()
+        date_to = parsed_date_to.isoformat()
+
+    period_options = {
+        '7d': ('7 derniers jours', 6),
+        '30d': ('30 derniers jours', 29),
+        '90d': ('90 derniers jours', 89),
+        '365d': ('12 derniers mois', 364),
+    }
+
+    if date_from or date_to:
+        period = 'custom'
+    elif period not in period_options:
+        period = '30d'
+
+    if period == 'custom':
+        period_name = 'Période personnalisée'
+        range_start = parsed_date_from
+        range_end = parsed_date_to
+    else:
+        period_name, days_back = period_options[period]
+        range_end = today
+        range_start = today - timedelta(days=days_back)
+
+    suppliers_queryset = Supplier.objects.filter(delete_at__isnull=True)
+    if search:
+        suppliers_queryset = suppliers_queryset.filter(
+            Q(name__icontains=search)
+            | Q(contact_phone__icontains=search)
+            | Q(contact_email__icontains=search)
+            | Q(niu__icontains=search)
+            | Q(address__icontains=search)
+        )
+    if activity == 'active':
+        suppliers_queryset = suppliers_queryset.filter(
+            supplies__isnull=False,
+            supplies__delete_at__isnull=True,
+        ).distinct()
+    elif activity == 'inactive':
+        suppliers_queryset = suppliers_queryset.exclude(
+            supplies__isnull=False,
+            supplies__delete_at__isnull=True,
+        ).distinct()
+    elif activity == 'debtors':
+        suppliers_queryset = suppliers_queryset.filter(
+            supplies__isnull=False,
+            supplies__delete_at__isnull=True,
+            supplies__credit_info__delete_at__isnull=True,
+            supplies__credit_info__amount_remaining__gt=0,
+        ).distinct()
+
+    suppliers_queryset = suppliers_queryset.distinct()
+    supplier_ids = list(suppliers_queryset.values_list('id', flat=True))
+
+    if supplier_ids:
+        supplies_queryset = Supply.objects.filter(
+            delete_at__isnull=True,
+            supplier_id__in=supplier_ids,
+        ).select_related('supplier', 'product', 'staff', 'credit_info')
+        credit_supplies_queryset = CreditSupply.objects.filter(
+            delete_at__isnull=True,
+            supply__delete_at__isnull=True,
+            supply__supplier_id__in=supplier_ids,
+        ).select_related('supply__supplier')
+        payments_queryset = SupplierPayment.objects.filter(
+            delete_at__isnull=True,
+            supplier_id__in=supplier_ids,
+        ).select_related('supplier', 'supply')
+        schedules_queryset = PaymentSchedule.objects.filter(
+            delete_at__isnull=True,
+            schedule_type='SUPPLIER',
+            credit_supply__delete_at__isnull=True,
+            credit_supply__supply__delete_at__isnull=True,
+            credit_supply__supply__supplier_id__in=supplier_ids,
+        ).select_related('credit_supply__supply__supplier')
+    else:
+        supplies_queryset = Supply.objects.none()
+        credit_supplies_queryset = CreditSupply.objects.none()
+        payments_queryset = SupplierPayment.objects.none()
+        schedules_queryset = PaymentSchedule.objects.none()
+
+    if range_start:
+        supplies_queryset = supplies_queryset.filter(create_at__date__gte=range_start)
+        payments_queryset = payments_queryset.filter(payment_date__gte=range_start)
+        schedules_queryset = schedules_queryset.filter(due_date__gte=range_start)
+    if range_end:
+        supplies_queryset = supplies_queryset.filter(create_at__date__lte=range_end)
+        payments_queryset = payments_queryset.filter(payment_date__lte=range_end)
+        schedules_queryset = schedules_queryset.filter(due_date__lte=range_end)
+
+    suppliers_created_queryset = suppliers_queryset
+    if range_start:
+        suppliers_created_queryset = suppliers_created_queryset.filter(create_at__date__gte=range_start)
+    if range_end:
+        suppliers_created_queryset = suppliers_created_queryset.filter(create_at__date__lte=range_end)
+
+    total_suppliers = suppliers_queryset.count()
+    new_suppliers_count = suppliers_created_queryset.count()
+    suppliers_with_supplies_count = supplies_queryset.values('supplier_id').distinct().count()
+    inactive_suppliers_count = max(total_suppliers - suppliers_with_supplies_count, 0)
+    suppliers_with_phone_count = suppliers_queryset.exclude(contact_phone__isnull=True).exclude(contact_phone='').count()
+    suppliers_with_email_count = suppliers_queryset.exclude(contact_email__isnull=True).exclude(contact_email='').count()
+
+    total_supplies_amount = supplies_queryset.aggregate(total=Sum('total_price'))['total'] or 0
+    supplies_count = supplies_queryset.count()
+    average_supply_per_supplier = (total_supplies_amount / suppliers_with_supplies_count) if suppliers_with_supplies_count else 0
+    credit_supplies_count = credit_supplies_queryset.count()
+    creditor_suppliers_count = credit_supplies_queryset.values('supply__supplier_id').distinct().count()
+    supplier_debt_total = credit_supplies_queryset.aggregate(total=Sum('amount_remaining'))['total'] or 0
+    supplier_payments_total = payments_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    overdue_schedules_count = schedules_queryset.exclude(status='PAID').filter(due_date__lt=today).count()
+
+    supplier_bucket, supplier_bucket_kind = chart_bucket_for_range('create_at', range_start, range_end)
+    new_suppliers_rows = suppliers_created_queryset.annotate(bucket=supplier_bucket).values('bucket').annotate(
+        total_suppliers=Count('id')
+    ).order_by('bucket')
+    supplier_growth_chart = {
+        'labels': [format_bucket_label(row['bucket'], supplier_bucket_kind) for row in new_suppliers_rows],
+        'values': [int(row['total_suppliers'] or 0) for row in new_suppliers_rows],
+    }
+
+    supplies_bucket, supplies_bucket_kind = chart_bucket_for_range('create_at', range_start, range_end)
+    supplies_rows = supplies_queryset.annotate(bucket=supplies_bucket).values('bucket').annotate(
+        total_amount=Sum('total_price'),
+        total_supplies=Count('id'),
+    ).order_by('bucket')
+    supplies_trend_chart = {
+        'labels': [format_bucket_label(row['bucket'], supplies_bucket_kind) for row in supplies_rows],
+        'amounts': [float(row['total_amount'] or 0) for row in supplies_rows],
+        'supplies': [int(row['total_supplies'] or 0) for row in supplies_rows],
+    }
+
+    payment_method_rows = list(
+        payments_queryset.values('payment_method').annotate(
+            total_amount=Sum('amount'),
+            total_payments=Count('id'),
+        ).order_by('-total_amount', 'payment_method')
+    )
+    payment_methods_chart = {
+        'labels': [payment_method_labels.get(row['payment_method'], row['payment_method']) for row in payment_method_rows],
+        'values': [float(row['total_amount'] or 0) for row in payment_method_rows],
+    }
+
+    top_supplier_rows = list(
+        supplies_queryset.values('supplier_id', 'supplier__name').annotate(
+            total_amount=Sum('total_price'),
+            total_supplies=Count('id'),
+        ).order_by('-total_amount', '-total_supplies')[:8]
+    )
+    outstanding_rows = list(
+        credit_supplies_queryset.values('supply__supplier_id').annotate(
+            total_outstanding=Sum('amount_remaining'),
+            total_credit_supplies=Count('id'),
+        )
+    )
+    payment_rows = list(
+        payments_queryset.values('supplier_id').annotate(total_payments=Sum('amount'))
+    )
+    supplies_activity_rows = list(
+        supplies_queryset.values('supplier_id').annotate(
+            total_supplies=Count('id'),
+            last_supply_at=Max('create_at'),
+        )
+    )
+    overdue_rows = list(
+        schedules_queryset.exclude(status='PAID').values('credit_supply__supply__supplier_id').annotate(
+            total_overdue=Count('id')
+        )
+    )
+
+    outstanding_map = {
+        row['supply__supplier_id']: {
+            'total_outstanding': row['total_outstanding'] or 0,
+            'total_credit_supplies': int(row['total_credit_supplies'] or 0),
+        }
+        for row in outstanding_rows
+    }
+    payment_map = {
+        row['supplier_id']: row['total_payments'] or 0
+        for row in payment_rows
+    }
+    supplies_activity_map = {
+        row['supplier_id']: {
+            'total_supplies': int(row['total_supplies'] or 0),
+            'last_supply_at': row['last_supply_at'],
+        }
+        for row in supplies_activity_rows
+    }
+    overdue_map = {
+        row['credit_supply__supply__supplier_id']: int(row['total_overdue'] or 0)
+        for row in overdue_rows
+    }
+
+    top_suppliers = []
+    for row in top_supplier_rows:
+        supplier_id = row['supplier_id']
+        debt_data = outstanding_map.get(supplier_id, {})
+        top_suppliers.append({
+            'label': row['supplier__name'] or f'Fournisseur #{supplier_id}',
+            'total_amount': row['total_amount'] or 0,
+            'total_supplies': int(row['total_supplies'] or 0),
+            'outstanding_total': debt_data.get('total_outstanding', 0),
+            'payments_total': payment_map.get(supplier_id, 0),
+            'credit_supplies_count': debt_data.get('total_credit_supplies', 0),
+            'overdue_count': overdue_map.get(supplier_id, 0),
+        })
+
+    top_suppliers_chart = {
+        'labels': [row['label'] for row in top_suppliers],
+        'amounts': [float(row['total_amount']) for row in top_suppliers],
+        'outstanding': [float(row['outstanding_total']) for row in top_suppliers],
+    }
+
+    recent_suppliers = []
+    for supplier in suppliers_queryset.order_by('-create_at', '-id')[:8]:
+        activity_data = supplies_activity_map.get(supplier.id, {})
+        debt_data = outstanding_map.get(supplier.id, {})
+        has_supplies = activity_data.get('total_supplies', 0) > 0
+        has_debt = debt_data.get('total_outstanding', 0) > 0
+        if has_debt:
+            status_label = 'À régler'
+            status_class = 'warning'
+        elif has_supplies:
+            status_label = 'Actif'
+            status_class = 'success'
+        else:
+            status_label = 'Inactif'
+            status_class = 'secondary'
+
+        recent_suppliers.append({
+            'label': supplier.name or f'Fournisseur #{supplier.id}',
+            'phone_number': supplier.contact_phone or '-',
+            'email': supplier.contact_email or '-',
+            'niu': supplier.niu or '-',
+            'create_at': supplier.create_at,
+            'last_supply_at': activity_data.get('last_supply_at'),
+            'total_supplies': activity_data.get('total_supplies', 0),
+            'outstanding_total': debt_data.get('total_outstanding', 0),
+            'overdue_count': overdue_map.get(supplier.id, 0),
+            'status_label': status_label,
+            'status_class': status_class,
+        })
+
+    context = {
+        'page_title': 'Statistiques fournisseurs',
+        'currency': settings_obj.currency_symbol,
+        'generated_at': timezone.now(),
+        'period_name': period_name,
+        'period_label': format_period_label(range_start, range_end),
+        'current_period': period,
+        'current_search': search,
+        'current_activity': activity,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'total_suppliers': total_suppliers,
+        'new_suppliers_count': new_suppliers_count,
+        'suppliers_with_supplies_count': suppliers_with_supplies_count,
+        'inactive_suppliers_count': inactive_suppliers_count,
+        'suppliers_with_phone_count': suppliers_with_phone_count,
+        'suppliers_with_email_count': suppliers_with_email_count,
+        'supplies_count': supplies_count,
+        'total_supplies_amount': total_supplies_amount,
+        'average_supply_per_supplier': average_supply_per_supplier,
+        'credit_supplies_count': credit_supplies_count,
+        'creditor_suppliers_count': creditor_suppliers_count,
+        'supplier_debt_total': supplier_debt_total,
+        'supplier_payments_total': supplier_payments_total,
+        'overdue_schedules_count': overdue_schedules_count,
+        'supplier_growth_chart': supplier_growth_chart,
+        'supplies_trend_chart': supplies_trend_chart,
+        'payment_methods_chart': payment_methods_chart,
+        'top_suppliers_chart': top_suppliers_chart,
+        'top_suppliers': top_suppliers,
+        'recent_suppliers': recent_suppliers,
+    }
+    return render(request, 'core/statistics_suppliers.html', context)
+
+
+@login_required
+@module_required('dashboard')
+def supply_statistics(request):
+    """Vue détaillée des statistiques approvisionnements avec filtres et graphiques."""
+    from core.models.settings_models import SystemSettings
+
+    def format_period_label(start, end):
+        if start and end:
+            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+        if start:
+            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+        if end:
+            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
+        return "Toutes les données disponibles"
+
+    def chart_bucket_for_range(field_name, start, end):
+        if not start and not end:
+            return TruncMonth(field_name), 'month'
+
+        effective_end = end or timezone.localdate()
+        effective_start = start or (effective_end - timedelta(days=180))
+        span_days = max((effective_end - effective_start).days + 1, 1)
+
+        if span_days <= 31:
+            return TruncDate(field_name), 'day'
+        if span_days <= 120:
+            return TruncWeek(field_name), 'week'
+        return TruncMonth(field_name), 'month'
+
+    def format_bucket_label(bucket_value, bucket_kind):
+        if hasattr(bucket_value, 'date'):
+            bucket_date = timezone.localtime(bucket_value).date() if timezone.is_aware(bucket_value) else bucket_value.date()
+        else:
+            bucket_date = bucket_value
+
+        if bucket_kind == 'month':
+            return bucket_date.strftime('%b %Y')
+        if bucket_kind == 'week':
+            week_end = bucket_date + timedelta(days=6)
+            return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
+        return bucket_date.strftime('%d/%m')
+
+    def format_person_label(firstname, lastname, username):
+        full_name = f"{firstname or ''} {lastname or ''}".strip()
+        return full_name or username or 'Non assigné'
+
+    settings_obj = SystemSettings.get_settings()
+    today = timezone.localdate()
+
+    period = request.GET.get('period', '30d')
+    search = request.GET.get('search', '').strip()
+    supplier_id = request.GET.get('supplier', '').strip()
+    staff_id = request.GET.get('staff', '').strip()
+    supply_type = request.GET.get('type', '').strip()
+    payment_status = request.GET.get('status', '').strip()
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    parsed_date_from = parse_date(date_from) if date_from else None
+    parsed_date_to = parse_date(date_to) if date_to else None
+
+    if parsed_date_from and parsed_date_to and parsed_date_from > parsed_date_to:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        date_from = parsed_date_from.isoformat()
+        date_to = parsed_date_to.isoformat()
+
+    period_options = {
+        '7d': ('7 derniers jours', 6),
+        '30d': ('30 derniers jours', 29),
+        '90d': ('90 derniers jours', 89),
+        '365d': ('12 derniers mois', 364),
+    }
+
+    if date_from or date_to:
+        period = 'custom'
+    elif period not in period_options:
+        period = '30d'
+
+    if period == 'custom':
+        period_name = 'Période personnalisée'
+        range_start = parsed_date_from
+        range_end = parsed_date_to
+    else:
+        period_name, days_back = period_options[period]
+        range_end = today
+        range_start = today - timedelta(days=days_back)
+
+    suppliers = Supplier.objects.filter(delete_at__isnull=True).order_by('name')
+    staff_members = CustomUser.objects.filter(delete_at__isnull=True).order_by('firstname', 'lastname', 'username')
+
+    supplies_queryset = Supply.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('supplier', 'product', 'staff', 'credit_info')
+
+    if search:
+        supplies_queryset = supplies_queryset.filter(
+            Q(product__name__icontains=search)
+            | Q(product__code__icontains=search)
+            | Q(supplier__name__icontains=search)
+            | Q(staff__firstname__icontains=search)
+            | Q(staff__lastname__icontains=search)
+            | Q(staff__username__icontains=search)
+        )
+    if supplier_id:
+        supplies_queryset = supplies_queryset.filter(supplier_id=supplier_id)
+    if staff_id:
+        supplies_queryset = supplies_queryset.filter(staff_id=staff_id)
+    if supply_type == 'cash':
+        supplies_queryset = supplies_queryset.filter(is_credit=False)
+    elif supply_type == 'credit':
+        supplies_queryset = supplies_queryset.filter(is_credit=True)
+    if payment_status == 'paid':
+        supplies_queryset = supplies_queryset.filter(is_paid=True)
+    elif payment_status == 'unpaid':
+        supplies_queryset = supplies_queryset.filter(is_paid=False)
+    if range_start:
+        supplies_queryset = supplies_queryset.filter(create_at__date__gte=range_start)
+    if range_end:
+        supplies_queryset = supplies_queryset.filter(create_at__date__lte=range_end)
+
+    supplies_queryset = supplies_queryset.order_by('-create_at', '-id')
+    supply_ids = list(supplies_queryset.values_list('id', flat=True))
+
+    if supply_ids:
+        credit_supplies_queryset = CreditSupply.objects.filter(
+            delete_at__isnull=True,
+            supply__delete_at__isnull=True,
+            supply_id__in=supply_ids,
+        ).select_related('supply__supplier', 'supply__product')
+        schedules_queryset = PaymentSchedule.objects.filter(
+            delete_at__isnull=True,
+            schedule_type='SUPPLIER',
+            credit_supply__delete_at__isnull=True,
+            credit_supply__supply__delete_at__isnull=True,
+            credit_supply__supply_id__in=supply_ids,
+        ).select_related('credit_supply__supply__supplier')
+    else:
+        credit_supplies_queryset = CreditSupply.objects.none()
+        schedules_queryset = PaymentSchedule.objects.none()
+
+    supplies_count = supplies_queryset.count()
+    total_supplies_amount = supplies_queryset.aggregate(total=Sum('total_price'))['total'] or 0
+    total_quantity = supplies_queryset.aggregate(total=Sum('quantity'))['total'] or 0
+    average_supply_amount = (total_supplies_amount / supplies_count) if supplies_count else 0
+    suppliers_count = supplies_queryset.exclude(supplier__isnull=True).values('supplier_id').distinct().count()
+    products_count = supplies_queryset.values('product_id').distinct().count()
+    staff_count = supplies_queryset.exclude(staff__isnull=True).values('staff_id').distinct().count()
+    credit_supplies_count = supplies_queryset.filter(is_credit=True).count()
+    cash_supplies_count = max(supplies_count - credit_supplies_count, 0)
+    paid_supplies_count = supplies_queryset.filter(is_paid=True).count()
+    unpaid_supplies_count = supplies_queryset.filter(is_paid=False).count()
+    paid_supplies_amount = supplies_queryset.filter(is_paid=True).aggregate(total=Sum('total_price'))['total'] or 0
+    unpaid_supplies_amount = supplies_queryset.filter(is_paid=False).aggregate(total=Sum('total_price'))['total'] or 0
+    outstanding_total = credit_supplies_queryset.aggregate(total=Sum('amount_remaining'))['total'] or 0
+    overdue_schedules_count = schedules_queryset.exclude(status='PAID').filter(due_date__lt=today).count()
+
+    supplies_bucket, supplies_bucket_kind = chart_bucket_for_range('create_at', range_start, range_end)
+    supplies_rows = supplies_queryset.annotate(bucket=supplies_bucket).values('bucket').annotate(
+        total_amount=Sum('total_price'),
+        total_quantity=Sum('quantity'),
+        total_supplies=Count('id'),
+    ).order_by('bucket')
+    supplies_trend_chart = {
+        'labels': [format_bucket_label(row['bucket'], supplies_bucket_kind) for row in supplies_rows],
+        'amounts': [float(row['total_amount'] or 0) for row in supplies_rows],
+        'quantities': [int(row['total_quantity'] or 0) for row in supplies_rows],
+        'supplies': [int(row['total_supplies'] or 0) for row in supplies_rows],
+    }
+
+    payment_status_chart = {
+        'labels': ['Payés', 'Non payés'],
+        'values': [paid_supplies_count, unpaid_supplies_count],
+    }
+
+    supply_type_chart = {
+        'labels': ['Comptant', 'Crédit'],
+        'values': [cash_supplies_count, credit_supplies_count],
+    }
+
+    top_product_rows = list(
+        supplies_queryset.values(
+            'product_id',
+            'product__code',
+            'product__name',
+        ).annotate(
+            total_quantity=Sum('quantity'),
+            total_amount=Sum('total_price'),
+            total_supplies=Count('id'),
+            total_suppliers=Count('supplier_id', distinct=True),
+        ).order_by('-total_amount', '-total_quantity', 'product__name')[:8]
+    )
+    top_products_chart = {
+        'labels': [row['product__name'] or f"Produit #{row['product_id']}" for row in top_product_rows],
+        'amounts': [float(row['total_amount'] or 0) for row in top_product_rows],
+        'quantities': [int(row['total_quantity'] or 0) for row in top_product_rows],
+    }
+
+    top_supplier_rows = list(
+        supplies_queryset.values('supplier_id', 'supplier__name').annotate(
+            total_amount=Sum('total_price'),
+            total_quantity=Sum('quantity'),
+            total_supplies=Count('id'),
+        ).order_by('-total_amount', '-total_quantity', 'supplier__name')[:8]
+    )
+    outstanding_rows = list(
+        credit_supplies_queryset.values('supply__supplier_id').annotate(
+            total_outstanding=Sum('amount_remaining'),
+        )
+    )
+    outstanding_map = {
+        row['supply__supplier_id']: row['total_outstanding'] or 0
+        for row in outstanding_rows
+    }
+
+    top_suppliers = []
+    for row in top_supplier_rows:
+        supplier_key = row['supplier_id']
+        top_suppliers.append({
+            'label': row['supplier__name'] or 'Sans fournisseur',
+            'total_supplies': int(row['total_supplies'] or 0),
+            'total_quantity': int(row['total_quantity'] or 0),
+            'total_amount': row['total_amount'] or 0,
+            'outstanding_total': outstanding_map.get(supplier_key, 0),
+        })
+
+    recent_supplies = list(supplies_queryset[:8])
+
+    context = {
+        'page_title': 'Statistiques approvisionnements',
+        'currency': settings_obj.currency_symbol,
+        'generated_at': timezone.now(),
+        'period_name': period_name,
+        'period_label': format_period_label(range_start, range_end),
+        'suppliers': suppliers,
+        'staff_members': staff_members,
+        'current_period': period,
+        'current_search': search,
+        'current_supplier': supplier_id,
+        'current_staff': staff_id,
+        'current_type': supply_type,
+        'current_status': payment_status,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'supplies_count': supplies_count,
+        'total_supplies_amount': total_supplies_amount,
+        'total_quantity': total_quantity,
+        'average_supply_amount': average_supply_amount,
+        'suppliers_count': suppliers_count,
+        'products_count': products_count,
+        'staff_count': staff_count,
+        'credit_supplies_count': credit_supplies_count,
+        'cash_supplies_count': cash_supplies_count,
+        'paid_supplies_count': paid_supplies_count,
+        'unpaid_supplies_count': unpaid_supplies_count,
+        'paid_supplies_amount': paid_supplies_amount,
+        'unpaid_supplies_amount': unpaid_supplies_amount,
+        'outstanding_total': outstanding_total,
+        'overdue_schedules_count': overdue_schedules_count,
+        'supplies_trend_chart': supplies_trend_chart,
+        'payment_status_chart': payment_status_chart,
+        'supply_type_chart': supply_type_chart,
+        'top_products_chart': top_products_chart,
+        'top_products': top_product_rows,
+        'top_suppliers': top_suppliers,
+        'recent_supplies': recent_supplies,
+        'format_person_label': format_person_label,
+    }
+    return render(request, 'core/statistics_supplies.html', context)
+
+
+@login_required
+@module_required('dashboard')
+def expense_statistics(request):
+    """Vue détaillée des statistiques dépenses et recettes avec filtres et graphiques."""
+    from core.models.settings_models import SystemSettings
+
+    def format_period_label(start, end):
+        if start and end:
+            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+        if start:
+            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+        if end:
+            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
+        return "Toutes les données disponibles"
+
+    def chart_bucket_for_range(field_name, start, end):
+        if not start and not end:
+            return TruncMonth(field_name), 'month'
+
+        effective_end = end or timezone.localdate()
+        effective_start = start or (effective_end - timedelta(days=180))
+        span_days = max((effective_end - effective_start).days + 1, 1)
+
+        if span_days <= 31:
+            return TruncDate(field_name), 'day'
+        if span_days <= 120:
+            return TruncWeek(field_name), 'week'
+        return TruncMonth(field_name), 'month'
+
+    def format_bucket_label(bucket_value, bucket_kind):
+        if hasattr(bucket_value, 'date'):
+            bucket_date = timezone.localtime(bucket_value).date() if timezone.is_aware(bucket_value) else bucket_value.date()
+        else:
+            bucket_date = bucket_value
+
+        if bucket_kind == 'month':
+            return bucket_date.strftime('%b %Y')
+        if bucket_kind == 'week':
+            week_end = bucket_date + timedelta(days=6)
+            return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
+        return bucket_date.strftime('%d/%m')
+
+    def format_person_label(firstname, lastname, username):
+        full_name = f"{firstname or ''} {lastname or ''}".strip()
+        return full_name or username or 'Non assigné'
+
+    settings_obj = SystemSettings.get_settings()
+    today = timezone.localdate()
+
+    period = request.GET.get('period', '30d')
+    search = request.GET.get('search', '').strip()
+    staff_id = request.GET.get('staff', '').strip()
+    expense_type_id = request.GET.get('expense_type', '').strip()
+    recipe_type_id = request.GET.get('recipe_type', '').strip()
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+
+    parsed_date_from = parse_date(date_from) if date_from else None
+    parsed_date_to = parse_date(date_to) if date_to else None
+
+    if parsed_date_from and parsed_date_to and parsed_date_from > parsed_date_to:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        date_from = parsed_date_from.isoformat()
+        date_to = parsed_date_to.isoformat()
+
+    period_options = {
+        '7d': ('7 derniers jours', 6),
+        '30d': ('30 derniers jours', 29),
+        '90d': ('90 derniers jours', 89),
+        '365d': ('12 derniers mois', 364),
+    }
+
+    if date_from or date_to:
+        period = 'custom'
+    elif period not in period_options:
+        period = '30d'
+
+    if period == 'custom':
+        period_name = 'Période personnalisée'
+        range_start = parsed_date_from
+        range_end = parsed_date_to
+    else:
+        period_name, days_back = period_options[period]
+        range_end = today
+        range_start = today - timedelta(days=days_back)
+
+    staff_members = CustomUser.objects.filter(delete_at__isnull=True).order_by('firstname', 'lastname', 'username')
+    expense_types = ExpenseType.objects.filter(delete_at__isnull=True).order_by('name')
+    recipe_types = RecipeType.objects.filter(delete_at__isnull=True).order_by('name')
+
+    expenses_queryset = DailyExpense.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('expense_type', 'staff', 'daily', 'exercise', 'account')
+    recipes_queryset = DailyRecipe.objects.filter(
+        delete_at__isnull=True,
+    ).select_related('recipe_type', 'staff', 'daily', 'exercise', 'account')
+
+    if search:
+        expenses_queryset = expenses_queryset.filter(
+            Q(description__icontains=search)
+            | Q(expense_type__name__icontains=search)
+            | Q(staff__firstname__icontains=search)
+            | Q(staff__lastname__icontains=search)
+            | Q(staff__username__icontains=search)
+            | Q(account__code__icontains=search)
+        )
+        recipes_queryset = recipes_queryset.filter(
+            Q(description__icontains=search)
+            | Q(recipe_type__name__icontains=search)
+            | Q(staff__firstname__icontains=search)
+            | Q(staff__lastname__icontains=search)
+            | Q(staff__username__icontains=search)
+            | Q(account__code__icontains=search)
+        )
+    if staff_id:
+        expenses_queryset = expenses_queryset.filter(staff_id=staff_id)
+        recipes_queryset = recipes_queryset.filter(staff_id=staff_id)
+    if expense_type_id:
+        expenses_queryset = expenses_queryset.filter(expense_type_id=expense_type_id)
+    if recipe_type_id:
+        recipes_queryset = recipes_queryset.filter(recipe_type_id=recipe_type_id)
+    if range_start:
+        expenses_queryset = expenses_queryset.filter(create_at__date__gte=range_start)
+        recipes_queryset = recipes_queryset.filter(create_at__date__gte=range_start)
+    if range_end:
+        expenses_queryset = expenses_queryset.filter(create_at__date__lte=range_end)
+        recipes_queryset = recipes_queryset.filter(create_at__date__lte=range_end)
+
+    expenses_queryset = expenses_queryset.order_by('-create_at', '-id')
+    recipes_queryset = recipes_queryset.order_by('-create_at', '-id')
+
+    expenses_count = expenses_queryset.count()
+    recipes_count = recipes_queryset.count()
+    operations_count = expenses_count + recipes_count
+    total_expenses = expenses_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    total_recipes = recipes_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    net_result = total_recipes - total_expenses
+    average_expense_amount = total_expenses / expenses_count if expenses_count else 0
+    average_recipe_amount = total_recipes / recipes_count if recipes_count else 0
+    expense_types_count = expenses_queryset.exclude(expense_type__isnull=True).values('expense_type_id').distinct().count()
+    recipe_types_count = recipes_queryset.exclude(recipe_type__isnull=True).values('recipe_type_id').distinct().count()
+    staff_ids = set(expenses_queryset.exclude(staff__isnull=True).values_list('staff_id', flat=True))
+    staff_ids.update(recipes_queryset.exclude(staff__isnull=True).values_list('staff_id', flat=True))
+    staff_count = len(staff_ids)
+
+    flow_bucket, flow_bucket_kind = chart_bucket_for_range('create_at', range_start, range_end)
+    expense_rows = expenses_queryset.annotate(bucket=flow_bucket).values('bucket').annotate(
+        total_amount=Sum('amount'),
+        total_operations=Count('id'),
+    ).order_by('bucket')
+    recipe_rows = recipes_queryset.annotate(bucket=flow_bucket).values('bucket').annotate(
+        total_amount=Sum('amount'),
+        total_operations=Count('id'),
+    ).order_by('bucket')
+
+    bucket_map = {}
+    for row in expense_rows:
+        bucket_map[row['bucket']] = {
+            'expenses': float(row['total_amount'] or 0),
+            'recipes': 0.0,
+            'operations': int(row['total_operations'] or 0),
+        }
+    for row in recipe_rows:
+        bucket_data = bucket_map.setdefault(row['bucket'], {
+            'expenses': 0.0,
+            'recipes': 0.0,
+            'operations': 0,
+        })
+        bucket_data['recipes'] = float(row['total_amount'] or 0)
+        bucket_data['operations'] += int(row['total_operations'] or 0)
+
+    ordered_buckets = sorted(bucket_map.keys())
+    financial_trend_chart = {
+        'labels': [format_bucket_label(bucket, flow_bucket_kind) for bucket in ordered_buckets],
+        'expenses': [bucket_map[bucket]['expenses'] for bucket in ordered_buckets],
+        'recipes': [bucket_map[bucket]['recipes'] for bucket in ordered_buckets],
+        'net': [bucket_map[bucket]['recipes'] - bucket_map[bucket]['expenses'] for bucket in ordered_buckets],
+        'operations': [bucket_map[bucket]['operations'] for bucket in ordered_buckets],
+    }
+
+    top_expense_types = [
+        {
+            'label': row['expense_type__name'] or 'Sans type',
+            'total_amount': row['total_amount'] or 0,
+            'total_operations': int(row['total_operations'] or 0),
+        }
+        for row in expenses_queryset.values('expense_type__name').annotate(
+            total_amount=Sum('amount'),
+            total_operations=Count('id'),
+        ).order_by('-total_amount', '-total_operations', 'expense_type__name')[:8]
+    ]
+    top_recipe_types = [
+        {
+            'label': row['recipe_type__name'] or 'Sans type',
+            'total_amount': row['total_amount'] or 0,
+            'total_operations': int(row['total_operations'] or 0),
+        }
+        for row in recipes_queryset.values('recipe_type__name').annotate(
+            total_amount=Sum('amount'),
+            total_operations=Count('id'),
+        ).order_by('-total_amount', '-total_operations', 'recipe_type__name')[:8]
+    ]
+
+    expense_types_chart = {
+        'labels': [row['label'] for row in top_expense_types],
+        'values': [float(row['total_amount'] or 0) for row in top_expense_types],
+    }
+    recipe_types_chart = {
+        'labels': [row['label'] for row in top_recipe_types],
+        'values': [float(row['total_amount'] or 0) for row in top_recipe_types],
+    }
+
+    staff_map = {}
+    for row in expenses_queryset.values(
+        'staff_id', 'staff__firstname', 'staff__lastname', 'staff__username',
+    ).annotate(total_amount=Sum('amount'), total_operations=Count('id')):
+        staff_key = row['staff_id'] if row['staff_id'] is not None else 'unassigned'
+        staff_map[staff_key] = {
+            'label': format_person_label(row['staff__firstname'], row['staff__lastname'], row['staff__username']),
+            'expense_total': row['total_amount'] or 0,
+            'recipe_total': 0,
+            'operations': int(row['total_operations'] or 0),
+        }
+    for row in recipes_queryset.values(
+        'staff_id', 'staff__firstname', 'staff__lastname', 'staff__username',
+    ).annotate(total_amount=Sum('amount'), total_operations=Count('id')):
+        staff_key = row['staff_id'] if row['staff_id'] is not None else 'unassigned'
+        staff_entry = staff_map.setdefault(staff_key, {
+            'label': format_person_label(row['staff__firstname'], row['staff__lastname'], row['staff__username']),
+            'expense_total': 0,
+            'recipe_total': 0,
+            'operations': 0,
+        })
+        staff_entry['recipe_total'] = row['total_amount'] or 0
+        staff_entry['operations'] += int(row['total_operations'] or 0)
+
+    top_staff = sorted(
+        [
+            {
+                **row,
+                'total_flow': (row['expense_total'] or 0) + (row['recipe_total'] or 0),
+            }
+            for row in staff_map.values()
+        ],
+        key=lambda row: (row['total_flow'], row['recipe_total'], row['expense_total'], row['operations']),
+        reverse=True,
+    )[:8]
+    staff_balance_chart = {
+        'labels': [row['label'] for row in top_staff],
+        'expenses': [float(row['expense_total'] or 0) for row in top_staff],
+        'recipes': [float(row['recipe_total'] or 0) for row in top_staff],
+    }
+
+    recent_operations = []
+    for expense in expenses_queryset[:6]:
+        recent_operations.append({
+            'kind': 'expense',
+            'kind_label': 'Dépense',
+            'type_label': expense.expense_type.name if expense.expense_type else 'Sans type',
+            'description': expense.description or '-',
+            'staff_label': format_person_label(
+                getattr(expense.staff, 'firstname', None),
+                getattr(expense.staff, 'lastname', None),
+                getattr(expense.staff, 'username', None),
+            ),
+            'date': expense.create_at,
+            'amount': expense.amount,
+        })
+    for recipe in recipes_queryset[:6]:
+        recent_operations.append({
+            'kind': 'recipe',
+            'kind_label': 'Recette',
+            'type_label': recipe.recipe_type.name if recipe.recipe_type else 'Sans type',
+            'description': recipe.description or '-',
+            'staff_label': format_person_label(
+                getattr(recipe.staff, 'firstname', None),
+                getattr(recipe.staff, 'lastname', None),
+                getattr(recipe.staff, 'username', None),
+            ),
+            'date': recipe.create_at,
+            'amount': recipe.amount,
+        })
+    recent_operations.sort(key=lambda row: row['date'] or timezone.now(), reverse=True)
+    recent_operations = recent_operations[:10]
+
+    context = {
+        'page_title': 'Statistiques dépenses & recettes',
+        'currency': settings_obj.currency_symbol,
+        'generated_at': timezone.now(),
+        'period_name': period_name,
+        'period_label': format_period_label(range_start, range_end),
+        'staff_members': staff_members,
+        'expense_types': expense_types,
+        'recipe_types': recipe_types,
+        'current_period': period,
+        'current_search': search,
+        'current_staff': staff_id,
+        'current_expense_type': expense_type_id,
+        'current_recipe_type': recipe_type_id,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'expenses_count': expenses_count,
+        'recipes_count': recipes_count,
+        'operations_count': operations_count,
+        'total_expenses': total_expenses,
+        'total_recipes': total_recipes,
+        'net_result': net_result,
+        'average_expense_amount': average_expense_amount,
+        'average_recipe_amount': average_recipe_amount,
+        'expense_types_count': expense_types_count,
+        'recipe_types_count': recipe_types_count,
+        'staff_count': staff_count,
+        'financial_trend_chart': financial_trend_chart,
+        'expense_types_chart': expense_types_chart,
+        'recipe_types_chart': recipe_types_chart,
+        'staff_balance_chart': staff_balance_chart,
+        'top_expense_types': top_expense_types,
+        'top_recipe_types': top_recipe_types,
+        'top_staff': top_staff,
+        'recent_operations': recent_operations,
+    }
+    return render(request, 'core/statistics_expenses.html', context)
+
+
+@login_required
+@module_required('dashboard')
 def personnel_statistics(request):
     """Vue détaillée des statistiques personnel avec filtres et graphiques."""
     from core.models.settings_models import SystemSettings, AppModule
@@ -1251,6 +2512,7 @@ def sales(request):
             queryset = SaleProduct.objects.filter(
                 delete_at__isnull=True,
                 sale__daily=current_daily,
+                sale__delete_at__isnull=True,
             ).select_related('sale', 'sale__client', 'sale__staff', 'product', 'product__category')
             
             # Filtre recherche (produit, client, vendeur, ID vente)
@@ -1365,9 +2627,11 @@ def sales_history(request):
 
         # Filtre statut paiement
         if payment_status == 'paid':
-            queryset = queryset.filter(sale__is_paid=True)
+            queryset = queryset.filter(sale__delete_at__isnull=True, sale__is_paid=True)
         elif payment_status == 'unpaid':
-            queryset = queryset.filter(sale__is_paid=False)
+            queryset = queryset.filter(sale__delete_at__isnull=True, sale__is_paid=False)
+        elif payment_status == 'cancelled':
+            queryset = queryset.filter(sale__delete_at__isnull=False)
 
         # Filtre dates
         if date_from:
@@ -1404,15 +2668,18 @@ def sales_history(request):
             'current_status': payment_status,
             'current_date_from': date_from,
             'current_date_to': date_to,
+            'current_full_path': request.get_full_path(),
+            'payment_method_choices': PAYMENT_METHOD_CHOICES,
             'total_count': paginator.count,
             'total_sales_amount': total_products_amount,
         }
         return render(request, 'core/sales_history.html', context)
 
     # Mode ventes par défaut (existing code)
-    queryset = Sale.objects.filter(
-        delete_at__isnull=True,
-    ).select_related('client', 'staff', 'daily', 'credit_info')
+    queryset = Sale.objects.select_related('client', 'staff', 'daily', 'credit_info').prefetch_related(
+        'sale_products__product',
+        'sale_returns',
+    )
 
     # Filtre recherche (client, vendeur, montant, ID)
     if search:
@@ -1440,9 +2707,11 @@ def sales_history(request):
 
     # Filtre statut paiement
     if payment_status == 'paid':
-        queryset = queryset.filter(is_paid=True)
+        queryset = queryset.filter(delete_at__isnull=True, is_paid=True)
     elif payment_status == 'unpaid':
-        queryset = queryset.filter(is_paid=False)
+        queryset = queryset.filter(delete_at__isnull=True, is_paid=False)
+    elif payment_status == 'cancelled':
+        queryset = queryset.filter(delete_at__isnull=False)
 
     # Filtre dates
     if date_from:
@@ -1476,10 +2745,182 @@ def sales_history(request):
         'current_status': payment_status,
         'current_date_from': date_from,
         'current_date_to': date_to,
+        'current_full_path': request.get_full_path(),
+        'payment_method_choices': PAYMENT_METHOD_CHOICES,
         'total_count': paginator.count,
         'total_sales_amount': total_sales_amount,
     }
     return render(request, 'core/sales_history.html', context)
+
+
+@login_required
+@module_required('sales')
+@require_POST
+def cancel_sale(request, sale_id):
+    """Annulation totale d'une vente depuis l'historique."""
+    sale = get_object_or_404(
+        Sale.objects.select_related('client', 'staff', 'daily', 'daily__exercise', 'credit_info'),
+        id=sale_id,
+    )
+    form = SaleCancellationForm(request.POST, sale=sale)
+    redirect_to = request.POST.get('next') or 'sales_history'
+
+    if form.is_valid():
+        try:
+            refund_amount = SaleService.cancel_sale(
+                sale=sale,
+                reason=form.cleaned_data['reason'],
+                refund_payment_method=form.cleaned_data['refund_payment_method'],
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+        else:
+            if refund_amount > 0:
+                messages.success(
+                    request,
+                    f'Vente #{sale.id} annulée. Remboursement tracé : {refund_amount:,.0f} FCFA.'
+                )
+            else:
+                messages.success(
+                    request,
+                    f'Vente #{sale.id} annulée. Aucune sortie de trésorerie n\'était nécessaire.'
+                )
+    else:
+        error_text = ' '.join(
+            ' '.join(errors) for errors in form.errors.values()
+        )
+        messages.error(request, error_text or "Impossible d'annuler la vente.")
+
+    return redirect(redirect_to)
+
+
+@login_required
+@module_required('sales')
+@require_POST
+def partial_return_sale(request, sale_id):
+    """Retour partiel d'une vente depuis l'historique."""
+    sale = get_object_or_404(
+        Sale.objects.select_related('client', 'staff', 'daily', 'daily__exercise', 'credit_info'),
+        id=sale_id,
+    )
+    form = SalePartialReturnForm(request.POST, sale=sale)
+    redirect_to = request.POST.get('next') or 'sales_history'
+
+    if form.is_valid():
+        try:
+            sale_return, refund_amount = SaleService.partial_return_sale(
+                sale=sale,
+                returned_items=form.cleaned_data['returned_items'],
+                reason=form.cleaned_data['reason'],
+                refund_payment_method=form.cleaned_data['refund_payment_method'],
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+        else:
+            if refund_amount > 0:
+                messages.success(
+                    request,
+                    f'Retour partiel enregistré sur la vente #{sale.id} '
+                    f'({sale_return.total:,.0f} FCFA). Remboursement tracé : {refund_amount:,.0f} FCFA.'
+                )
+            else:
+                messages.success(
+                    request,
+                    f'Retour partiel enregistré sur la vente #{sale.id} '
+                    f'({sale_return.total:,.0f} FCFA). Aucune sortie de trésorerie supplémentaire n\'était nécessaire.'
+                )
+    else:
+        error_text = ' '.join(
+            ' '.join(errors) for errors in form.errors.values()
+        )
+        messages.error(request, error_text or "Impossible d'enregistrer le retour partiel.")
+
+    return redirect(redirect_to)
+
+
+@login_required
+@module_required('supplies')
+@require_POST
+def cancel_supply(request, supply_id):
+    """Annulation totale d'un approvisionnement depuis l'historique."""
+    supply = get_object_or_404(
+        Supply.objects.select_related('product', 'supplier', 'staff', 'daily', 'daily__exercise', 'credit_info'),
+        id=supply_id,
+    )
+    form = SupplyCancellationForm(request.POST, supply=supply)
+    redirect_to = request.POST.get('next') or 'supplies'
+
+    if form.is_valid():
+        try:
+            refund_amount = SupplyService.cancel_supply(
+                supply=supply,
+                reason=form.cleaned_data['reason'],
+                refund_payment_method=form.cleaned_data['refund_payment_method'],
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+        else:
+            if refund_amount > 0:
+                messages.success(
+                    request,
+                    f'Approvisionnement #{supply.id} annulé. Remboursement fournisseur tracé : {refund_amount:,.0f} FCFA.'
+                )
+            else:
+                messages.success(
+                    request,
+                    f'Approvisionnement #{supply.id} annulé. Aucun remboursement fournisseur supplémentaire n\'était attendu.'
+                )
+    else:
+        error_text = ' '.join(
+            ' '.join(errors) for errors in form.errors.values()
+        )
+        messages.error(request, error_text or "Impossible d'annuler l'approvisionnement.")
+
+    return redirect(redirect_to)
+
+
+@login_required
+@module_required('supplies')
+@require_POST
+def partial_return_supply(request, supply_id):
+    """Retour partiel d'un approvisionnement depuis l'historique."""
+    supply = get_object_or_404(
+        Supply.objects.select_related('product', 'supplier', 'staff', 'daily', 'daily__exercise', 'credit_info'),
+        id=supply_id,
+    )
+    form = SupplyPartialReturnForm(request.POST, supply=supply)
+    redirect_to = request.POST.get('next') or 'supplies'
+
+    if form.is_valid():
+        try:
+            supply_return, refund_amount = SupplyService.partial_return_supply(
+                supply=supply,
+                returned_quantity=form.cleaned_data['returned_quantity'],
+                reason=form.cleaned_data['reason'],
+                refund_payment_method=form.cleaned_data['refund_payment_method'],
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+        else:
+            if refund_amount > 0:
+                messages.success(
+                    request,
+                    f"Retour partiel enregistré sur l'approvisionnement #{supply.id} "
+                    f'({supply_return.total:,.0f} FCFA). Remboursement fournisseur tracé : {refund_amount:,.0f} FCFA.'
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Retour partiel enregistré sur l'approvisionnement #{supply.id} "
+                    f'({supply_return.total:,.0f} FCFA). Aucune entrée de trésorerie supplémentaire n\'était attendue.'
+                )
+    else:
+        error_text = ' '.join(
+            ' '.join(errors) for errors in form.errors.values()
+        )
+        messages.error(request, error_text or "Impossible d'enregistrer le retour partiel.")
+
+    return redirect(redirect_to)
 
 
 @login_required
@@ -2030,7 +3471,7 @@ def supplies(request):
 
     queryset = Supply.objects.filter(
         delete_at__isnull=True,
-    ).select_related('product', 'supplier', 'staff', 'daily', 'credit_info')
+    ).select_related('product', 'supplier', 'staff', 'daily', 'credit_info').prefetch_related('supply_returns')
 
     if search:
         queryset = queryset.filter(
@@ -2059,6 +3500,8 @@ def supplies(request):
         'current_supplier': supplier_id,
         'current_date_from': date_from,
         'current_date_to': date_to,
+        'current_full_path': request.get_full_path(),
+        'payment_method_choices': PAYMENT_METHOD_CHOICES,
         'total_count': paginator.count,
     }
     return render(request, 'core/supplies.html', context)
@@ -2070,8 +3513,6 @@ def add_supply(request):
     """Vue pour ajouter un nouvel approvisionnement"""
     if request.method == 'POST':
         form = SupplyForm(request.POST)
-        print(form.is_valid())
-        print(form.errors)
         if form.is_valid():
             supply = form.save(commit=False)
             supply.staff = request.user
@@ -2154,6 +3595,7 @@ def add_supply(request):
                     'message': f'Approvisionnement de {supply.quantity} x "{product.name}" enregistré avec succès.',
                     'product_name': product.name,
                     'quantity': supply.quantity,
+                    'unit_price': float(supply.purchase_cost),
                     'purchase_cost': float(supply.purchase_cost),
                     'total_price': float(supply.total_price),
                     'vat_amount': float(supply.vat_amount) if supply.vat_amount else 0,
@@ -2164,6 +3606,20 @@ def add_supply(request):
             messages.success(request, f'Approvisionnement de {supply.quantity} x "{product.name}" enregistré avec succès.')
             return redirect('supplies')
         else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                form_errors = form.errors.get_json_data()
+                return JsonResponse({
+                    'success': False,
+                    'errors': {
+                        field: [error['message'] for error in errors]
+                        for field, errors in form_errors.items()
+                        if field != '__all__'
+                    },
+                    'non_field_errors': [
+                        error['message'] for error in form_errors.get('__all__', [])
+                    ],
+                }, status=400)
+
             form = SupplyForm(request.POST)  # Re-render form with errors
             return render(request, 'core/supplies_add.html', {
                 'page_title': 'Nouvel approvisionnement',

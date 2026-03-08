@@ -4,6 +4,8 @@
 {% block title %}Approvisionnement - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/sales.css' %}">
+<link rel="stylesheet" href="{% static 'css/sales_history.css' %}">
 <link rel="stylesheet" href="{% static 'css/supplies.css' %}">
 {% endblock %}
 
@@ -141,19 +143,48 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if supply.is_credit and supply.credit_info and not supply.credit_info.is_fully_paid %}
-                            <a href="{% url 'record_supply_payment' supply.id %}" class="btn btn-primary btn-sm" title="Enregistrer un paiement">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                </svg>
-                                Payer
-                            </a>
+                            <div class="action-buttons">
+                                <div class="sale-actions-menu">
+                                    <button
+                                        type="button"
+                                        class="btn-icon js-supply-actions-toggle"
+                                        title="Actions sur l'approvisionnement"
+                                        aria-label="Ouvrir les actions de l'approvisionnement"
+                                        aria-expanded="false"
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <circle cx="12" cy="5" r="1.75" fill="currentColor"/>
+                                            <circle cx="12" cy="12" r="1.75" fill="currentColor"/>
+                                            <circle cx="12" cy="19" r="1.75" fill="currentColor"/>
+                                        </svg>
+                                    </button>
+                                    <div class="sale-actions-dropdown supply-actions-dropdown">
+                                        {% if supply.is_credit and supply.credit_info and not supply.credit_info.is_fully_paid %}
+                                        <a href="{% url 'record_supply_payment' supply.id %}" class="sale-actions-item">
+                                            Payer
+                                        </a>
+                                        {% endif %}
+                                        {% if supply.quantity > 1 %}
+                                        <button type="button" class="sale-actions-item js-open-supply-modal" data-modal-target="partialReturnSupplyModal{{ supply.id }}">
+                                            Retour partiel
+                                        </button>
+                                        {% endif %}
+                                        <button type="button" class="sale-actions-item sale-actions-item-danger js-open-supply-modal" data-modal-target="cancelSupplyModal{{ supply.id }}">
+                                            Annuler
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% if supply.supply_returns.all|length %}
+                            <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.35rem;">
+                                {{ supply.supply_returns.all|length }} retour{{ supply.supply_returns.all|length|pluralize }} partiel{{ supply.supply_returns.all|length|pluralize }} enregistré{{ supply.supply_returns.all|length|pluralize }}
+                            </div>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center">Aucun approvisionnement trouvé</td>
+                        <td colspan="10" class="text-center">Aucun approvisionnement trouvé</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -189,5 +220,179 @@
         {% endif %}
     </div>
 </div>
+
+{% for supply in supplies %}
+    <div class="modal sale-action-modal" id="cancelSupplyModal{{ supply.id }}">
+        <div class="modal-content sale-action-modal-content">
+            <div class="modal-header">
+                <h3>Annuler l'approvisionnement #{{ supply.id }}</h3>
+                <button type="button" class="modal-close js-close-supply-modal" aria-label="Fermer">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{% url 'cancel_supply' supply.id %}" class="sale-action-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ current_full_path }}">
+
+                    <div class="sale-action-fields">
+                        <div class="form-group">
+                            <label class="form-label">Mode de remboursement</label>
+                            <select name="refund_payment_method" class="form-control">
+                                {% for value, label in payment_method_choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Motif</label>
+                            <textarea name="reason" class="form-control" rows="3" required placeholder="Motif d'annulation / retour fournisseur"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="sale-action-form-actions">
+                        <button type="button" class="btn btn-secondary js-close-supply-modal">Fermer</button>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Confirmer l\'annulation de cet approvisionnement ?');">
+                            Confirmer l'annulation
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {% if supply.quantity > 1 %}
+    <div class="modal sale-action-modal" id="partialReturnSupplyModal{{ supply.id }}">
+        <div class="modal-content sale-action-modal-content">
+            <div class="modal-header">
+                <h3>Retour partiel — Approvisionnement #{{ supply.id }}</h3>
+                <button type="button" class="modal-close js-close-supply-modal" aria-label="Fermer">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{% url 'partial_return_supply' supply.id %}" class="sale-action-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ current_full_path }}">
+
+                    <div class="sale-action-lines">
+                        <div class="sale-action-line">
+                            <div class="sale-action-line-label">
+                                <strong>{{ supply.product.name }}</strong>
+                                <span class="text-secondary">Quantité restante : {{ supply.quantity }} × {{ supply.purchase_cost|floatformat:0 }} FCFA</span>
+                            </div>
+                            <input
+                                type="number"
+                                name="returned_quantity"
+                                class="form-control"
+                                min="1"
+                                max="{{ supply.quantity|add:'-1' }}"
+                                step="1"
+                                value="1"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="sale-action-fields">
+                        <div class="form-group">
+                            <label class="form-label">Mode de remboursement</label>
+                            <select name="refund_payment_method" class="form-control">
+                                {% for value, label in payment_method_choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Motif</label>
+                            <textarea name="reason" class="form-control" rows="3" required placeholder="Motif du retour partiel / avoir fournisseur"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="sale-action-form-actions">
+                        <button type="button" class="btn btn-secondary js-close-supply-modal">Fermer</button>
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('Confirmer le retour partiel de cet approvisionnement ?');">
+                            Valider le retour
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        function closeAllSupplyActionMenus() {
+            document.querySelectorAll('.sale-actions-menu.open').forEach(function (menu) {
+                menu.classList.remove('open');
+                const toggle = menu.querySelector('.js-supply-actions-toggle');
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
+        function closeSupplyModal(modal) {
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+
+        document.querySelectorAll('.js-supply-actions-toggle').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                const menu = button.closest('.sale-actions-menu');
+                const isOpen = menu.classList.contains('open');
+                closeAllSupplyActionMenus();
+                if (!isOpen) {
+                    menu.classList.add('open');
+                    button.setAttribute('aria-expanded', 'true');
+                }
+            });
+        });
+
+        document.querySelectorAll('.supply-actions-dropdown').forEach(function (dropdown) {
+            dropdown.addEventListener('click', function (event) {
+                event.stopPropagation();
+            });
+        });
+
+        document.querySelectorAll('.js-open-supply-modal').forEach(function (button) {
+            button.addEventListener('click', function () {
+                closeAllSupplyActionMenus();
+                const modal = document.getElementById(button.dataset.modalTarget);
+                if (modal) {
+                    modal.classList.add('active');
+                }
+            });
+        });
+
+        document.querySelectorAll('.js-close-supply-modal').forEach(function (button) {
+            button.addEventListener('click', function () {
+                closeSupplyModal(button.closest('.modal'));
+            });
+        });
+
+        document.querySelectorAll('.sale-action-modal').forEach(function (modal) {
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) {
+                    closeSupplyModal(modal);
+                }
+            });
+        });
+
+        document.addEventListener('click', function () {
+            closeAllSupplyActionMenus();
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                closeAllSupplyActionMenus();
+                document.querySelectorAll('.sale-action-modal.active').forEach(function (modal) {
+                    closeSupplyModal(modal);
+                });
+            }
+        });
+    });
+</script>
 {% endblock %}
 

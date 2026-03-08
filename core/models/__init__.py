@@ -32,11 +32,14 @@ __all__ = [
     # Sale models
     'Sale',
     'SaleProduct',
+    'SaleReturn',
+    'SaleReturnLine',
     'CreditSale',
     'Refund',
 
     # Inventory models
     'Supply',
+    'SupplyReturn',
     'Inventory',
     'InventorySnapshot',
     'DailyInventory',

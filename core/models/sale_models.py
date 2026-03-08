@@ -1,5 +1,5 @@
 """
-Sale-related models: Sale, SaleProduct, CreditSale, Refund.
+Sale-related models: Sale, SaleProduct, SaleReturn, SaleReturnLine, CreditSale, Refund.
 """
 
 from django.db import models
@@ -43,7 +43,10 @@ class Sale(SoftDeleteModel):
     
     def get_total(self):
         """Calculate total from sale products."""
-        return sum(sp.get_subtotal() for sp in self.sale_products.all())
+        return sum(
+            sp.get_subtotal()
+            for sp in self.sale_products.filter(delete_at__isnull=True, quantity__gt=0)
+        )
     
     def get_related_credit_sale(self):
         """Get related CreditSale if exists."""
@@ -75,6 +78,43 @@ class SaleProduct(SoftDeleteModel):
         """Calculate subtotal for this line item."""
         subtotal = self.quantity * self.unit_price
         return subtotal
+
+
+class SaleReturn(SoftDeleteModel):
+    """Trace d'un retour partiel de vente."""
+
+    sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='sale_returns')
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+    reason = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'sale_return'
+        verbose_name = 'Retour de vente'
+        verbose_name_plural = 'Retours de vente'
+        ordering = ['-create_at']
+
+    def __str__(self):
+        return f"Retour {self.total} pour Vente #{self.sale_id}"
+
+
+class SaleReturnLine(SoftDeleteModel):
+    """Ligne d'un retour partiel, avec snapshot quantité/prix."""
+
+    sale_return = models.ForeignKey(SaleReturn, on_delete=models.CASCADE, related_name='lines')
+    sale_product = models.ForeignKey(SaleProduct, on_delete=models.CASCADE, related_name='return_lines')
+    quantity = models.IntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = 'sale_return_line'
+        verbose_name = 'Ligne de retour de vente'
+        verbose_name_plural = 'Lignes de retour de vente'
+
+    def __str__(self):
+        return f"Retour ligne vente #{self.sale_return.sale_id} - x{self.quantity}"
+
+    def get_subtotal(self):
+        return self.quantity * self.unit_price
 
 
 class CreditSale(SoftDeleteModel):

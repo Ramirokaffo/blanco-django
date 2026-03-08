@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Statistiques clients - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/statistics.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="statistics-clients-page">
+    <div class="page-header statistics-header"><div><h1>Statistiques clients</h1><p class="text-secondary">Analysez votre portefeuille clients, leur activité commerciale et le suivi de leurs créances avec des filtres dédiés.</p></div><div class="statistics-header-actions"><a href="{% url 'statistics' %}" class="btn btn-secondary btn-sm">Retour aux statistiques</a><a href="{% url 'contacts' %}?tab=clients" class="btn btn-secondary btn-sm">Voir les clients</a></div></div>
+    <div class="statistics-clients-summary"><div><strong>{{ period_name }}</strong><div class="text-secondary">{{ period_label }}</div></div><div class="statistics-clients-summary-meta"><span class="statistics-pill">{{ total_clients }} client{{ total_clients|pluralize }}</span><span class="statistics-pill">{{ clients_with_sales_count }} actif{{ clients_with_sales_count|pluralize }}</span><span class="statistics-pill">Mise à jour : {{ generated_at|date:"d/m/Y H:i" }}</span></div></div>
+
+    <div class="card statistics-clients-filters"><div class="card-header"><h3 class="card-title">Filtres</h3></div><div class="card-body"><form method="get" action="{% url 'client_statistics' %}" class="filters-form"><div class="filters-row"><div class="filter-group"><label class="form-label">Période</label><select name="period" class="form-control"><option value="7d" {% if current_period == '7d' %}selected{% endif %}>7 derniers jours</option><option value="30d" {% if current_period == '30d' %}selected{% endif %}>30 derniers jours</option><option value="90d" {% if current_period == '90d' %}selected{% endif %}>90 derniers jours</option><option value="365d" {% if current_period == '365d' %}selected{% endif %}>12 derniers mois</option><option value="custom" {% if current_period == 'custom' %}selected{% endif %}>Personnalisée</option></select></div><div class="filter-group"><label class="form-label">Recherche</label><input type="text" name="search" class="form-control" placeholder="Nom, prénom, téléphone, e-mail..." value="{{ current_search }}"></div><div class="filter-group"><label class="form-label">Date début</label><input type="date" name="date_from" class="form-control" value="{{ current_date_from }}"></div><div class="filter-group"><label class="form-label">Date fin</label><input type="date" name="date_to" class="form-control" value="{{ current_date_to }}"></div></div><div class="filters-row"><div class="filter-group"><label class="form-label">Genre</label><select name="gender" class="form-control"><option value="">Tous</option>{% for item in genders %}<option value="{{ item }}" {% if current_gender == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div><div class="filter-group"><label class="form-label">Activité</label><select name="activity" class="form-control"><option value="">Toutes</option><option value="active" {% if current_activity == 'active' %}selected{% endif %}>Clients actifs</option><option value="inactive" {% if current_activity == 'inactive' %}selected{% endif %}>Sans vente</option><option value="debtors" {% if current_activity == 'debtors' %}selected{% endif %}>Débiteurs</option></select></div><div class="filter-group"><label class="form-label">Téléphone renseigné</label><div class="form-control">{{ clients_with_phone_count }} client{{ clients_with_phone_count|pluralize }}</div></div><div class="filters-actions"><button type="submit" class="btn btn-primary btn-sm">Filtrer</button><a href="{% url 'client_statistics' %}" class="btn btn-secondary btn-sm">Réinitialiser</a></div></div></form></div></div>
+
+    <div class="kpi-grid"><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Clients concernés</div><div class="kpi-value">{{ total_clients }}</div><div class="kpi-sub">Nouveaux : {{ new_clients_count }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Clients actifs</div><div class="kpi-value">{{ clients_with_sales_count }}</div><div class="kpi-sub">Sans vente : {{ inactive_clients_count }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Chiffre d'affaires</div><div class="kpi-value">{{ total_revenue|floatformat:0 }} {{ currency }}</div><div class="kpi-sub">Moyenne/client : {{ average_revenue_per_client|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Ventes associées</div><div class="kpi-value">{{ sales_count }}</div><div class="kpi-sub">Paiements reçus : {{ payments_received_total|floatformat:0 }} {{ currency }}</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Clients débiteurs</div><div class="kpi-value">{{ credit_clients_count }}</div><div class="kpi-sub">{{ credit_sales_count }} vente{{ credit_sales_count|pluralize }} à crédit</div></div></div><div class="kpi-card"><div class="kpi-info"><div class="kpi-label">Encours client</div><div class="kpi-value">{{ receivables_total|floatformat:0 }} {{ currency }}</div><div class="kpi-sub">{{ overdue_schedules_count }} échéance{{ overdue_schedules_count|pluralize }} en retard</div></div></div></div>
+
+    <div class="statistics-clients-chart-grid"><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Acquisition clients</h3></div><div class="card-body"><canvas id="clientGrowthChart"></canvas><p class="statistics-chart-note">Évolution du nombre de nouveaux clients créés sur la période filtrée.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Tendance ventes / chiffre d'affaires</h3></div><div class="card-body"><canvas id="clientSalesTrendChart"></canvas><p class="statistics-chart-note">Suivi chronologique des ventes et du chiffre d'affaires générés par les clients sélectionnés.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Répartition par genre</h3></div><div class="card-body"><canvas id="genderDistributionChart"></canvas><p class="statistics-chart-note">Distribution du portefeuille clients selon le genre renseigné dans les fiches.</p></div></div><div class="card statistics-chart-card"><div class="card-header"><h3 class="card-title">Top clients</h3></div><div class="card-body"><canvas id="topClientsChart"></canvas><p class="statistics-chart-note">Comparaison des clients les plus générateurs de chiffre d'affaires et de leur encours restant dû.</p></div></div></div>
+
+    <div class="statistics-clients-detail-grid"><div class="card"><div class="card-header"><h3 class="card-title">Clients les plus actifs</h3></div><div class="card-body">{% if top_clients %}<div class="table-responsive"><table class="table"><thead><tr><th>Client</th><th class="text-right">Ventes</th><th class="text-right">CA</th><th class="text-right">Encours</th></tr></thead><tbody>{% for client in top_clients %}<tr><td><strong>{{ client.label }}</strong><div class="statistics-entity-sub">Paiements : {{ client.payments_total|floatformat:0 }} {{ currency }} · Crédit : {{ client.credit_sales_count }}</div></td><td class="text-right">{{ client.total_sales }}</td><td class="text-right">{{ client.total_revenue|floatformat:0 }} {{ currency }}</td><td class="text-right">{{ client.outstanding_total|floatformat:0 }} {{ currency }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucune activité client sur cette période.</p></div>{% endif %}</div></div><div class="card"><div class="card-header"><h3 class="card-title">Derniers clients filtrés</h3></div><div class="card-body">{% if recent_clients %}<div class="table-responsive"><table class="table"><thead><tr><th>Client</th><th>Contact</th><th>Genre</th><th>Dernière vente</th><th>Statut</th></tr></thead><tbody>{% for client in recent_clients %}<tr><td><strong>{{ client.label }}</strong><div class="statistics-entity-sub">Créé le {{ client.create_at|date:"d/m/Y" }}</div></td><td>{{ client.phone_number }}<div class="statistics-entity-sub">{{ client.email }}</div></td><td>{{ client.gender }}</td><td>{% if client.last_sale_at %}{{ client.last_sale_at|date:"d/m/Y H:i" }}<div class="statistics-entity-sub">{{ client.total_sales }} vente{{ client.total_sales|pluralize }}</div>{% else %}-{% endif %}</td><td><span class="badge badge-{{ client.status_class }}">{{ client.status_label }}</span>{% if client.outstanding_total %}<div class="statistics-entity-sub">{{ client.outstanding_total|floatformat:0 }} {{ currency }}</div>{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><p>Aucun client ne correspond aux filtres actuels.</p></div>{% endif %}</div></div></div>
+</div>
+
+{{ client_growth_chart|json_script:"client-statistics-growth-data" }}
+{{ sales_trend_chart|json_script:"client-statistics-sales-data" }}
+{{ gender_distribution_chart|json_script:"client-statistics-gender-data" }}
+{{ top_clients_chart|json_script:"client-statistics-top-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function readChartData(id) {
+        const node = document.getElementById(id);
+        return node ? JSON.parse(node.textContent) : { labels: [] };
+    }
+
+    function buildChart(canvasId, config) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !window.Chart) {
+            return;
+        }
+        new Chart(canvas, config);
+    }
+
+    const clientGrowth = readChartData('client-statistics-growth-data');
+    buildChart('clientGrowthChart', { type: 'bar', data: { labels: clientGrowth.labels, datasets: [{ label: 'Nouveaux clients', data: clientGrowth.values, backgroundColor: 'rgba(37, 99, 235, 0.75)', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } });
+
+    const clientSales = readChartData('client-statistics-sales-data');
+    buildChart('clientSalesTrendChart', { type: 'line', data: { labels: clientSales.labels, datasets: [{ label: 'CA', data: clientSales.revenue, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.12)', yAxisID: 'y', tension: 0.35, fill: true }, { label: 'Ventes', data: clientSales.sales, borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.10)', yAxisID: 'y1', tension: 0.35 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true }, y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } } } } });
+
+    const genders = readChartData('client-statistics-gender-data');
+    buildChart('genderDistributionChart', { type: 'doughnut', data: { labels: genders.labels, datasets: [{ data: genders.values, backgroundColor: ['#2563eb', '#7c3aed', '#16a34a', '#ea580c', '#0f766e', '#dc2626'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+
+    const topClients = readChartData('client-statistics-top-data');
+    buildChart('topClientsChart', { type: 'bar', data: { labels: topClients.labels, datasets: [{ label: 'CA', data: topClients.revenue, backgroundColor: 'rgba(59, 130, 246, 0.78)', borderRadius: 8 }, { label: 'Encours', data: topClients.outstanding, backgroundColor: 'rgba(245, 158, 11, 0.72)', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: false }, y: { beginAtZero: true } } } });
+});
+</script>
+{% endblock %}

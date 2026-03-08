@@ -15,20 +15,6 @@
             </li>
             {% endif %}
 
-                        {% if 'dashboard' in user_modules %}
-            <li class="nav-item">
-                <a href="{% url 'statistics' %}" class="nav-link {% if request.resolver_match.url_name == 'statistics' %}active{% endif %}">
-                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <path d="M4 19h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <path d="M7 16V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <path d="M12 16V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <path d="M17 16v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                    <span>Statistiques</span>
-                </a>
-            </li>
-            {% endif %}
-
             {% if 'sales' in user_modules %}
             <li class="nav-item">
                 <a href="{% url 'sales' %}" class="nav-link {% if request.resolver_match.url_name == 'sales' %}active{% endif %}">
@@ -188,6 +174,20 @@
             </li>
             {% endif %}
 
+
+                        {% if 'dashboard' in user_modules %}
+            <li class="nav-item">
+                <a href="{% url 'statistics' %}" class="nav-link {% if request.resolver_match.url_name == 'statistics' %}active{% endif %}">
+                    <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 19h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M7 16V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M12 16V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M17 16v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span>Statistiques</span>
+                </a>
+            </li>
+            {% endif %}
 
 
 
