@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Grand Livre - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Grand Livre" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -54,18 +55,19 @@
     <div class="page-header">
         <div class="header-content">
             <div>
-                <span class="ledger-kicker">Comptabilité générale</span>
-                <h1>Grand Livre</h1>
+                <span class="ledger-kicker">{% trans "Comptabilité générale" %}</span>
+                <h1>{% trans "Grand Livre" %}</h1>
                 {% if selected_account %}
-                <p class="text-secondary ledger-subtitle">Analyse détaillée du compte {{ selected_account.code }} - {{ selected_account.name }} avec un solde courant de {{ balance|floatformat:0 }} FCFA.</p>
+                {% trans selected_account.name as selected_account_name %}
+                <p class="text-secondary ledger-subtitle">{% blocktrans with code=selected_account.code name=selected_account_name balance=balance|floatformat:0 %}Analyse détaillée du compte {{ code }} - {{ name }} avec un solde courant de {{ balance }} FCFA.{% endblocktrans %}</p>
                 {% else %}
-                <p class="text-secondary ledger-subtitle">Sélectionnez un compte et une période pour visualiser l’historique détaillé de ses mouvements.</p>
+                <p class="text-secondary ledger-subtitle">{% trans "Sélectionnez un compte et une période pour visualiser l’historique détaillé de ses mouvements." %}</p>
                 {% endif %}
             </div>
             <div class="header-actions">
-                <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Journal</a>
-                <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
-                <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
+                <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">{% trans "Journal" %}</a>
+                <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">{% trans "Balance" %}</a>
+                <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">{% trans "Plan comptable" %}</a>
             </div>
         </div>
     </div>
@@ -73,19 +75,19 @@
     {% if selected_account %}
     <div class="ledger-stats">
         <div class="stat-card is-accent">
-            <span class="stat-label">Compte sélectionné</span>
+            <span class="stat-label">{% trans "Compte sélectionné" %}</span>
             <span class="stat-value">{{ selected_account.code }}</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Solde</span>
+            <span class="stat-label">{% trans "Solde" %}</span>
             <span class="stat-value">{{ balance|floatformat:0 }} FCFA</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Total débit</span>
+            <span class="stat-label">{% trans "Total débit" %}</span>
             <span class="stat-value">{{ total_debit|floatformat:0 }} FCFA</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Total crédit</span>
+            <span class="stat-label">{% trans "Total crédit" %}</span>
             <span class="stat-value">{{ total_credit|floatformat:0 }} FCFA</span>
         </div>
     </div>
@@ -94,34 +96,34 @@
     <div class="card filters-card">
         <div class="filters-topbar">
             <div class="filters-title-group">
-                <h3 class="card-title">Filtres du grand livre</h3>
-                <p class="filters-helper">Choisissez un compte puis définissez votre période d’analyse.</p>
+                <h3 class="card-title">{% trans "Filtres du grand livre" %}</h3>
+                <p class="filters-helper">{% trans "Choisissez un compte puis définissez votre période d’analyse." %}</p>
             </div>
         </div>
         <div class="card-body">
             <form method="get" action="{% url 'accounting_ledger' %}" class="filters-form">
                 <div class="filters-row">
                     <div class="filter-group filter-search">
-                        <label class="form-label">Compte</label>
+                        <label class="form-label">{% trans "Compte" %}</label>
                         <select name="account" class="form-control">
-                            <option value="">-- Sélectionner un compte --</option>
+                            <option value="">{% trans "-- Sélectionner un compte --" %}</option>
                             {% for acc in accounts %}
-                            <option value="{{ acc.code }}" {% if current_account == acc.code %}selected{% endif %}>{{ acc.code }} - {{ acc.name }}</option>
+                            <option value="{{ acc.code }}" {% if current_account == acc.code %}selected{% endif %}>{{ acc.code }} - {% trans acc.name %}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label class="form-label">Date début</label>
+                        <label class="form-label">{% trans "Date début" %}</label>
                         <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
                     </div>
                     <div class="filter-group">
-                        <label class="form-label">Date fin</label>
+                        <label class="form-label">{% trans "Date fin" %}</label>
                         <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
                     </div>
                 </div>
                 <div class="filters-actions">
-                    <button type="submit" class="btn btn-primary btn-sm">Afficher</button>
-                    <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+                    <button type="submit" class="btn btn-primary btn-sm">{% trans "Afficher" %}</button>
+                    <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser" %}</a>
                 </div>
             </form>
         </div>
@@ -130,20 +132,20 @@
     {% if selected_account %}
     <div class="card ledger-table-card">
         <div class="card-header">
-            <h3 class="card-title">Mouvements — {{ selected_account }}</h3>
-            <div class="table-meta">{{ ledger_lines|length }} ligne{{ ledger_lines|length|pluralize }}</div>
+            <h3 class="card-title">{% blocktrans with account=selected_account %}Mouvements — {{ account }}{% endblocktrans %}</h3>
+            <div class="table-meta">{% blocktrans count counter=ledger_lines|length %}{{ counter }} ligne{% plural %}{{ counter }} lignes{% endblocktrans %}</div>
         </div>
         <div class="card-body">
             <div class="ledger-table-wrapper">
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Référence</th>
-                            <th>Libellé</th>
-                            <th class="text-right">Débit</th>
-                            <th class="text-right">Crédit</th>
-                            <th class="text-right">Solde</th>
+                            <th>{% trans "Date" %}</th>
+                            <th>{% trans "Référence" %}</th>
+                            <th>{% trans "Libellé" %}</th>
+                            <th class="text-right">{% trans "Débit" %}</th>
+                            <th class="text-right">{% trans "Crédit" %}</th>
+                            <th class="text-right">{% trans "Solde" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -158,14 +160,14 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="empty-state">Aucun mouvement pour ce compte sur la période sélectionnée.</td>
+                            <td colspan="6" class="empty-state">{% trans "Aucun mouvement pour ce compte sur la période sélectionnée." %}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     {% if ledger_lines %}
                     <tfoot>
                         <tr class="totals-row">
-                            <td colspan="3">TOTAUX</td>
+                            <td colspan="3">{% trans "TOTAUX" %}</td>
                             <td class="amount-cell">{{ total_debit|floatformat:0 }}</td>
                             <td class="amount-cell">{{ total_credit|floatformat:0 }}</td>
                             <td class="amount-cell">{{ balance|floatformat:0 }}</td>
@@ -179,12 +181,12 @@
     {% else %}
     <div class="card ledger-empty-card">
         <div class="card-header">
-            <h3 class="card-title">Prêt pour l’analyse</h3>
+            <h3 class="card-title">{% trans "Prêt pour l’analyse" %}</h3>
         </div>
         <div class="card-body">
             <div class="empty-state">
-                <div class="empty-state-title">Sélectionnez un compte</div>
-                <p>Choisissez un compte dans les filtres ci-dessus pour afficher ses mouvements détaillés et son solde cumulé.</p>
+                <div class="empty-state-title">{% trans "Sélectionnez un compte" %}</div>
+                <p>{% trans "Choisissez un compte dans les filtres ci-dessus pour afficher ses mouvements détaillés et son solde cumulé." %}</p>
             </div>
         </div>
     </div>

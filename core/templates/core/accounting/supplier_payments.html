@@ -1,20 +1,21 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Paiements fournisseurs - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Paiements fournisseurs" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Paiements fournisseurs</h1>
-            <p class="text-secondary">{{ total_count }} paiement{{ total_count|pluralize }} — Total : {{ total_amount|floatformat:0 }} FCFA</p>
+            <h1>{% trans "Paiements fournisseurs" %}</h1>
+            <p class="text-secondary">{% blocktrans count counter=total_count|default:0 with total=total_amount|floatformat:0 %}{{ counter }} paiement — Total : {{ total }} FCFA{% plural %}{{ counter }} paiements — Total : {{ total }} FCFA{% endblocktrans %}</p>
         </div>
         <a href="{% url 'add_supplier_payment' %}" class="btn btn-primary btn-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
-            Nouveau paiement
+            {% trans "Nouveau paiement" %}
         </a>
     </div>
 </div>
@@ -33,13 +34,13 @@
     <form method="get" action="{% url 'supplier_payments' %}" class="filters-form">
         <div class="filters-row">
             <div class="filter-group filter-search">
-                <label class="form-label">Recherche</label>
-                <input type="text" name="search" class="form-control" placeholder="Fournisseur ou référence..." value="{{ current_search }}">
+                <label class="form-label">{% trans "Recherche" %}</label>
+                <input type="text" name="search" class="form-control" placeholder="{% trans "Fournisseur ou référence..." %}" value="{{ current_search }}">
             </div>
             <div class="filter-group">
-                <label class="form-label">Fournisseur</label>
+                <label class="form-label">{% trans "Fournisseur" %}</label>
                 <select name="supplier" class="form-control">
-                    <option value="">Tous</option>
+                    <option value="">{% trans "Tous" %}</option>
                     {% for s in suppliers %}
                     <option value="{{ s.id }}" {% if current_supplier == s.id|stringformat:"d" %}selected{% endif %}>{{ s.name }}</option>
                     {% endfor %}
@@ -47,8 +48,8 @@
             </div>
         </div>
         <div class="filters-actions">
-            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
-            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+            <button type="submit" class="btn btn-primary btn-sm">{% trans "Filtrer" %}</button>
+            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser" %}</a>
         </div>
     </form>
 </div>
@@ -56,9 +57,9 @@
 <!-- Tableau -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des paiements</h3>
+        <h3 class="card-title">{% trans "Liste des paiements" %}</h3>
         <div class="pagination-info-header">
-            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+            {% blocktrans with number=page_obj.number total=page_obj.paginator.num_pages %}Page {{ number }} sur {{ total }}{% endblocktrans %}
         </div>
     </div>
     <div class="card-body">
@@ -66,12 +67,12 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Fournisseur</th>
-                        <th>Mode</th>
-                        <th class="text-right">Montant</th>
-                        <th>Référence</th>
-                        <th>Par</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Fournisseur" %}</th>
+                        <th>{% trans "Mode" %}</th>
+                        <th class="text-right">{% trans "Montant" %}</th>
+                        <th>{% trans "Référence" %}</th>
+                        <th>{% trans "Par" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -86,7 +87,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center">Aucun paiement trouvé</td>
+                        <td colspan="6" class="text-center">{% trans "Aucun paiement trouvé" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -97,7 +98,7 @@
         {% if page_obj.paginator.num_pages > 1 %}
         <div class="pagination-container">
             <div class="pagination-info">
-                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+                {% blocktrans with start=page_obj.start_index end=page_obj.end_index %}Affichage de {{ start }} à {{ end }} sur {{ total_count }}{% endblocktrans %}
             </div>
             <div class="pagination">
                 {% if page_obj.has_previous %}
@@ -119,4 +120,3 @@
     </div>
 </div>
 {% endblock %}
-

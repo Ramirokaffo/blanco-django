@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Nouvel approvisionnement - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Nouvel approvisionnement" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/supplies.css' %}">
@@ -11,14 +11,14 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Nouvel approvisionnement</h1>
-            <p class="text-secondary">Enregistrer un nouvel approvisionnement de stock</p>
+            <h1>{% trans "Nouvel approvisionnement" %}</h1>
+            <p class="text-secondary">{% trans "Enregistrer un nouvel approvisionnement de stock" %}</p>
         </div>
         <a href="{% url 'supplies' %}" class="btn btn-secondary btn-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Retour à la liste
+            {% trans "Retour à la liste" %}
         </a>
     </div>
 </div>
@@ -53,23 +53,23 @@
             <div class="form-section">
                 <div class="section-heading">
                     <div>
-                        <h4 class="section-title">Produit et tarification</h4>
+                        <h4 class="section-title">{% trans "Produit et tarification" %}</h4>
                     </div>
                 </div>
 
                 <div class="product-reference-card" id="productReferenceCard">
                     <div class="product-reference-empty" id="productReferenceEmpty">
-                        Sélectionnez un produit pour afficher ses valeurs de référence.
+                        {% trans "Sélectionnez un produit pour afficher ses valeurs de référence." %}
                     </div>
 
                     <div class="product-reference-grid" id="productReferenceGrid" style="display:none;">
                         <div class="reference-item">
-                            <span class="reference-label">Prix de vente actuel</span>
-                            <strong id="currentSellingPrice">Non renseigné</strong>
+                            <span class="reference-label">{% trans "Prix de vente actuel" %}</span>
+                            <strong id="currentSellingPrice">{% trans "Non renseigné" %}</strong>
                         </div>
                         <div class="reference-item">
-                            <span class="reference-label">Dernier coût d'achat</span>
-                            <strong id="lastPurchaseCost">Non renseigné</strong>
+                            <span class="reference-label">{% trans "Dernier coût d'achat" %}</span>
+                            <strong id="lastPurchaseCost">{% trans "Non renseigné" %}</strong>
                         </div>
                     </div>
                 </div>
@@ -109,7 +109,7 @@
                         {% if form.purchase_cost.errors %}
                         <div class="field-error">{{ form.purchase_cost.errors.0 }}</div>
                         {% endif %}
-                        <small class="form-help">Prérempli avec le dernier coût d'achat unitaire connu du produit sélectionné.</small>
+                        <small class="form-help">{% trans "Prérempli avec le dernier coût d'achat unitaire connu du produit sélectionné." %}</small>
                     </div>
 
                     <!-- Prix de vente -->
@@ -119,7 +119,7 @@
                         {% if form.selling_price.errors %}
                         <div class="field-error">{{ form.selling_price.errors.0 }}</div>
                         {% endif %}
-                        <small class="form-help">Prérempli avec le prix de vente actuel du produit pour une modification rapide si nécessaire.</small>
+                        <small class="form-help">{% trans "Prérempli avec le prix de vente actuel du produit pour une modification rapide si nécessaire." %}</small>
                     </div>
 
                     <!-- Date d'expiration -->
@@ -136,8 +136,8 @@
             <div class="form-section">
                 <div class="section-heading">
                     <div>
-                        <h4 class="section-title">Règlement et comptabilisation</h4>
-                        <p class="section-subtitle">Renseignez le mode de règlement et les informations comptables associées.</p>
+                        <h4 class="section-title">{% trans "Règlement et comptabilisation" %}</h4>
+                        <p class="section-subtitle">{% trans "Renseignez le mode de règlement et les informations comptables associées." %}</p>
                     </div>
                 </div>
 
@@ -183,17 +183,17 @@
 
             <!-- Récapitulatif -->
             <div class="supply-summary" id="supplySummary" style="display:none;">
-                <h4>Récapitulatif</h4>
+                <h4>{% trans "Récapitulatif" %}</h4>
                 <div class="summary-row">
-                    <span>Coût total :</span>
+                    <span>{% trans "Coût total :" %}</span>
                     <strong id="totalCost">0 FCFA</strong>
                 </div>
                 <div class="summary-row" id="vatRow" style="display:none;">
-                    <span>TVA :</span>
+                    <span>{% trans "TVA :" %}</span>
                     <strong id="vatAmount">0 FCFA</strong>
                 </div>
                 <div class="summary-row" id="totalWithVatRow" style="display:none;">
-                    <span>Total TTC :</span>
+                    <span>{% trans "Total TTC :" %}</span>
                     <strong id="totalWithVat">0 FCFA</strong>
                 </div>
             </div>
@@ -203,9 +203,9 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    Enregistrer l'approvisionnement
+                    {% trans "Enregistrer l'approvisionnement" %}
                 </button>
-                <a href="{% url 'supplies' %}" class="btn btn-secondary">Annuler</a>
+                <a href="{% url 'supplies' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
             </div>
         </form>
     </div>
@@ -238,12 +238,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function formatCurrency(value, withDecimals = false) {
         if (value === null || value === undefined || value === '') {
-            return 'Non renseigné';
+            return gettext('Non renseigné');
         }
 
         const numericValue = parseFloat(typeof value === 'string' ? value.replace(',', '.') : value);
         if (Number.isNaN(numericValue)) {
-            return 'Non renseigné';
+            return gettext('Non renseigné');
         }
 
         const options = withDecimals
@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (nonFieldErrors.length) {
             formFeedback.innerHTML = nonFieldErrors
-                .map((message) => `<div class="alert alert-error">${message}</div>`)
+                .map((message) => `<div class="alert alert-error">${escapeHtml(message)}</div>`)
                 .join('');
         }
 
@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const expenseData = new FormData();
                 expenseData.append('expense_type', expenseTypeId);
                 expenseData.append('amount', (totalPrice + vatAmountValue).toFixed(2));
-                expenseData.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price}FCFA)`);
+                expenseData.append('description', interpolate(gettext("Dépense liée à l'approvisionnement de %(product)s (%(quantity)s x %(price)sFCFA)"), {product: data.product_name, quantity: data.quantity, price: data.unit_price}, true));
                 expenseData.append('payment_method', data.payment_method || 'CASH');
                 expenseData.append('csrfmiddlewaretoken', formData.get('csrfmiddlewaretoken'));
 
@@ -446,17 +446,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(expResponse => expResponse.json())
                 .then(expData => {
-                    let message = data.message;
+                    let message = escapeHtml(data.message);
                     if (expData.success) {
-                        message += '<br><small>La dépense a été créée automatiquement.</small>';
+                        message += '<br><small>' + gettext('La dépense a été créée automatiquement.') + '</small>';
                     } else {
-                        message += '<br><small>Attention: La dépense automatique n\'a pas pu être créée.</small>';
+                        message += '<br><small>' + gettext('Attention: La dépense automatique n\'a pas pu être créée.') + '</small>';
                     }
 
                     const messageDiv = document.createElement('div');
                     messageDiv.className = 'alert alert-success';
                     messageDiv.style.marginBottom = '20px';
-                    messageDiv.innerHTML = `<strong>✓ Succès!</strong> ${message}`;
+                    messageDiv.innerHTML = '<strong>✓ ' + gettext('Succès!') + '</strong> ' + message;
 
                     const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
                     if (messagesContainer) {
@@ -476,7 +476,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const messageDiv = document.createElement('div');
                     messageDiv.className = 'alert alert-success';
                     messageDiv.style.marginBottom = '20px';
-                    messageDiv.innerHTML = `<strong>✓ Succès!</strong> ${data.message}<br><small>La création automatique de la dépense a échoué. Vous pouvez la créer manuellement.</small>`;
+                    messageDiv.innerHTML = '<strong>✓ ' + gettext('Succès!') + '</strong> ' + escapeHtml(data.message) + '<br><small>' + gettext('La création automatique de la dépense a échoué. Vous pouvez la créer manuellement.') + '</small>';
 
                     const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
                     if (messagesContainer) {
@@ -493,7 +493,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Old behavior: redirect to expense page
                 const expenseUrl = new URL("{% url 'add_expense' %}", window.location.origin);
                 expenseUrl.searchParams.append('amount', amount);
-                expenseUrl.searchParams.append('description', `Dépense liée à l'approvisionnement de ${data.product_name} (${data.quantity} x ${data.unit_price}FCFA)`);
+                expenseUrl.searchParams.append('description', interpolate(gettext("Dépense liée à l'approvisionnement de %(product)s (%(quantity)s x %(price)sFCFA)"), {product: data.product_name, quantity: data.quantity, price: data.unit_price}, true));
                 expenseUrl.searchParams.append('expense_type', 'approvisionnement');
 
                 window.open(expenseUrl.toString(), '_blank');
@@ -501,10 +501,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'alert alert-success';
                 messageDiv.style.marginBottom = '20px';
-                messageDiv.innerHTML = `
-                    <strong>✓ Succès!</strong> ${data.message}<br>
-                    <small>La page d'ajout de dépenses a été ouverte dans un nouvel onglet.</small>
-                `;
+                messageDiv.innerHTML = '<strong>✓ ' + gettext('Succès!') + '</strong> ' + escapeHtml(data.message) + '<br>' +
+                    '<small>' + gettext("La page d'ajout de dépenses a été ouverte dans un nouvel onglet.") + '</small>';
 
                 const messagesContainer = document.querySelector('.messages-container') || document.querySelector('.card-body');
                 if (messagesContainer) {
@@ -524,7 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderFormErrors(error.errors || {}, error.non_field_errors || []);
                 return;
             }
-            alert('Une erreur est survenue lors de l\'enregistrement.');
+            alert(gettext('Une erreur est survenue lors de l\'enregistrement.'));
         });
     });
 });

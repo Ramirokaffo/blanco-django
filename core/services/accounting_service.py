@@ -6,15 +6,20 @@ automatique des écritures comptables (partie double).
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db import transaction
+import logging
+
+from django.db import IntegrityError, transaction
 from django.db.models import Sum, Q, F, DecimalField, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.translation import gettext as _, gettext_noop
 
 from core.models.accounting_models import (
     Account, JournalEntry, JournalEntryLine,
     PAYMENT_METHOD_ACCOUNT_MAP, TaxRate,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -23,40 +28,40 @@ from core.models.accounting_models import (
 
 DEFAULT_ACCOUNTS = [
     # Classe 1 – Capitaux propres
-    ('12', 'Résultat de l\'exercice', 'PASSIF', None),
-    ('13', 'Report à nouveau', 'PASSIF', None),
-    ('131', 'Report à nouveau (solde créditeur)', 'PASSIF', '13'),
-    ('139', 'Report à nouveau (solde débiteur)', 'ACTIF', '13'),
+    ('12', gettext_noop('Résultat de l\'exercice'), 'PASSIF', None),
+    ('13', gettext_noop('Report à nouveau'), 'PASSIF', None),
+    ('131', gettext_noop('Report à nouveau (solde créditeur)'), 'PASSIF', '13'),
+    ('139', gettext_noop('Report à nouveau (solde débiteur)'), 'ACTIF', '13'),
     # Classe 3 – Stocks
-    ('31', 'Stocks de marchandises', 'ACTIF', None),
+    ('31', gettext_noop('Stocks de marchandises'), 'ACTIF', None),
     # Classe 4 – Tiers
-    ('401', 'Fournisseurs', 'PASSIF', None),
-    ('411', 'Clients', 'ACTIF', None),
-    ('443', 'État, TVA facturée', 'PASSIF', None),
-    ('4431', 'TVA facturée sur ventes', 'PASSIF', '443'),
-    ('445', 'État, TVA récupérable', 'ACTIF', None),
-    ('4451', 'TVA récupérable sur achats', 'ACTIF', '445'),
-    ('4441', 'État, TVA due', 'PASSIF', None),
+    ('401', gettext_noop('Fournisseurs'), 'PASSIF', None),
+    ('411', gettext_noop('Clients'), 'ACTIF', None),
+    ('443', gettext_noop('État, TVA facturée'), 'PASSIF', None),
+    ('4431', gettext_noop('TVA facturée sur ventes'), 'PASSIF', '443'),
+    ('445', gettext_noop('État, TVA récupérable'), 'ACTIF', None),
+    ('4451', gettext_noop('TVA récupérable sur achats'), 'ACTIF', '445'),
+    ('4441', gettext_noop('État, TVA due'), 'PASSIF', None),
     # Classe 5 – Trésorerie
-    ('52', 'Banques', 'ACTIF', None),
-    ('521', 'Banque locale', 'ACTIF', '52'),
-    ('57', 'Caisse', 'ACTIF', None),
-    ('571', 'Caisse principale', 'ACTIF', '57'),
-    ('58', 'Virements internes', 'ACTIF', None),
-    ('585', 'Mobile Money', 'ACTIF', '58'),
+    ('52', gettext_noop('Banques'), 'ACTIF', None),
+    ('521', gettext_noop('Banque locale'), 'ACTIF', '52'),
+    ('57', gettext_noop('Caisse'), 'ACTIF', None),
+    ('571', gettext_noop('Caisse principale'), 'ACTIF', '57'),
+    ('58', gettext_noop('Virements internes'), 'ACTIF', None),
+    ('585', gettext_noop('Mobile Money'), 'ACTIF', '58'),
     # Classe 6 – Charges
-    ('601', "Achats de marchandises", 'CHARGE', None),
-    ('6031', "Variations de stocks de marchandises", 'CHARGE', None),
-    ('61', "Transports", 'CHARGE', None),
-    ('62', "Services extérieurs", 'CHARGE', None),
-    ('63', "Autres services extérieurs", 'CHARGE', None),
-    ('64', "Charges de personnel", 'CHARGE', None),
-    ('65', "Autres charges", 'CHARGE', None),
+    ('601', gettext_noop("Achats de marchandises"), 'CHARGE', None),
+    ('6031', gettext_noop("Variations de stocks de marchandises"), 'CHARGE', None),
+    ('61', gettext_noop("Transports"), 'CHARGE', None),
+    ('62', gettext_noop("Services extérieurs"), 'CHARGE', None),
+    ('63', gettext_noop("Autres services extérieurs"), 'CHARGE', None),
+    ('64', gettext_noop("Charges de personnel"), 'CHARGE', None),
+    ('65', gettext_noop("Autres charges"), 'CHARGE', None),
     # Classe 7 – Produits
-    ('701', 'Ventes de marchandises', 'PRODUIT', None),
-    ('71', "Production stockée", 'PRODUIT', None),
-    ('75', 'Autres produits', 'PRODUIT', None),
-    ('758', 'Produits divers', 'PRODUIT', None),
+    ('701', gettext_noop('Ventes de marchandises'), 'PRODUIT', None),
+    ('71', gettext_noop("Production stockée"), 'PRODUIT', None),
+    ('75', gettext_noop('Autres produits'), 'PRODUIT', None),
+    ('758', gettext_noop('Produits divers'), 'PRODUIT', None),
 ]
 
 
@@ -77,7 +82,7 @@ class AccountingService:
             parent = None
             if parent_code:
                 parent = Account.objects.filter(code=parent_code).first()
-            _, created = Account.objects.get_or_create(
+            _unused, created = Account.objects.get_or_create(
                 code=code,
                 defaults={
                     'name': name,
@@ -93,27 +98,58 @@ class AccountingService:
 
     @staticmethod
     def _generate_reference(journal_code: str) -> str:
-        """Génère une référence unique : VE-20260225-001"""
+        """Génère la prochaine référence du jour : VE-20260225-001"""
         today = date.today().strftime('%Y%m%d')
-        prefix = f"{journal_code}-{today}"
-        last = (
-            JournalEntry.objects
-            .filter(reference__startswith=prefix)
-            .order_by('-reference')
-            .first()
-        )
-        if last:
-            seq = int(last.reference.split('-')[-1]) + 1
-        else:
-            seq = 1
-        return f"{prefix}-{seq:03d}"
+        prefix = f"{journal_code}-{today}-"
+        # Max numérique (et non lexicographique : '999' > '1000' sinon)
+        seq = 0
+        for ref in JournalEntry.objects.filter(
+            reference__startswith=prefix
+        ).values_list('reference', flat=True):
+            suffix = ref[len(prefix):]
+            if suffix.isdigit():
+                seq = max(seq, int(suffix))
+        return f"{prefix}{seq + 1:03d}"
+
+    _REFERENCE_RETRIES = 5
+
+    @classmethod
+    def _create_entry(cls, journal_code: str, **fields) -> JournalEntry:
+        """
+        Crée une écriture avec une référence unique. La numérotation n'étant
+        pas verrouillée, deux écritures simultanées peuvent calculer la même
+        référence : on réessaie dans un savepoint sur ``IntegrityError``.
+        """
+        last_error = None
+        for _unused in range(cls._REFERENCE_RETRIES):
+            ref = cls._generate_reference(journal_code)
+            try:
+                with transaction.atomic():
+                    return JournalEntry.objects.create(reference=ref, **fields)
+            except IntegrityError as exc:
+                last_error = exc
+        raise last_error
 
     # ── Helpers pour récupérer un compte ──────────────────────────────
 
     @staticmethod
     def get_account(code: str) -> Account:
-        """Récupère un compte par son code. Lève DoesNotExist si absent."""
-        return Account.objects.get(code=code)
+        """Récupère un compte actif par son code. Lève DoesNotExist si absent/inactif."""
+        return Account.objects.get(code=code, is_active=True, delete_at__isnull=True)
+
+    @staticmethod
+    def treasury_account_code(payment_method) -> str:
+        """
+        Code du compte de trésorerie pour un mode de paiement.
+        Un mode inconnu lève une erreur au lieu de retomber silencieusement
+        sur la caisse (571).
+        """
+        if not payment_method:
+            return PAYMENT_METHOD_ACCOUNT_MAP['CASH']
+        try:
+            return PAYMENT_METHOD_ACCOUNT_MAP[payment_method]
+        except KeyError:
+            raise ValueError(_("Mode de paiement inconnu : %(method)s") % {'method': payment_method})
 
     # ── Helper TVA ──────────────────────────────────────────────────
 
@@ -168,10 +204,10 @@ class AccountingService:
         entries = []
 
         with transaction.atomic():
-            reversal_entry = JournalEntry.objects.create(
-                reference=cls._generate_reference('VE'),
+            reversal_entry = cls._create_entry(
+                'VE',
                 date=timezone.now().date(),
-                description=f"Annulation vente #{sale.id}",
+                description=_("Annulation vente #%(id)s") % {'id': sale.id},
                 journal='VE',
                 exercise=exercise,
                 daily=daily,
@@ -184,7 +220,7 @@ class AccountingService:
                     account=cls.get_account('701'),
                     debit=revenue_amount,
                     credit=0,
-                    description=f"Contrepassation vente #{sale.id}",
+                    description=_("Contrepassation vente #%(id)s") % {'id': sale.id},
                 ),
             ]
 
@@ -194,16 +230,16 @@ class AccountingService:
                     account=cls.get_account('4431'),
                     debit=tva_amount,
                     credit=0,
-                    description=f"Contrepassation TVA collectée – vente #{sale.id}",
+                    description=_("Contrepassation TVA collectée – vente #%(id)s") % {'id': sale.id},
                 ))
 
             if getattr(sale, 'is_credit', False):
                 credit_account = cls.get_account('411')
-                credit_desc = f"Annulation créance client – vente #{sale.id}"
+                credit_desc = _("Annulation créance client – vente #%(id)s") % {'id': sale.id}
             else:
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                account_code = cls.treasury_account_code(refund_payment_method)
                 credit_account = cls.get_account(account_code)
-                credit_desc = f"Remboursement client – vente #{sale.id}"
+                credit_desc = _("Remboursement client – vente #%(id)s") % {'id': sale.id}
 
             reversal_lines.append(JournalEntryLine(
                 entry=reversal_entry,
@@ -216,30 +252,30 @@ class AccountingService:
             entries.append(reversal_entry)
 
             if getattr(sale, 'is_credit', False) and refund_amount > 0:
-                refund_entry = JournalEntry.objects.create(
-                    reference=cls._generate_reference('CA'),
+                refund_entry = cls._create_entry(
+                    'CA',
                     date=timezone.now().date(),
-                    description=f"Remboursement client – annulation vente #{sale.id}",
+                    description=_("Remboursement client – annulation vente #%(id)s") % {'id': sale.id},
                     journal='CA',
                     exercise=exercise,
                     daily=daily,
                     sale=sale,
                 )
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                account_code = cls.treasury_account_code(refund_payment_method)
                 JournalEntryLine.objects.bulk_create([
                     JournalEntryLine(
                         entry=refund_entry,
                         account=cls.get_account('411'),
                         debit=refund_amount,
                         credit=0,
-                        description=f"Extinction avoir client – vente #{sale.id}",
+                        description=_("Extinction avoir client – vente #%(id)s") % {'id': sale.id},
                     ),
                     JournalEntryLine(
                         entry=refund_entry,
                         account=cls.get_account(account_code),
                         debit=0,
                         credit=refund_amount,
-                        description=f"Sortie trésorerie – vente #{sale.id}",
+                        description=_("Sortie trésorerie – vente #%(id)s") % {'id': sale.id},
                     ),
                 ])
                 entries.append(refund_entry)
@@ -269,10 +305,10 @@ class AccountingService:
         entries = []
 
         with transaction.atomic():
-            reversal_entry = JournalEntry.objects.create(
-                reference=cls._generate_reference('VE'),
+            reversal_entry = cls._create_entry(
+                'VE',
                 date=timezone.now().date(),
-                description=f"Retour partiel vente #{sale.id}",
+                description=_("Retour partiel vente #%(id)s") % {'id': sale.id},
                 journal='VE',
                 exercise=exercise,
                 daily=daily,
@@ -285,7 +321,7 @@ class AccountingService:
                     account=cls.get_account('701'),
                     debit=revenue_amount,
                     credit=0,
-                    description=f"Contrepassation retour partiel – vente #{sale.id}",
+                    description=_("Contrepassation retour partiel – vente #%(id)s") % {'id': sale.id},
                 ),
             ]
 
@@ -295,16 +331,16 @@ class AccountingService:
                     account=cls.get_account('4431'),
                     debit=tva_amount,
                     credit=0,
-                    description=f"Contrepassation TVA – retour partiel vente #{sale.id}",
+                    description=_("Contrepassation TVA – retour partiel vente #%(id)s") % {'id': sale.id},
                 ))
 
             if getattr(sale, 'is_credit', False):
                 credit_account = cls.get_account('411')
-                credit_desc = f"Réduction créance client – vente #{sale.id}"
+                credit_desc = _("Réduction créance client – vente #%(id)s") % {'id': sale.id}
             else:
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                account_code = cls.treasury_account_code(refund_payment_method)
                 credit_account = cls.get_account(account_code)
-                credit_desc = f"Remboursement client – retour partiel vente #{sale.id}"
+                credit_desc = _("Remboursement client – retour partiel vente #%(id)s") % {'id': sale.id}
 
             reversal_lines.append(JournalEntryLine(
                 entry=reversal_entry,
@@ -317,30 +353,30 @@ class AccountingService:
             entries.append(reversal_entry)
 
             if getattr(sale, 'is_credit', False) and refund_amount > 0:
-                refund_entry = JournalEntry.objects.create(
-                    reference=cls._generate_reference('CA'),
+                refund_entry = cls._create_entry(
+                    'CA',
                     date=timezone.now().date(),
-                    description=f"Remboursement client – retour partiel vente #{sale.id}",
+                    description=_("Remboursement client – retour partiel vente #%(id)s") % {'id': sale.id},
                     journal='CA',
                     exercise=exercise,
                     daily=daily,
                     sale=sale,
                 )
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                account_code = cls.treasury_account_code(refund_payment_method)
                 JournalEntryLine.objects.bulk_create([
                     JournalEntryLine(
                         entry=refund_entry,
                         account=cls.get_account('411'),
                         debit=refund_amount,
                         credit=0,
-                        description=f"Extinction avoir client – retour partiel vente #{sale.id}",
+                        description=_("Extinction avoir client – retour partiel vente #%(id)s") % {'id': sale.id},
                     ),
                     JournalEntryLine(
                         entry=refund_entry,
                         account=cls.get_account(account_code),
                         debit=0,
                         credit=refund_amount,
-                        description=f"Sortie trésorerie – retour partiel vente #{sale.id}",
+                        description=_("Sortie trésorerie – retour partiel vente #%(id)s") % {'id': sale.id},
                     ),
                 ])
                 entries.append(refund_entry)
@@ -377,10 +413,10 @@ class AccountingService:
         entries = []
 
         with transaction.atomic():
-            reversal_entry = JournalEntry.objects.create(
-                reference=cls._generate_reference('AC'),
+            reversal_entry = cls._create_entry(
+                'AC',
                 date=timezone.now().date(),
-                description=f"Annulation approvisionnement #{supply.id}",
+                description=_("Annulation approvisionnement #%(id)s") % {'id': supply.id},
                 journal='AC',
                 exercise=exercise,
                 daily=daily,
@@ -393,7 +429,7 @@ class AccountingService:
                     account=cls.get_account('601'),
                     debit=0,
                     credit=purchase_amount,
-                    description=f"Contrepassation achat – appro. #{supply.id}",
+                    description=_("Contrepassation achat – appro. #%(id)s") % {'id': supply.id},
                 ),
             ]
 
@@ -403,16 +439,16 @@ class AccountingService:
                     account=cls.get_account('4451'),
                     debit=0,
                     credit=tva_amount,
-                    description=f"Contrepassation TVA déductible – appro. #{supply.id}",
+                    description=_("Contrepassation TVA déductible – appro. #%(id)s") % {'id': supply.id},
                 ))
 
             if getattr(supply, 'is_credit', False):
                 debit_account = cls.get_account('401')
-                debit_desc = f"Annulation dette fournisseur – appro. #{supply.id}"
+                debit_desc = _("Annulation dette fournisseur – appro. #%(id)s") % {'id': supply.id}
             else:
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                account_code = cls.treasury_account_code(refund_payment_method)
                 debit_account = cls.get_account(account_code)
-                debit_desc = f"Remboursement fournisseur – appro. #{supply.id}"
+                debit_desc = _("Remboursement fournisseur – appro. #%(id)s") % {'id': supply.id}
 
             reversal_lines.append(JournalEntryLine(
                 entry=reversal_entry,
@@ -425,30 +461,30 @@ class AccountingService:
             entries.append(reversal_entry)
 
             if getattr(supply, 'is_credit', False) and refund_amount > 0:
-                reimbursement_entry = JournalEntry.objects.create(
-                    reference=cls._generate_reference('CA'),
+                reimbursement_entry = cls._create_entry(
+                    'CA',
                     date=timezone.now().date(),
-                    description=f"Remboursement fournisseur – annulation approvisionnement #{supply.id}",
+                    description=_("Remboursement fournisseur – annulation approvisionnement #%(id)s") % {'id': supply.id},
                     journal='CA',
                     exercise=exercise,
                     daily=daily,
                     supply=supply,
                 )
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                account_code = cls.treasury_account_code(refund_payment_method)
                 JournalEntryLine.objects.bulk_create([
                     JournalEntryLine(
                         entry=reimbursement_entry,
                         account=cls.get_account(account_code),
                         debit=refund_amount,
                         credit=0,
-                        description=f"Entrée trésorerie – appro. #{supply.id}",
+                        description=_("Entrée trésorerie – appro. #%(id)s") % {'id': supply.id},
                     ),
                     JournalEntryLine(
                         entry=reimbursement_entry,
                         account=cls.get_account('401'),
                         debit=0,
                         credit=refund_amount,
-                        description=f"Extinction avoir fournisseur – appro. #{supply.id}",
+                        description=_("Extinction avoir fournisseur – appro. #%(id)s") % {'id': supply.id},
                     ),
                 ])
                 entries.append(reimbursement_entry)
@@ -477,10 +513,10 @@ class AccountingService:
         entries = []
 
         with transaction.atomic():
-            reversal_entry = JournalEntry.objects.create(
-                reference=cls._generate_reference('AC'),
+            reversal_entry = cls._create_entry(
+                'AC',
                 date=timezone.now().date(),
-                description=f"Retour partiel approvisionnement #{supply.id}",
+                description=_("Retour partiel approvisionnement #%(id)s") % {'id': supply.id},
                 journal='AC',
                 exercise=exercise,
                 daily=daily,
@@ -493,7 +529,7 @@ class AccountingService:
                     account=cls.get_account('601'),
                     debit=0,
                     credit=purchase_amount,
-                    description=f"Contrepassation retour partiel – appro. #{supply.id}",
+                    description=_("Contrepassation retour partiel – appro. #%(id)s") % {'id': supply.id},
                 ),
             ]
 
@@ -503,16 +539,16 @@ class AccountingService:
                     account=cls.get_account('4451'),
                     debit=0,
                     credit=tva_amount,
-                    description=f"Contrepassation TVA – retour partiel appro. #{supply.id}",
+                    description=_("Contrepassation TVA – retour partiel appro. #%(id)s") % {'id': supply.id},
                 ))
 
             if getattr(supply, 'is_credit', False):
                 debit_account = cls.get_account('401')
-                debit_desc = f"Réduction dette fournisseur – appro. #{supply.id}"
+                debit_desc = _("Réduction dette fournisseur – appro. #%(id)s") % {'id': supply.id}
             else:
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                account_code = cls.treasury_account_code(refund_payment_method)
                 debit_account = cls.get_account(account_code)
-                debit_desc = f"Remboursement fournisseur – retour partiel appro. #{supply.id}"
+                debit_desc = _("Remboursement fournisseur – retour partiel appro. #%(id)s") % {'id': supply.id}
 
             reversal_lines.append(JournalEntryLine(
                 entry=reversal_entry,
@@ -525,30 +561,30 @@ class AccountingService:
             entries.append(reversal_entry)
 
             if getattr(supply, 'is_credit', False) and refund_amount > 0:
-                reimbursement_entry = JournalEntry.objects.create(
-                    reference=cls._generate_reference('CA'),
+                reimbursement_entry = cls._create_entry(
+                    'CA',
                     date=timezone.now().date(),
-                    description=f"Remboursement fournisseur – retour partiel approvisionnement #{supply.id}",
+                    description=_("Remboursement fournisseur – retour partiel approvisionnement #%(id)s") % {'id': supply.id},
                     journal='CA',
                     exercise=exercise,
                     daily=daily,
                     supply=supply,
                 )
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(refund_payment_method, '571')
+                account_code = cls.treasury_account_code(refund_payment_method)
                 JournalEntryLine.objects.bulk_create([
                     JournalEntryLine(
                         entry=reimbursement_entry,
                         account=cls.get_account(account_code),
                         debit=refund_amount,
                         credit=0,
-                        description=f"Entrée trésorerie – retour partiel appro. #{supply.id}",
+                        description=_("Entrée trésorerie – retour partiel appro. #%(id)s") % {'id': supply.id},
                     ),
                     JournalEntryLine(
                         entry=reimbursement_entry,
                         account=cls.get_account('401'),
                         debit=0,
                         credit=refund_amount,
-                        description=f"Extinction avoir fournisseur – retour partiel appro. #{supply.id}",
+                        description=_("Extinction avoir fournisseur – retour partiel appro. #%(id)s") % {'id': supply.id},
                     ),
                 ])
                 entries.append(reimbursement_entry)
@@ -580,13 +616,22 @@ class AccountingService:
         tax_rate = cls.get_default_tax_rate() if apply_tax else None
         ht, tva = cls.compute_tax(amount, tax_rate)
 
+        if is_credit and tax_rate:
+            description = _("Vente #%(id)s (crédit) TVA %(rate)s%%") % {
+                'id': sale.id, 'rate': tax_rate.rate,
+            }
+        elif is_credit:
+            description = _("Vente #%(id)s (crédit)") % {'id': sale.id}
+        elif tax_rate:
+            description = _("Vente #%(id)s TVA %(rate)s%%") % {'id': sale.id, 'rate': tax_rate.rate}
+        else:
+            description = _("Vente #%(id)s") % {'id': sale.id}
+
         with transaction.atomic():
-            ref = cls._generate_reference('VE')
-            entry = JournalEntry.objects.create(
-                reference=ref,
+            entry = cls._create_entry(
+                'VE',
                 date=timezone.now().date(),
-                description=f"Vente #{sale.id}" + (" (crédit)" if is_credit else "")
-                            + (f" TVA {tax_rate.rate}%" if tax_rate else ""),
+                description=description,
                 journal='VE',
                 exercise=exercise,
                 daily=daily,
@@ -595,11 +640,11 @@ class AccountingService:
 
             if is_credit:
                 debit_account = cls.get_account('411')
-                debit_desc = f"Créance client – vente #{sale.id}"
+                debit_desc = _("Créance client – vente #%(id)s") % {'id': sale.id}
             else:
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(payment_method, '571')
+                account_code = cls.treasury_account_code(payment_method)
                 debit_account = cls.get_account(account_code)
-                debit_desc = f"Encaissement vente #{sale.id}"
+                debit_desc = _("Encaissement vente #%(id)s") % {'id': sale.id}
 
             lines = [
                 JournalEntryLine(
@@ -612,7 +657,7 @@ class AccountingService:
                     entry=entry,
                     account=cls.get_account('701'),
                     debit=0, credit=ht,
-                    description=f"Vente de marchandises #{sale.id} (HT)",
+                    description=_("Vente de marchandises #%(id)s (HT)") % {'id': sale.id},
                 ),
             ]
 
@@ -621,7 +666,7 @@ class AccountingService:
                     entry=entry,
                     account=cls.get_account('4431'),
                     debit=0, credit=tva,
-                    description=f"TVA collectée – vente #{sale.id}",
+                    description=_("TVA collectée – vente #%(id)s") % {'id': sale.id},
                 ))
 
             JournalEntryLine.objects.bulk_create(lines)
@@ -662,9 +707,11 @@ class AccountingService:
         
         entries_created = 0
         
-        with transaction.atomic():
-            for sale in sales_with_tva:
-                try:
+        for sale in sales_with_tva:
+            # Savepoint PAR vente : une erreur n'annule pas les autres et
+            # n'aborte pas la transaction englobante.
+            try:
+                with transaction.atomic():
                     amount = Decimal(str(sale.total or 0))
                     if amount <= 0:
                         continue
@@ -675,11 +722,10 @@ class AccountingService:
                         continue
                     
                     # Créer une écriture de TVA collectée
-                    ref = cls._generate_reference('VE')
-                    entry = JournalEntry.objects.create(
-                        reference=ref,
+                    entry = cls._create_entry(
+                        'VE',
                         date=timezone.now().date(),
-                        description=f"TVA collectée - Vente #{sale.id} (clôture daily)",
+                        description=_("TVA collectée - Vente #%(id)s (clôture daily)") % {'id': sale.id},
                         journal='VE',
                         exercise=daily.exercise,
                         daily=daily,
@@ -692,14 +738,14 @@ class AccountingService:
                             account=cls.get_account('701'),
                             debit=tva,
                             credit=0,
-                            description=f"Constatation TVA différée – vente #{sale.id}",
+                            description=_("Constatation TVA différée – vente #%(id)s") % {'id': sale.id},
                         ),
                         JournalEntryLine(
                             entry=entry,
                             account=cls.get_account('4431'),
                             debit=0,
                             credit=tva,
-                            description=f"TVA collectée – vente #{sale.id}",
+                            description=_("TVA collectée – vente #%(id)s") % {'id': sale.id},
                         ),
                     ])
                     
@@ -709,10 +755,12 @@ class AccountingService:
                     
                     entries_created += 1
                     
-                except Exception as e:
-                    # Log l'erreur mais continuer avec les autres ventes
-                    print(f"Erreur lors de la création des écritures TVA pour la vente #{sale.id}: {e}")
-                    continue
+            except Exception:
+                # Journaliser et continuer avec les autres ventes
+                logger.exception(
+                    "Écritures TVA différée impossibles pour la vente #%s", sale.id,
+                )
+                continue
         
         return entries_created
 
@@ -740,14 +788,28 @@ class AccountingService:
 
         ht, tva = cls.compute_tax(amount, tax_rate)
 
+        if is_credit and tax_rate:
+            description = _("Approvisionnement #%(id)s – %(product)s (crédit) TVA %(rate)s%%") % {
+                'id': supply.id, 'product': supply.product.name, 'rate': tax_rate.rate,
+            }
+        elif is_credit:
+            description = _("Approvisionnement #%(id)s – %(product)s (crédit)") % {
+                'id': supply.id, 'product': supply.product.name,
+            }
+        elif tax_rate:
+            description = _("Approvisionnement #%(id)s – %(product)s TVA %(rate)s%%") % {
+                'id': supply.id, 'product': supply.product.name, 'rate': tax_rate.rate,
+            }
+        else:
+            description = _("Approvisionnement #%(id)s – %(product)s") % {
+                'id': supply.id, 'product': supply.product.name,
+            }
+
         with transaction.atomic():
-            ref = cls._generate_reference('AC')
-            entry = JournalEntry.objects.create(
-                reference=ref,
+            entry = cls._create_entry(
+                'AC',
                 date=timezone.now().date(),
-                description=f"Approvisionnement #{supply.id} – {supply.product.name}"
-                            + (" (crédit)" if is_credit else "")
-                            + (f" TVA {tax_rate.rate}%" if tax_rate else ""),
+                description=description,
                 journal='AC',
                 exercise=exercise,
                 daily=daily,
@@ -756,18 +818,18 @@ class AccountingService:
 
             if is_credit:
                 credit_account = cls.get_account('401')
-                credit_desc = f"Dette fournisseur – appro. #{supply.id}"
+                credit_desc = _("Dette fournisseur – appro. #%(id)s") % {'id': supply.id}
             else:
-                account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(payment_method, '571')
+                account_code = cls.treasury_account_code(payment_method)
                 credit_account = cls.get_account(account_code)
-                credit_desc = f"Paiement fournisseur – appro. #{supply.id}"
+                credit_desc = _("Paiement fournisseur – appro. #%(id)s") % {'id': supply.id}
 
             lines = [
                 JournalEntryLine(
                     entry=entry,
                     account=cls.get_account('601'),
                     debit=ht, credit=0,
-                    description=f"Achat {supply.product.name} (HT)",
+                    description=_("Achat %(product)s (HT)") % {'product': supply.product.name},
                 ),
                 JournalEntryLine(
                     entry=entry,
@@ -782,7 +844,7 @@ class AccountingService:
                     entry=entry,
                     account=cls.get_account('4451'),
                     debit=tva, credit=0,
-                    description=f"TVA déductible – appro. #{supply.id}",
+                    description=_("TVA déductible – appro. #%(id)s") % {'id': supply.id},
                 ))
 
             JournalEntryLine.objects.bulk_create(lines)
@@ -803,20 +865,29 @@ class AccountingService:
         if amount <= 0:
             return None
 
-        account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(payment_method, '571')
+        account_code = cls.treasury_account_code(payment_method)
         
-        # Utiliser le compte sélectionné dans la dépense ou défaut 65
+        # Utiliser le compte sélectionné dans la dépense ou défaut 65.
+        # Une dépense ne peut débiter qu'un compte de charge (classe 6) : cela
+        # empêche d'effacer une créance (411) ou de créer un mouvement de
+        # caisse fictif (571) via le module dépenses.
         if expense.account:
             expense_account = expense.account
+            if not str(expense_account.code).startswith('6'):
+                raise ValueError(
+                    _("Une dépense doit être imputée sur un compte de charge (classe 6), "
+                      "pas sur %(code)s.") % {'code': expense_account.code}
+                )
         else:
             expense_account = cls.get_account('65')
 
         with transaction.atomic():
-            ref = cls._generate_reference('CA')
-            entry = JournalEntry.objects.create(
-                reference=ref,
+            entry = cls._create_entry(
+                'CA',
                 date=timezone.now().date(),
-                description=f"Dépense – {expense.expense_type.name if expense.expense_type else 'Divers'}",
+                description=_("Dépense – %(type)s") % {
+                    'type': expense.expense_type.name if expense.expense_type else _('Divers'),
+                },
                 journal='CA',
                 exercise=exercise,
                 daily=daily,
@@ -827,13 +898,13 @@ class AccountingService:
                     entry=entry,
                     account=expense_account,
                     debit=amount, credit=0,
-                    description=expense.description or f"Dépense #{expense.id}",
+                    description=expense.description or _("Dépense #%(id)s") % {'id': expense.id},
                 ),
                 JournalEntryLine(
                     entry=entry,
                     account=cls.get_account(account_code),
                     debit=0, credit=amount,
-                    description=f"Sortie de caisse – dépense #{expense.id}",
+                    description=_("Sortie de caisse – dépense #%(id)s") % {'id': expense.id},
                 ),
             ])
         return entry
@@ -853,20 +924,27 @@ class AccountingService:
         if amount <= 0:
             return None
 
-        account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(payment_method, '571')
+        account_code = cls.treasury_account_code(payment_method)
         
-        # Utiliser le compte sélectionné dans la recette ou défaut 75
+        # Utiliser le compte sélectionné dans la recette ou défaut 75.
+        # Une recette ne peut créditer qu'un compte de produit (classe 7).
         if recipe.account:
             recipe_account = recipe.account
+            if not str(recipe_account.code).startswith('7'):
+                raise ValueError(
+                    _("Une recette doit être imputée sur un compte de produit (classe 7), "
+                      "pas sur %(code)s.") % {'code': recipe_account.code}
+                )
         else:
             recipe_account = cls.get_account('75')
 
         with transaction.atomic():
-            ref = cls._generate_reference('CA')
-            entry = JournalEntry.objects.create(
-                reference=ref,
+            entry = cls._create_entry(
+                'CA',
                 date=timezone.now().date(),
-                description=f"Recette – {recipe.recipe_type.name if recipe.recipe_type else 'Divers'}",
+                description=_("Recette – %(type)s") % {
+                    'type': recipe.recipe_type.name if recipe.recipe_type else _('Divers'),
+                },
                 journal='CA',
                 exercise=exercise,
                 daily=daily,
@@ -876,13 +954,13 @@ class AccountingService:
                     entry=entry,
                     account=cls.get_account(account_code),
                     debit=amount, credit=0,
-                    description=f"Entrée de caisse – recette #{recipe.id}",
+                    description=_("Entrée de caisse – recette #%(id)s") % {'id': recipe.id},
                 ),
                 JournalEntryLine(
                     entry=entry,
                     account=recipe_account,
                     debit=0, credit=amount,
-                    description=recipe.description or f"Recette #{recipe.id}",
+                    description=recipe.description or _("Recette #%(id)s") % {'id': recipe.id},
                 ),
             ])
         return entry
@@ -900,14 +978,13 @@ class AccountingService:
         if amount <= 0:
             return None
 
-        account_code = PAYMENT_METHOD_ACCOUNT_MAP.get(payment.payment_method, '571')
+        account_code = cls.treasury_account_code(payment.payment_method)
 
         with transaction.atomic():
-            ref = cls._generate_reference('CA')
-            entry = JournalEntry.objects.create(
-                reference=ref,
+            entry = cls._create_entry(
+                'CA',
                 date=timezone.now().date(),
-                description=f"Paiement crédit – Vente #{payment.credit_sale.sale_id}",
+                description=_("Paiement crédit – Vente #%(id)s") % {'id': payment.credit_sale.sale_id},
                 journal='CA',
                 exercise=exercise,
                 daily=daily,
@@ -917,13 +994,13 @@ class AccountingService:
                     entry=entry,
                     account=cls.get_account(account_code),
                     debit=amount, credit=0,
-                    description=f"Encaissement crédit – Vente #{payment.credit_sale.sale_id}",
+                    description=_("Encaissement crédit – Vente #%(id)s") % {'id': payment.credit_sale.sale_id},
                 ),
                 JournalEntryLine(
                     entry=entry,
                     account=cls.get_account('411'),
                     debit=0, credit=amount,
-                    description=f"Règlement client – Vente #{payment.credit_sale.sale_id}",
+                    description=_("Règlement client – Vente #%(id)s") % {'id': payment.credit_sale.sale_id},
                 ),
             ])
         return entry
@@ -946,11 +1023,10 @@ class AccountingService:
         )
 
         with transaction.atomic():
-            ref = cls._generate_reference('CA')
-            entry = JournalEntry.objects.create(
-                reference=ref,
+            entry = cls._create_entry(
+                'CA',
                 date=timezone.now().date(),
-                description=f"Paiement fournisseur – {supplier_payment.supplier.name}",
+                description=_("Paiement fournisseur – %(supplier)s") % {'supplier': supplier_payment.supplier.name},
                 journal='CA',
                 exercise=exercise,
                 daily=daily,
@@ -960,14 +1036,14 @@ class AccountingService:
                     entry=entry,
                     account=cls.get_account('401'),
                     debit=amount, credit=0,
-                    description=f"Règlement fournisseur – {supplier_payment.supplier.name}",
+                    description=_("Règlement fournisseur – %(supplier)s") % {'supplier': supplier_payment.supplier.name},
                 ),
                 JournalEntryLine(
                     entry=entry,
                     account=cls.get_account(account_code),
                     debit=0, 
                     credit=amount,
-                    description=f"Sortie trésorerie – paiement {supplier_payment.supplier.name}",
+                    description=_("Sortie trésorerie – paiement %(supplier)s") % {'supplier': supplier_payment.supplier.name},
                 ),
             ])
         return entry
@@ -990,6 +1066,7 @@ class AccountingService:
         for account in accounts:
             filters = {
                 'entry__is_validated': True,
+                'entry__delete_at__isnull': True,
                 'account': account,
                 'delete_at__isnull': True,
             }
@@ -1241,8 +1318,8 @@ class AccountingService:
                     client_name = f"{cs.sale.client.firstname} {cs.sale.client.lastname}"
 
                 result.append({
-                    'reference': f"Vente #{cs.sale_id}",
-                    'tiers': client_name or 'Client anonyme',
+                    'reference': _("Vente #%(id)s") % {'id': cs.sale_id},
+                    'tiers': client_name or _('Client anonyme'),
                     'date': sale_date,
                     'due_date': cs.due_date,
                     'age_days': age_days,
@@ -1256,12 +1333,12 @@ class AccountingService:
                 'items': result,
                 'tranches_data': [
                     {'label': label, 'amount': totals[label]}
-                    for label, _, _ in tranches
+                    for label, _low, _high in tranches
                 ],
                 'totals': totals,
                 'grand_total': grand_total,
                 'balance_type': 'client',
-                'title': 'Créances clients',
+                'title': _('Créances clients'),
             }
             return {
                 'items': result,
@@ -1269,7 +1346,7 @@ class AccountingService:
                 'grand_total': grand_total,
                 'tranches': [t[0] for t in tranches],
                 'balance_type': 'client',
-                'title': 'Créances clients',
+                'title': _('Créances clients'),
             }
 
         else:  # supplier
@@ -1323,12 +1400,12 @@ class AccountingService:
                 'items': result,
                 'tranches_data': [
                     {'label': label, 'amount': totals[label]}
-                    for label, _, _ in tranches
+                    for label, _low, _high in tranches
                 ],
                 'totals': totals,
                 'grand_total': grand_total,
                 'balance_type': 'client',
-                'title': 'Créances clients',
+                'title': _('Créances clients'),
 }
             return {
                 'items': result,
@@ -1336,7 +1413,7 @@ class AccountingService:
                 'grand_total': grand_total,
                 'tranches': [t[0] for t in tranches],
                 'balance_type': 'supplier',
-                'title': 'Dettes fournisseurs',
+                'title': _('Dettes fournisseurs'),
             }
 
 
@@ -1598,14 +1675,33 @@ class AccountingService:
         Rapproche une ligne de relevé bancaire avec une ligne d'écriture comptable.
         """
         from core.models.accounting_models import BankStatement
-        stmt = BankStatement.objects.get(id=statement_id, delete_at__isnull=True)
-        entry_line = JournalEntryLine.objects.get(id=entry_line_id)
+        with transaction.atomic():
+            stmt = BankStatement.objects.select_for_update().get(
+                id=statement_id, delete_at__isnull=True,
+            )
+            if stmt.is_reconciled:
+                raise ValueError(_("Cette ligne de relevé est déjà rapprochée."))
+            # La ligne d'écriture doit être active, du MÊME compte que le relevé,
+            # et pas déjà rapprochée avec un autre relevé.
+            entry_line = JournalEntryLine.objects.filter(
+                id=entry_line_id,
+                account=stmt.account,
+                delete_at__isnull=True,
+                entry__delete_at__isnull=True,
+                entry__is_validated=True,
+            ).first()
+            if entry_line is None:
+                raise ValueError(_("Ligne d'écriture introuvable ou non rapprochable avec ce compte."))
+            if BankStatement.objects.filter(
+                reconciled_entry=entry_line, is_reconciled=True, delete_at__isnull=True,
+            ).exclude(pk=stmt.pk).exists():
+                raise ValueError(_("Cette ligne d'écriture est déjà rapprochée avec un autre relevé."))
 
-        stmt.is_reconciled = True
-        stmt.reconciled_entry = entry_line
-        stmt.reconciled_at = timezone.now()
-        stmt.reconciled_by = user
-        stmt.save()
+            stmt.is_reconciled = True
+            stmt.reconciled_entry = entry_line
+            stmt.reconciled_at = timezone.now()
+            stmt.reconciled_by = user
+            stmt.save()
         return stmt
 
     @classmethod
@@ -1632,14 +1728,32 @@ class AccountingService:
         4. Enregistre l'historique dans ExerciseClosing
         Retourne l'objet ExerciseClosing créé.
         """
-        from core.models.accounting_models import ExerciseClosing
-
-        if not exercise.is_active():
-            raise ValueError("Cet exercice est déjà clôturé.")
+        from core.models.accounting_models import ExerciseClosing, Daily
 
         zero = Decimal('0')
 
         with transaction.atomic():
+            # Verrouiller l'exercice : deux clôtures simultanées sont impossibles
+            from core.models.accounting_models import Exercise
+            exercise = Exercise.objects.select_for_update().get(pk=exercise.pk)
+            if not exercise.is_active():
+                raise ValueError(_("Cet exercice est déjà clôturé."))
+            if ExerciseClosing.objects.filter(exercise=exercise, delete_at__isnull=True).exists():
+                raise ValueError(_("Cet exercice a déjà fait l'objet d'une clôture."))
+            if Daily.objects.filter(
+                exercise=exercise, end_date__isnull=True, delete_at__isnull=True,
+            ).exists():
+                raise ValueError(_(
+                    "Une journée est encore ouverte sur cet exercice. "
+                    "Clôturez la journée avant de clôturer l'exercice."
+                ))
+            # Les à-nouveaux (AN) ne sont que le report d'ouverture : un
+            # exercice qui n'a rien d'autre n'a pas d'activité à clôturer.
+            if not JournalEntry.objects.filter(
+                exercise=exercise, delete_at__isnull=True,
+            ).exclude(journal='AN').exists():
+                raise ValueError(_("Cet exercice ne contient aucune opération : rien à clôturer."))
+
             # Calculer soldes des classes 6 et 7
             accounts_6 = Account.objects.filter(
                 code__startswith='6', delete_at__isnull=True
@@ -1677,11 +1791,10 @@ class AccountingService:
             resultat = total_produits - total_charges
 
             # Écriture de clôture
-            ref = cls._generate_reference('CL')
-            closing_entry = JournalEntry.objects.create(
-                reference=ref,
+            closing_entry = cls._create_entry(
+                'CL',
                 date=timezone.now().date(),
-                description=f"Clôture exercice {exercise} — Résultat: {resultat} FCFA",
+                description=_("Clôture exercice %(exercise)s — Résultat: %(result)s FCFA") % {'exercise': exercise, 'result': resultat},
                 journal='OD',  # Opérations diverses
                 exercise=exercise,
                 is_validated=True,
@@ -1695,7 +1808,9 @@ class AccountingService:
                     account=line['account'],
                     debit=line['debit'],
                     credit=line['credit'],
-                    description=f"Clôture {line['account'].code} — {line['account'].name}",
+                    description=_("Clôture %(code)s — %(name)s") % {
+                        'code': line['account'].code, 'name': line['account'].name,
+                    },
                 ))
 
             # Ligne résultat vers compte 12
@@ -1706,7 +1821,7 @@ class AccountingService:
                     entry=closing_entry,
                     account=compte_12,
                     debit=zero, credit=resultat,
-                    description=f"Résultat de l'exercice (bénéfice)",
+                    description=_("Résultat de l'exercice (bénéfice)"),
                 ))
             else:
                 # Perte → Débit 12
@@ -1714,7 +1829,7 @@ class AccountingService:
                     entry=closing_entry,
                     account=compte_12,
                     debit=abs(resultat), credit=zero,
-                    description=f"Résultat de l'exercice (perte)",
+                    description=_("Résultat de l'exercice (perte)"),
                 ))
 
             JournalEntryLine.objects.bulk_create(entry_lines)
@@ -1743,12 +1858,18 @@ class AccountingService:
         3. Reporte le résultat (compte 12) vers le report à nouveau (131/139)
         Retourne le nouvel exercice créé.
         """
-        from core.models.accounting_models import Exercise
+        from core.models.accounting_models import Exercise, ExerciseClosing
 
         old_exercise = closing.exercise
         zero = Decimal('0')
 
         with transaction.atomic():
+            # Idempotence : une clôture ne peut ouvrir qu'UN nouvel exercice
+            # (sinon les à-nouveaux seraient dupliqués à chaque appel).
+            closing = ExerciseClosing.objects.select_for_update().get(pk=closing.pk)
+            if closing.new_exercise_id:
+                raise ValueError(_("Un nouvel exercice a déjà été ouvert pour cette clôture."))
+
             # Créer le nouvel exercice
             new_exercise = Exercise.objects.create(
                 start_date=timezone.now(),
@@ -1756,11 +1877,10 @@ class AccountingService:
             )
 
             # Écriture d'ouverture (report à nouveau)
-            ref = cls._generate_reference('AN')  # À-Nouveau
-            opening_entry = JournalEntry.objects.create(
-                reference=ref,
+            opening_entry = cls._create_entry(
+                'AN',
                 date=timezone.now().date(),
-                description=f"Report à nouveau — ouverture exercice {new_exercise}",
+                description=_("Report à nouveau — ouverture exercice %(exercise)s") % {'exercise': new_exercise},
                 journal='AN',
                 exercise=new_exercise,
                 is_validated=True,
@@ -1789,14 +1909,14 @@ class AccountingService:
                             entry=opening_entry,
                             account=acc,
                             debit=balance, credit=zero,
-                            description=f"Report à nouveau {acc.code}",
+                            description=_("Report à nouveau %(code)s") % {'code': acc.code},
                         ))
                     else:
                         entry_lines.append(JournalEntryLine(
                             entry=opening_entry,
                             account=acc,
                             debit=zero, credit=abs(balance),
-                            description=f"Report à nouveau {acc.code}",
+                            description=_("Report à nouveau %(code)s") % {'code': acc.code},
                         ))
                 else:
                     # PASSIF/PRODUIT — solde normalement créditeur
@@ -1805,14 +1925,14 @@ class AccountingService:
                             entry=opening_entry,
                             account=acc,
                             debit=zero, credit=balance,
-                            description=f"Report à nouveau {acc.code}",
+                            description=_("Report à nouveau %(code)s") % {'code': acc.code},
                         ))
                     else:
                         entry_lines.append(JournalEntryLine(
                             entry=opening_entry,
                             account=acc,
                             debit=abs(balance), credit=zero,
-                            description=f"Report à nouveau {acc.code}",
+                            description=_("Report à nouveau %(code)s") % {'code': acc.code},
                         ))
 
             # Reporter le résultat (12) vers report à nouveau (131 ou 139)
@@ -1823,13 +1943,13 @@ class AccountingService:
                     entry=opening_entry,
                     account=cls.get_account('12'),
                     debit=resultat, credit=zero,
-                    description="Affectation résultat bénéficiaire",
+                    description=_("Affectation résultat bénéficiaire"),
                 ))
                 entry_lines.append(JournalEntryLine(
                     entry=opening_entry,
                     account=cls.get_account('131'),
                     debit=zero, credit=resultat,
-                    description="Report à nouveau — bénéfice",
+                    description=_("Report à nouveau — bénéfice"),
                 ))
             elif resultat < 0:
                 # Perte → vider 12 (crédit) → 139 (débit)
@@ -1837,13 +1957,13 @@ class AccountingService:
                     entry=opening_entry,
                     account=cls.get_account('12'),
                     debit=zero, credit=abs(resultat),
-                    description="Affectation résultat déficitaire",
+                    description=_("Affectation résultat déficitaire"),
                 ))
                 entry_lines.append(JournalEntryLine(
                     entry=opening_entry,
                     account=cls.get_account('139'),
                     debit=abs(resultat), credit=zero,
-                    description="Report à nouveau — perte",
+                    description=_("Report à nouveau — perte"),
                 ))
 
             if entry_lines:

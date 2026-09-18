@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Plan comptable - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Plan comptable" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -32,47 +32,47 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Plan comptable OHADA</h1>
-            <p class="text-secondary">{{ total_accounts }} compte{{ total_accounts|pluralize }}</p>
+            <h1>{% trans "Plan comptable OHADA" %}</h1>
+            <p class="text-secondary">{% blocktrans count counter=total_accounts|default:0 %}{{ counter }} compte{% plural %}{{ counter }} comptes{% endblocktrans %}</p>
         </div>
         <div>
             <a href="{% url 'export_chart_of_accounts' %}?format=csv" class="btn btn-primary btn-sm" style="margin-right: 5px;">
-                Exporter CSV
+                {% trans "Exporter CSV" %}
             </a>
             <a href="{% url 'export_chart_of_accounts' %}?format=txt" class="btn btn-primary btn-sm" style="margin-right: 5px;">
-                Exporter TXT
+                {% trans "Exporter TXT" %}
             </a>
             <button type="button" class="btn btn-success btn-sm" onclick="toggleImportForm()" style="margin-right: 5px;">
-                Importer
+                {% trans "Importer" %}
             </button>
             <a href="{% url 'accounting_add_entry' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">
-                + Nouvelle écriture
+                {% trans "+ Nouvelle écriture" %}
             </a>
-            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Journal</a>
-            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">Grand Livre</a>
-            <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
+            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">{% trans "Journal" %}</a>
+            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm" style="margin-right: 5px;">{% trans "Grand Livre" %}</a>
+            <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">{% trans "Balance" %}</a>
         </div>
     </div>
 </div>
 
 <!-- Import Form (collapsible) -->
 <div id="importForm" class="import-form-container" style="display: none;">
-    <h3>Importer un plan comptable</h3>
+    <h3>{% trans "Importer un plan comptable" %}</h3>
     <form method="post" action="{% url 'import_chart_of_accounts' %}" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="form-group">
-            <label for="importFile">Fichier CSV ou TXT</label>
+            <label for="importFile">{% trans "Fichier CSV ou TXT" %}</label>
             <input type="file" class="form-control" id="importFile" name="file" accept=".csv,.txt" required>
             <small class="form-text text-muted">
-                Format attendu: Code; Libellé; Type; Compte Parent (optionnel); Description (optionnel); Actif (optionnel)
+                {% trans "Format attendu: Code; Libellé; Type; Compte Parent (optionnel); Description (optionnel); Actif (optionnel)" %}
             </small>
         </div>
         <div class="alert alert-info">
-            <strong>Types de comptes:</strong> ACTIF, PASSIF, CHARGE, PRODUIT
+            <strong>{% trans "Types de comptes:" %}</strong> ACTIF, PASSIF, CHARGE, PRODUIT
         </div>
         <div class="btn-group">
-            <button type="submit" class="btn btn-primary">Importer</button>
-            <button type="button" class="btn btn-secondary" onclick="toggleImportForm()">Annuler</button>
+            <button type="submit" class="btn btn-primary">{% trans "Importer" %}</button>
+            <button type="button" class="btn btn-secondary" onclick="toggleImportForm()">{% trans "Annuler" %}</button>
         </div>
     </form>
 </div>
@@ -91,27 +91,27 @@
 {% for class_num, class_data in classes.items %}
 <div class="card" style="margin-bottom: 1rem;">
     <div class="card-header">
-        <h3 class="card-title">Classe {{ class_num }} — {{ class_data.label }}</h3>
+        {% trans class_data.label as class_label %}<h3 class="card-title">{% blocktrans with num=class_num label=class_label %}Classe {{ num }} — {{ label }}{% endblocktrans %}</h3>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th style="width: 100px;">Code</th>
-                        <th>Libellé</th>
-                        <th style="width: 120px;">Type</th>
-                        <th style="width: 100px;">Actions</th>
+                        <th style="width: 100px;">{% trans "Code" %}</th>
+                        <th>{% trans "Libellé" %}</th>
+                        <th style="width: 120px;">{% trans "Type" %}</th>
+                        <th style="width: 100px;">{% trans "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for account in class_data.accounts %}
                     <tr>
                         <td><strong>{{ account.code }}</strong></td>
-                        <td>{% if account.parent %}<span style="padding-left: 1.5rem;">↳ </span>{% endif %}{{ account.name }}</td>
+                        <td>{% if account.parent %}<span style="padding-left: 1.5rem;">↳ </span>{% endif %}{% trans account.name %}</td>
                         <td><span class="badge badge-{{ account.account_type|lower }}">{{ account.get_account_type_display }}</span></td>
                         <td>
-                            <a href="{% url 'accounting_ledger' %}?account={{ account.code }}" class="btn btn-secondary btn-sm" title="Voir le grand livre">
+                            <a href="{% url 'accounting_ledger' %}?account={{ account.code }}" class="btn btn-secondary btn-sm" title="{% trans "Voir le grand livre" %}">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/>
                                     <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>

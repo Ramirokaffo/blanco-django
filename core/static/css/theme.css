@@ -1,4 +1,8 @@
-/* Variables de couleurs - Light Mode */
+/* Variables de couleurs - Light Mode
+   Déclarées aussi sur :root : c'est le thème par défaut, ainsi la page reste
+   lisible même si l'attribut data-theme est absent ou contient une valeur
+   inattendue (ex. "system" écrite par une autre application sur la même origine). */
+:root,
 [data-theme="light"] {
     /* Couleurs principales - Orange */
     --primary-color: #ff8c00;

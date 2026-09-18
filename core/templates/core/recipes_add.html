@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Nouvelle recette - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Nouvelle recette" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/expenses.css' %}">
@@ -11,14 +12,14 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Nouvelle recette</h1>
-            <p class="text-secondary">Enregistrer une nouvelle recette quotidienne</p>
+            <h1>{% trans "Nouvelle recette" %}</h1>
+            <p class="text-secondary">{% trans "Enregistrer une nouvelle recette quotidienne" %}</p>
         </div>
         <a href="{% url 'expenses' %}" class="btn btn-secondary btn-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Retour à la liste
+            {% trans "Retour à la liste" %}
         </a>
     </div>
 </div>
@@ -37,7 +38,7 @@
 <!-- Formulaire -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Informations de la recette</h3>
+        <h3 class="card-title">{% trans "Informations de la recette" %}</h3>
     </div>
     <div class="card-body">
         <form method="post" action="{% url 'add_recipe' %}" class="expense-form" id="recipeForm">
@@ -86,7 +87,7 @@
                     {% if form.account.errors %}
                     <div class="field-error">{{ form.account.errors.0 }}</div>
                     {% endif %}
-                    <small class="form-text text-muted">Laissez vide pour utiliser le compte 75 par défaut</small>
+                    <small class="form-text text-muted">{% trans "Laissez vide pour utiliser le compte 75 par défaut" %}</small>
                 </div>
 
                 <!-- Description (pleine largeur) -->
@@ -104,9 +105,9 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    Enregistrer la recette
+                    {% trans "Enregistrer la recette" %}
                 </button>
-                <a href="{% url 'expenses' %}" class="btn btn-secondary">Annuler</a>
+                <a href="{% url 'expenses' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
             </div>
         </form>
     </div>

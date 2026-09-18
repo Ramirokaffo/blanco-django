@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Factures - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Factures" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Factures</h1>
-            <p class="text-secondary">{{ total_count }} facture{{ total_count|pluralize }}</p>
+            <h1>{% trans "Factures" %}</h1>
+            <p class="text-secondary">{% blocktrans count counter=total_count|default:0 %}{{ counter }} facture{% plural %}{{ counter }} factures{% endblocktrans %}</p>
         </div>
     </div>
 </div>
@@ -27,23 +27,23 @@
     <form method="get" action="{% url 'invoices' %}" class="filters-form">
         <div class="filters-row">
             <div class="filter-group filter-search">
-                <label class="form-label">Recherche</label>
-                <input type="text" name="search" class="form-control" placeholder="N° facture ou client..." value="{{ current_search }}">
+                <label class="form-label">{% trans "Recherche" %}</label>
+                <input type="text" name="search" class="form-control" placeholder="{% trans "N° facture ou client..." %}" value="{{ current_search }}">
             </div>
             <div class="filter-group">
-                <label class="form-label">Statut</label>
+                <label class="form-label">{% trans "Statut" %}</label>
                 <select name="status" class="form-control">
-                    <option value="">Tous</option>
-                    <option value="DRAFT" {% if current_status == 'DRAFT' %}selected{% endif %}>Brouillon</option>
-                    <option value="SENT" {% if current_status == 'SENT' %}selected{% endif %}>Envoyée</option>
-                    <option value="PAID" {% if current_status == 'PAID' %}selected{% endif %}>Payée</option>
-                    <option value="CANCELLED" {% if current_status == 'CANCELLED' %}selected{% endif %}>Annulée</option>
+                    <option value="">{% trans "Tous" %}</option>
+                    <option value="DRAFT" {% if current_status == 'DRAFT' %}selected{% endif %}>{% trans "Brouillon" %}</option>
+                    <option value="SENT" {% if current_status == 'SENT' %}selected{% endif %}>{% trans "Envoyée" %}</option>
+                    <option value="PAID" {% if current_status == 'PAID' %}selected{% endif %}>{% trans "Payée" %}</option>
+                    <option value="CANCELLED" {% if current_status == 'CANCELLED' %}selected{% endif %}>{% trans "Annulée" %}</option>
                 </select>
             </div>
         </div>
         <div class="filters-actions">
-            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
-            <a href="{% url 'invoices' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+            <button type="submit" class="btn btn-primary btn-sm">{% trans "Filtrer" %}</button>
+            <a href="{% url 'invoices' %}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser" %}</a>
         </div>
     </form>
 </div>
@@ -51,9 +51,9 @@
 <!-- Tableau -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des factures</h3>
+        <h3 class="card-title">{% trans "Liste des factures" %}</h3>
         <div class="pagination-info-header">
-            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+            {% blocktrans with number=page_obj.number num_pages=page_obj.paginator.num_pages %}Page {{ number }} sur {{ num_pages }}{% endblocktrans %}
         </div>
     </div>
     <div class="card-body">
@@ -61,12 +61,12 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>N° Facture</th>
-                        <th>Date</th>
-                        <th>Client</th>
-                        <th class="text-right">Montant</th>
-                        <th>Échéance</th>
-                        <th>Statut</th>
+                        <th>{% trans "N° Facture" %}</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Client" %}</th>
+                        <th class="text-right">{% trans "Montant" %}</th>
+                        <th>{% trans "Échéance" %}</th>
+                        <th>{% trans "Statut" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -79,19 +79,19 @@
                         <td>{% if inv.due_date %}{{ inv.due_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
                         <td>
                             {% if inv.status == 'PAID' %}
-                            <span class="badge badge-success">Payée</span>
+                            <span class="badge badge-success">{% trans "Payée" %}</span>
                             {% elif inv.status == 'SENT' %}
-                            <span class="badge badge-info">Envoyée</span>
+                            <span class="badge badge-info">{% trans "Envoyée" %}</span>
                             {% elif inv.status == 'DRAFT' %}
-                            <span class="badge badge-secondary">Brouillon</span>
+                            <span class="badge badge-secondary">{% trans "Brouillon" %}</span>
                             {% elif inv.status == 'CANCELLED' %}
-                            <span class="badge badge-danger">Annulée</span>
+                            <span class="badge badge-danger">{% trans "Annulée" %}</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center">Aucune facture trouvée</td>
+                        <td colspan="6" class="text-center">{% trans "Aucune facture trouvée" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -102,7 +102,7 @@
         {% if page_obj.paginator.num_pages > 1 %}
         <div class="pagination-container">
             <div class="pagination-info">
-                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+                {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=total_count %}Affichage de {{ start }} à {{ end }} sur {{ total }}{% endblocktrans %}
             </div>
             <div class="pagination">
                 {% if page_obj.has_previous %}

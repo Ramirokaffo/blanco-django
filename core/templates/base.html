@@ -1,12 +1,11 @@
-<!DOCTYPE html>
-<html lang="fr">
+{% load static i18n %}<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ system_settings.company_name }} - Gestion{% endblock %}</title>
+    <title>{% block title %}{{ system_settings.company_name }} - {% trans "Gestion" %}{% endblock %}</title>
     
     <!-- Styles CSS -->
-    {% load static %}
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/theme.css' %}">
     <link rel="stylesheet" href="{% static 'css/components.css' %}">
@@ -30,7 +29,7 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; {% now "Y" %} {{ system_settings.company_name }} - Tous droits réservés</p>
+            <p>&copy; {% now "Y" %} {{ system_settings.company_name }} - {% trans "Tous droits réservés" %}</p>
         </div>
     </footer>
     
@@ -39,19 +38,21 @@
     <div class="qr-modal-overlay" id="qrModal">
         <div class="qr-modal">
             <div class="qr-modal-header">
-                <h3>QR Code Serveur</h3>
-                <button class="qr-modal-close" id="qrModalClose" aria-label="Fermer">&times;</button>
+                <h3>{% trans "QR Code Serveur" %}</h3>
+                <button class="qr-modal-close" id="qrModalClose" aria-label="{% trans "Fermer" %}">&times;</button>
             </div>
             <div class="qr-modal-body">
-                <img id="qrCodeImg" src="data:image/png;base64,{{ server_qr_base64 }}" alt="QR Code serveur" class="qr-code-img">
+                <img id="qrCodeImg" src="data:image/png;base64,{{ server_qr_base64 }}" alt="{% trans "QR Code serveur" %}" class="qr-code-img">
                 <p id="qrServerAddress" class="qr-server-address">{{ server_address }}</p>
-                <p class="qr-hint">Scannez ce code QR pour connecter l'application mobile au serveur</p>
+                <p class="qr-hint">{% trans "Scannez ce code QR pour connecter l'application mobile au serveur" %}</p>
             </div>
         </div>
     </div>
     {% endif %}
 
     <!-- Scripts JavaScript -->
+    {# Catalogue de traductions JS (gettext, ngettext, interpolate) : doit précéder tout autre script #}
+    <script src="{% url 'javascript-catalog' %}?lang={{ LANGUAGE_CODE }}"></script>
     <script src="{% static 'js/theme.js' %}"></script>
     <script src="{% static 'js/main.js' %}"></script>
     {% block extra_js %}{% endblock %}

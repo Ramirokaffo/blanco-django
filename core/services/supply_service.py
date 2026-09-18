@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from core.models import Product, Supply, SupplyReturn
 from core.models.inventory_models import CreditSupply, PaymentSchedule
@@ -46,13 +47,25 @@ class SupplyService:
             if schedule.amount_paid > schedule.amount_due:
                 schedule.amount_paid = schedule.amount_due
 
-            note = f"Retour partiel approvisionnement #{credit_supply.supply_id} : -{reduction:,.0f} FCFA"
+            note = _("Retour partiel approvisionnement #%(id)s : -%(amount)s FCFA") % {
+                'id': credit_supply.supply_id, 'amount': format(reduction, ',.0f'),
+            }
             if reason:
-                note = f"{note} — Motif: {reason}"
+                note = _("%(note)s — Motif: %(reason)s") % {'note': note, 'reason': reason}
             schedule.notes = SupplyService._append_note(schedule.notes, note)
             schedule.update_status()
             schedule.save(update_fields=['amount_due', 'amount_paid', 'status', 'notes'])
             remaining_reduction -= reduction
+
+    @staticmethod
+    def _ensure_exercise_open(supply):
+        """Un approvisionnement d'un exercice clôturé ne peut plus être annulé ni retourné."""
+        exercise = getattr(getattr(supply, 'daily', None), 'exercise', None)
+        if exercise is not None and exercise.end_date is not None:
+            raise ValueError(_(
+                "Impossible de modifier un approvisionnement d'un exercice clôturé. "
+                "Passez une écriture de régularisation dans l'exercice en cours."
+            ))
 
     @staticmethod
     @transaction.atomic
@@ -63,13 +76,14 @@ class SupplyService:
         ).get(id=supply.id)
 
         if supply.delete_at is not None:
-            raise ValueError("Cet approvisionnement est déjà annulé.")
+            raise ValueError(_("Cet approvisionnement est déjà annulé."))
+        SupplyService._ensure_exercise_open(supply)
 
         product = Product.objects.select_for_update().get(id=supply.product_id)
         if (product.stock or 0) < supply.quantity:
-            raise ValueError(
+            raise ValueError(_(
                 "Stock insuffisant pour annuler cet approvisionnement et retourner la marchandise au fournisseur."
-            )
+            ))
 
         credit_supply = SupplyService._get_credit_supply(supply)
         amount_paid = Decimal('0')
@@ -111,32 +125,33 @@ class SupplyService:
         ).get(id=supply.id)
 
         if supply.delete_at is not None:
-            raise ValueError("Cet approvisionnement est déjà annulé.")
+            raise ValueError(_("Cet approvisionnement est déjà annulé."))
+        SupplyService._ensure_exercise_open(supply)
 
         returned_quantity = int(returned_quantity or 0)
         if returned_quantity <= 0:
-            raise ValueError("Veuillez renseigner une quantité à retourner.")
+            raise ValueError(_("Veuillez renseigner une quantité à retourner."))
         if returned_quantity >= supply.quantity:
-            raise ValueError("Ce retour couvre tout l'approvisionnement. Utilisez l'annulation totale.")
+            raise ValueError(_("Ce retour couvre tout l'approvisionnement. Utilisez l'annulation totale."))
 
         product = Product.objects.select_for_update().get(id=supply.product_id)
         if (product.stock or 0) < returned_quantity:
-            raise ValueError(
+            raise ValueError(_(
                 "Stock insuffisant pour effectuer ce retour fournisseur."
-            )
+            ))
 
         previous_total = Decimal(str(supply.total_price or 0))
         previous_vat = Decimal(str(supply.vat_amount or 0))
         return_total = Decimal(str(supply.purchase_cost or 0)) * returned_quantity
         new_total = previous_total - return_total
         if new_total <= 0:
-            raise ValueError("Ce retour couvre tout l'approvisionnement. Utilisez l'annulation totale.")
+            raise ValueError(_("Ce retour couvre tout l'approvisionnement. Utilisez l'annulation totale."))
 
         refund_amount = Decimal('0')
         credit_supply = SupplyService._get_credit_supply(supply)
         if supply.is_credit:
             if credit_supply is None or credit_supply.delete_at is not None:
-                raise ValueError("L'approvisionnement à crédit ne possède pas d'information de crédit active.")
+                raise ValueError(_("L'approvisionnement à crédit ne possède pas d'information de crédit active."))
 
             current_paid = Decimal(str(credit_supply.amount_paid or 0))
             refund_amount = max(current_paid - new_total, Decimal('0'))

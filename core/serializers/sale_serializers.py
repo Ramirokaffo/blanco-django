@@ -3,6 +3,9 @@ Serializers for sale-related endpoints.
 Correspond à l'ancien endpoint Flask: POST /sale
 """
 
+from decimal import Decimal
+
+from django.utils.translation import gettext
 from rest_framework import serializers
 from core.models import Product, Sale, SaleProduct, CreditSale, Client
 
@@ -49,12 +52,12 @@ class SaleSerializer(serializers.ModelSerializer):
     def get_client_name(self, obj):
         if obj.client:
             return f"{obj.client.firstname} {obj.client.lastname}"
-        return "Client de passage"
+        return gettext("Client de passage")
 
     def get_staff_name(self, obj):
         if obj.staff:
             return obj.staff.get_full_name()
-        return "N/A"
+        return gettext("N/A")
 
 
 # ── Écriture ──────────────────────────────────────────────────────────
@@ -63,30 +66,38 @@ class SaleItemCreateSerializer(serializers.Serializer):
     """Serializer pour un article dans une création de vente."""
     product_id = serializers.IntegerField()
     quantity = serializers.IntegerField(min_value=1)
-    unit_price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal('0.01'),
+    )
 
     def validate_product_id(self, value):
         try:
             Product.objects.get(id=value, delete_at__isnull=True)
         except Product.DoesNotExist:
-            raise serializers.ValidationError("Produit introuvable.")
+            raise serializers.ValidationError(gettext("Produit introuvable."))
         return value
 
     def validate(self, data):
+        # Les mêmes invariants sont ré-appliqués sous verrou dans
+        # SaleService.create_sale ; ici on renvoie des erreurs lisibles tôt.
         product = Product.objects.get(id=data['product_id'])
         if data['quantity'] > product.stock:
             raise serializers.ValidationError({
-                'quantity': f"Stock insuffisant. Disponible : {product.stock}"
+                'quantity': gettext("Stock insuffisant. Disponible : %(stock)s") % {
+                    'stock': product.stock,
+                }
             })
         if product.max_salable_price and data['unit_price'] > product.max_salable_price:
             raise serializers.ValidationError({
-                'unit_price': f"Prix trop élevé. Maximum : {product.max_salable_price}"
+                'unit_price': gettext("Prix trop élevé. Maximum : %(max_price)s") % {
+                    'max_price': product.max_salable_price,
+                }
             })
         if (product.actual_price
                 and data['unit_price'] < product.actual_price
                 and not product.is_price_reducible):
             raise serializers.ValidationError({
-                'unit_price': "Le prix de ce produit ne peut pas être réduit."
+                'unit_price': gettext("Le prix de ce produit ne peut pas être réduit.")
             })
         return data
 
@@ -111,7 +122,7 @@ class SaleCreateSerializer(serializers.Serializer):
     def validate_client_id(self, value):
         if value:
             if not Client.objects.filter(id=value, delete_at__isnull=True).exists():
-                raise serializers.ValidationError("Client introuvable.")
+                raise serializers.ValidationError(gettext("Client introuvable."))
         return value
 
     def validate(self, data):
@@ -120,10 +131,10 @@ class SaleCreateSerializer(serializers.Serializer):
         data['items'] = items
 
         if not items:
-            raise serializers.ValidationError({'items': "Au moins un article requis."})
+            raise serializers.ValidationError({'items': gettext("Au moins un article requis.")})
         if data.get('is_credit') and not data.get('due_date'):
             raise serializers.ValidationError({
-                'due_date': "Date d'échéance obligatoire pour une vente à crédit."
+                'due_date': gettext("Date d'échéance obligatoire pour une vente à crédit.")
             })
         return data
 

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Nouveau paiement fournisseur - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Nouveau paiement fournisseur" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -48,14 +48,14 @@
     <div class="page-header">
         <div class="header-content">
             <div>
-                <span class="supplier-payment-kicker">Trésorerie fournisseur</span>
+                <span class="supplier-payment-kicker">{% trans "Trésorerie fournisseur" %}</span>
                 <h1>{{ page_title }}</h1>
             </div>
             <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Retour à la liste
+                {% trans "Retour à la liste" %}
             </a>
         </div>
     </div>
@@ -72,7 +72,7 @@
         <div class="supplier-payment-main">
             <div class="card supplier-payment-card">
                 <div class="card-header">
-                    <h3 class="card-title">Informations du paiement</h3>
+                    <h3 class="card-title">{% trans "Informations du paiement" %}</h3>
                 </div>
                 <div class="card-body">
                     <form method="post" class="supplier-payment-form">
@@ -125,9 +125,9 @@
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                     <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
-                                Enregistrer le paiement
+                                {% trans "Enregistrer le paiement" %}
                             </button>
-                            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary">Annuler</a>
+                            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
                         </div>
                     </form>
                 </div>
@@ -137,14 +137,14 @@
         <aside class="supplier-payment-side">
             <div class="card supplier-payment-info">
                 <div class="card-header">
-                    <h3 class="card-title">Repères utiles</h3>
+                    <h3 class="card-title">{% trans "Repères utiles" %}</h3>
                 </div>
                 <div class="card-body">
                     <div class="supplier-summary">
                         <div class="summary-card">
-                            <span class="summary-label">À vérifier</span>
-                            <span class="summary-value">Référence et méthode</span>
-                            <p class="summary-note">Ajoutez une référence de chèque, virement ou pièce justificative pour faciliter les recherches futures.</p>
+                            <span class="summary-label">{% trans "À vérifier" %}</span>
+                            <span class="summary-value">{% trans "Référence et méthode" %}</span>
+                            <p class="summary-note">{% trans "Ajoutez une référence de chèque, virement ou pièce justificative pour faciliter les recherches futures." %}</p>
                         </div>
                     </div>
                 </div>
@@ -152,29 +152,29 @@
 
             <div class="card supplier-payment-info">
                 <div class="card-header">
-                    <h3 class="card-title">Étapes</h3>
+                    <h3 class="card-title">{% trans "Étapes" %}</h3>
                 </div>
                 <div class="card-body">
                     <div class="process-steps">
                         <div class="process-step">
                             <span class="process-badge">1</span>
                             <div>
-                                <strong>Sélectionner le fournisseur</strong>
-                                <p>Choisissez le bon partenaire avant de saisir le règlement.</p>
+                                <strong>{% trans "Sélectionner le fournisseur" %}</strong>
+                                <p>{% trans "Choisissez le bon partenaire avant de saisir le règlement." %}</p>
                             </div>
                         </div>
                         <div class="process-step">
                             <span class="process-badge">2</span>
                             <div>
-                                <strong>Renseigner le paiement</strong>
-                                <p>Montant, mode de paiement, date et référence si disponible.</p>
+                                <strong>{% trans "Renseigner le paiement" %}</strong>
+                                <p>{% trans "Montant, mode de paiement, date et référence si disponible." %}</p>
                             </div>
                         </div>
                         <div class="process-step">
                             <span class="process-badge">3</span>
                             <div>
-                                <strong>Valider la saisie</strong>
-                                <p>Le paiement sera ajouté à votre suivi fournisseur.</p>
+                                <strong>{% trans "Valider la saisie" %}</strong>
+                                <p>{% trans "Le paiement sera ajouté à votre suivi fournisseur." %}</p>
                             </div>
                         </div>
                     </div>

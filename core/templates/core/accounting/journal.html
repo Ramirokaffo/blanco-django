@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Journal comptable - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Journal comptable" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -60,34 +61,34 @@
     <div class="page-header">
         <div class="header-content">
             <div>
-                <span class="journal-kicker">Comptabilité générale</span>
-                <h1>Journal comptable</h1>
-                <p class="text-secondary journal-subtitle">{{ total_count }} écriture{{ total_count|pluralize }} enregistrée{{ total_count|pluralize }} avec un total débit de {{ total_debit|floatformat:0 }} FCFA et un total crédit de {{ total_credit|floatformat:0 }} FCFA.</p>
+                <span class="journal-kicker">{% trans "Comptabilité générale" %}</span>
+                <h1>{% trans "Journal comptable" %}</h1>
+                <p class="text-secondary journal-subtitle">{% blocktrans with debit=total_debit|floatformat:0 credit=total_credit|floatformat:0 count counter=total_count %}{{ counter }} écriture enregistrée avec un total débit de {{ debit }} FCFA et un total crédit de {{ credit }} FCFA.{% plural %}{{ counter }} écritures enregistrées avec un total débit de {{ debit }} FCFA et un total crédit de {{ credit }} FCFA.{% endblocktrans %}</p>
             </div>
             <div class="header-actions">
-                <a href="{% url 'accounting_add_entry' %}" class="btn btn-primary btn-sm">+ Nouvelle écriture</a>
-                <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
-                <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Grand livre</a>
-                <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">Balance</a>
+                <a href="{% url 'accounting_add_entry' %}" class="btn btn-primary btn-sm">{% trans "+ Nouvelle écriture" %}</a>
+                <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">{% trans "Plan comptable" %}</a>
+                <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">{% trans "Grand livre" %}</a>
+                <a href="{% url 'accounting_balance' %}" class="btn btn-secondary btn-sm">{% trans "Balance" %}</a>
             </div>
         </div>
     </div>
 
     <div class="journal-stats">
         <div class="stat-card is-accent">
-            <span class="stat-label">Écritures</span>
+            <span class="stat-label">{% trans "Écritures" %}</span>
             <span class="stat-value">{{ total_count }}</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Total débit</span>
+            <span class="stat-label">{% trans "Total débit" %}</span>
             <span class="stat-value">{{ total_debit|floatformat:0 }} FCFA</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Total crédit</span>
+            <span class="stat-label">{% trans "Total crédit" %}</span>
             <span class="stat-value">{{ total_credit|floatformat:0 }} FCFA</span>
         </div>
         <div class="stat-card">
-            <span class="stat-label">Pagination</span>
+            <span class="stat-label">{% trans "Pagination" %}</span>
             <span class="stat-value">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
         </div>
     </div>
@@ -95,38 +96,38 @@
     <div class="card filters-card">
         <div class="filters-topbar">
             <div class="filters-title-group">
-                <h3 class="card-title">Filtres et recherche</h3>
-                <p class="filters-helper">Affinez vos écritures par journal, période ou mot-clé.</p>
+                <h3 class="card-title">{% trans "Filtres et recherche" %}</h3>
+                <p class="filters-helper">{% trans "Affinez vos écritures par journal, période ou mot-clé." %}</p>
             </div>
         </div>
         <div class="card-body">
             <form method="get" action="{% url 'accounting_journal' %}" class="filters-form">
                 <div class="filters-row">
                     <div class="filter-group filter-search">
-                        <label class="form-label">Recherche</label>
-                        <input type="text" name="search" class="form-control" placeholder="Référence ou libellé..." value="{{ current_search }}">
+                        <label class="form-label">{% trans "Recherche" %}</label>
+                        <input type="text" name="search" class="form-control" placeholder="{% trans "Référence ou libellé..." %}" value="{{ current_search }}">
                     </div>
                     <div class="filter-group">
-                        <label class="form-label">Journal</label>
+                        <label class="form-label">{% trans "Journal" %}</label>
                         <select name="journal" class="form-control">
-                            <option value="">Tous</option>
+                            <option value="">{% trans "Tous" %}</option>
                             {% for code, label in journal_choices %}
                             <option value="{{ code }}" {% if current_journal == code %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label class="form-label">Date début</label>
+                        <label class="form-label">{% trans "Date début" %}</label>
                         <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
                     </div>
                     <div class="filter-group">
-                        <label class="form-label">Date fin</label>
+                        <label class="form-label">{% trans "Date fin" %}</label>
                         <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
                     </div>
                 </div>
                 <div class="filters-actions">
-                    <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
-                    <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+                    <button type="submit" class="btn btn-primary btn-sm">{% trans "Filtrer" %}</button>
+                    <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser" %}</a>
                 </div>
             </form>
         </div>
@@ -134,21 +135,21 @@
 
     <div class="card journal-table-card">
         <div class="card-header">
-            <h3 class="card-title">Écritures comptables</h3>
-            <div class="table-meta">Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}</div>
+            <h3 class="card-title">{% trans "Écritures comptables" %}</h3>
+            <div class="table-meta">{% blocktrans with page=page_obj.number total=page_obj.paginator.num_pages %}Page {{ page }} sur {{ total }}{% endblocktrans %}</div>
         </div>
         <div class="card-body">
             <div class="journal-table-wrapper">
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Référence</th>
-                            <th>Journal</th>
-                            <th>Libellé</th>
-                            <th>Compte</th>
-                            <th class="text-right">Débit</th>
-                            <th class="text-right">Crédit</th>
+                            <th>{% trans "Date" %}</th>
+                            <th>{% trans "Référence" %}</th>
+                            <th>{% trans "Journal" %}</th>
+                            <th>{% trans "Libellé" %}</th>
+                            <th>{% trans "Compte" %}</th>
+                            <th class="text-right">{% trans "Débit" %}</th>
+                            <th class="text-right">{% trans "Crédit" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -161,14 +162,14 @@
                                 <td rowspan="{{ entry.lines.count }}"><span class="journal-tag">{{ entry.get_journal_display }}</span></td>
                                 <td rowspan="{{ entry.lines.count }}" class="muted-cell">{{ entry.description|truncatewords:10 }}</td>
                                 {% endif %}
-                                <td><span class="account-name">{{ line.account.code }}</span> - {{ line.account.name }}</td>
+                                <td><span class="account-name">{{ line.account.code }}</span> - {% trans line.account.name %}</td>
                                 <td class="amount-cell">{% if line.debit > 0 %}<strong>{{ line.debit|floatformat:0 }}</strong>{% else %}<span class="muted-cell">—</span>{% endif %}</td>
                                 <td class="amount-cell">{% if line.credit > 0 %}<strong>{{ line.credit|floatformat:0 }}</strong>{% else %}<span class="muted-cell">—</span>{% endif %}</td>
                             </tr>
                             {% endfor %}
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="empty-state">Aucune écriture trouvée pour les critères sélectionnés.</td>
+                            <td colspan="7" class="empty-state">{% trans "Aucune écriture trouvée pour les critères sélectionnés." %}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -177,7 +178,7 @@
 
             {% if page_obj.paginator.num_pages > 1 %}
             <div class="pagination-container">
-                <div class="pagination-info">Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}</div>
+                <div class="pagination-info">{% blocktrans with start=page_obj.start_index end=page_obj.end_index total=total_count %}Affichage de {{ start }} à {{ end }} sur {{ total }}{% endblocktrans %}</div>
                 <div class="pagination">
                     {% if page_obj.has_previous %}
                     <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_journal %}&journal={{ current_journal }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}" class="pagination-btn">&lsaquo;</a>

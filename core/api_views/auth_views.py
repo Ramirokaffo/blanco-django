@@ -4,17 +4,23 @@ Correspond à l'ancien endpoint Flask: GET /login/<login>/<password>
 """
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 
 from core.serializers.auth_serializers import LoginSerializer
 from core.serializers.staff_serializers import StaffSerializer
 from core.services.auth_service import AuthService
 
 
+class LoginRateThrottle(AnonRateThrottle):
+    scope = 'login'
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def login(request):
     """
     Authentification d'un utilisateur.
@@ -35,4 +41,3 @@ def login(request):
         'status': 0,
         'errors': serializer.errors,
     }, status=status.HTTP_400_BAD_REQUEST)
-

@@ -1,45 +1,46 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Balance générale - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Balance générale" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Balance générale</h1>
+            <h1>{% trans "Balance générale" %}</h1>
             <p class="text-secondary">
-                Exercice en cours
+                {% trans "Exercice en cours" %}
                 {% if is_balanced %}
-                    — <span style="color: var(--success-color, #28a745);">✓ Équilibrée</span>
+                    — <span style="color: var(--success-color, #28a745);">✓ {% trans "Équilibrée" %}</span>
                 {% else %}
-                    — <span style="color: var(--danger-color, #dc3545);">✗ Déséquilibrée</span>
+                    — <span style="color: var(--danger-color, #dc3545);">✗ {% trans "Déséquilibrée" %}</span>
                 {% endif %}
             </p>
         </div>
         <div>
-            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Journal</a>
-            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">Grand Livre</a>
-            <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">Plan comptable</a>
+            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">{% trans "Journal" %}</a>
+            <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary btn-sm">{% trans "Grand Livre" %}</a>
+            <a href="{% url 'accounting_chart' %}" class="btn btn-secondary btn-sm">{% trans "Plan comptable" %}</a>
         </div>
     </div>
 </div>
 
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Balance des comptes</h3>
+        <h3 class="card-title">{% trans "Balance des comptes" %}</h3>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Code</th>
-                        <th>Intitulé du compte</th>
-                        <th>Type</th>
-                        <th class="text-right">Total Débit</th>
-                        <th class="text-right">Total Crédit</th>
-                        <th class="text-right">Solde</th>
+                        <th>{% trans "Code" %}</th>
+                        <th>{% trans "Intitulé du compte" %}</th>
+                        <th>{% trans "Type" %}</th>
+                        <th class="text-right">{% trans "Total Débit" %}</th>
+                        <th class="text-right">{% trans "Total Crédit" %}</th>
+                        <th class="text-right">{% trans "Solde" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -48,7 +49,7 @@
                         <td>
                             <a href="{% url 'accounting_ledger' %}?account={{ item.account.code }}">{{ item.account.code }}</a>
                         </td>
-                        <td>{{ item.account.name }}</td>
+                        <td>{% trans item.account.name %}</td>
                         <td><span class="badge badge-{{ item.account.account_type|lower }}">{{ item.account.get_account_type_display }}</span></td>
                         <td class="text-right">{{ item.total_debit|floatformat:0 }}</td>
                         <td class="text-right">{{ item.total_credit|floatformat:0 }}</td>
@@ -60,14 +61,14 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center">Aucun mouvement comptable enregistré</td>
+                        <td colspan="6" class="text-center">{% trans "Aucun mouvement comptable enregistré" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
                 {% if trial_balance %}
                 <tfoot>
                     <tr style="font-weight: bold; border-top: 2px solid var(--border-color, #dee2e6);">
-                        <td colspan="3">TOTAUX</td>
+                        <td colspan="3">{% trans "TOTAUX" %}</td>
                         <td class="text-right">{{ total_debit|floatformat:0 }}</td>
                         <td class="text-right">{{ total_credit|floatformat:0 }}</td>
                         <td class="text-right">{{ total_debit|floatformat:0 }}</td>
@@ -79,4 +80,3 @@
     </div>
 </div>
 {% endblock %}
-

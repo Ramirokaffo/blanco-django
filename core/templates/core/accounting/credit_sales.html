@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Ventes à crédit - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Ventes à crédit" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Ventes à crédit</h1>
-            <p class="text-secondary">{{ total_count }} vente{{ total_count|pluralize }} — Total : {{ total_credit|floatformat:0 }} FCFA | Payé : {{ total_paid|floatformat:0 }} FCFA | Restant : {{ total_remaining|floatformat:0 }} FCFA</p>
+            <h1>{% trans "Ventes à crédit" %}</h1>
+            <p class="text-secondary">{% blocktrans count counter=total_count|default:0 %}{{ counter }} vente{% plural %}{{ counter }} ventes{% endblocktrans %} — {% blocktrans with total=total_credit|floatformat:0 paid=total_paid|floatformat:0 remaining=total_remaining|floatformat:0 %}Total : {{ total }} FCFA | Payé : {{ paid }} FCFA | Restant : {{ remaining }} FCFA{% endblocktrans %}</p>
         </div>
         <div>
-            <a href="{% url 'treasury_dashboard' %}" class="btn btn-secondary btn-sm">Trésorerie</a>
+            <a href="{% url 'treasury_dashboard' %}" class="btn btn-secondary btn-sm">{% trans "Trésorerie" %}</a>
         </div>
     </div>
 </div>
@@ -30,21 +30,21 @@
     <form method="get" action="{% url 'credit_sales' %}" class="filters-form">
         <div class="filters-row">
             <div class="filter-group filter-search">
-                <label class="form-label">Recherche</label>
-                <input type="text" name="search" class="form-control" placeholder="Nom du client ou n° de vente..." value="{{ current_search }}">
+                <label class="form-label">{% trans "Recherche" %}</label>
+                <input type="text" name="search" class="form-control" placeholder="{% trans "Nom du client ou n° de vente..." %}" value="{{ current_search }}">
             </div>
             <div class="filter-group">
-                <label class="form-label">Statut</label>
+                <label class="form-label">{% trans "Statut" %}</label>
                 <select name="status" class="form-control">
-                    <option value="">Tous</option>
-                    <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>Non soldé</option>
-                    <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>Soldé</option>
+                    <option value="">{% trans "Tous" %}</option>
+                    <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>{% trans "Non soldé" %}</option>
+                    <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>{% trans "Soldé" %}</option>
                 </select>
             </div>
         </div>
         <div class="filters-actions">
-            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
-            <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+            <button type="submit" class="btn btn-primary btn-sm">{% trans "Filtrer" %}</button>
+            <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser" %}</a>
         </div>
     </form>
 </div>
@@ -52,9 +52,9 @@
 <!-- Tableau -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des ventes à crédit</h3>
+        <h3 class="card-title">{% trans "Liste des ventes à crédit" %}</h3>
         <div class="pagination-info-header">
-            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+            {% blocktrans with number=page_obj.number num_pages=page_obj.paginator.num_pages %}Page {{ number }} sur {{ num_pages }}{% endblocktrans %}
         </div>
     </div>
     <div class="card-body">
@@ -62,15 +62,15 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Vente</th>
-                        <th>Date</th>
-                        <th>Client</th>
-                        <th class="text-right">Total</th>
-                        <th class="text-right">Payé</th>
-                        <th class="text-right">Restant</th>
-                        <th>Échéance</th>
-                        <th>Statut</th>
-                        <th>Actions</th>
+                        <th>{% trans "Vente" %}</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Client" %}</th>
+                        <th class="text-right">{% trans "Total" %}</th>
+                        <th class="text-right">{% trans "Payé" %}</th>
+                        <th class="text-right">{% trans "Restant" %}</th>
+                        <th>{% trans "Échéance" %}</th>
+                        <th>{% trans "Statut" %}</th>
+                        <th>{% trans "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -85,20 +85,20 @@
                         <td>{% if cs.due_date %}{{ cs.due_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
                         <td>
                             {% if cs.is_fully_paid %}
-                            <span class="badge badge-success">Soldé</span>
+                            <span class="badge badge-success">{% trans "Soldé" %}</span>
                             {% else %}
-                            <span class="badge badge-warning">En cours</span>
+                            <span class="badge badge-warning">{% trans "En cours" %}</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if not cs.is_fully_paid %}
-                            <a href="{% url 'record_credit_payment' cs.id %}" class="btn btn-primary btn-sm">Payer</a>
+                            <a href="{% url 'record_credit_payment' cs.id %}" class="btn btn-primary btn-sm">{% trans "Payer" %}</a>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center">Aucune vente à crédit trouvée</td>
+                        <td colspan="9" class="text-center">{% trans "Aucune vente à crédit trouvée" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -109,7 +109,7 @@
         {% if page_obj.paginator.num_pages > 1 %}
         <div class="pagination-container">
             <div class="pagination-info">
-                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+                {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=total_count %}Affichage de {{ start }} à {{ end }} sur {{ total }}{% endblocktrans %}
             </div>
             <div class="pagination">
                 {% if page_obj.has_previous %}

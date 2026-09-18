@@ -1,17 +1,18 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Déclaration de TVA - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Déclaration de TVA" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Déclaration de TVA</h1>
-            <p class="text-secondary">Exercice : {{ exercise }}</p>
+            <h1>{% trans "Déclaration de TVA" %}</h1>
+            <p class="text-secondary">{% blocktrans %}Exercice : {{ exercise }}{% endblocktrans %}</p>
         </div>
         <div>
-            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">Rapports</a>
+            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">{% trans "Rapports" %}</a>
         </div>
     </div>
 </div>
@@ -19,37 +20,37 @@
 <!-- Résumé TVA -->
 <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
     <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--success, #28a745);">
-        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">TVA collectée (4431)</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">{% trans "TVA collectée (4431)" %}</div>
         <div style="font-size: 1.5rem; font-weight: 700; color: var(--success, #28a745);">{{ tva_collectee|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
-        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">Sur ventes</div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">{% trans "Sur ventes" %}</div>
     </div>
     <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--info, #17a2b8);">
-        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">TVA déductible (4451)</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">{% trans "TVA déductible (4451)" %}</div>
         <div style="font-size: 1.5rem; font-weight: 700; color: var(--info, #17a2b8);">{{ tva_deductible|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
-        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">Sur achats</div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">{% trans "Sur achats" %}</div>
     </div>
     <div class="card" style="padding: 1.25rem; border-left: 3px solid {% if tva_due >= 0 %}var(--danger, #e74c3c){% else %}var(--success, #28a745){% endif %};">
-        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">TVA due à l'État (4441)</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">{% trans "TVA due à l'État (4441)" %}</div>
         <div style="font-size: 1.5rem; font-weight: 700; color: {% if tva_due >= 0 %}var(--danger, #e74c3c){% else %}var(--success, #28a745){% endif %};">
             {{ tva_due|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small>
         </div>
-        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">{% if tva_due >= 0 %}À reverser{% else %}Crédit de TVA{% endif %}</div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary, #6c757d);">{% if tva_due >= 0 %}{% trans "À reverser" %}{% else %}{% trans "Crédit de TVA" %}{% endif %}</div>
     </div>
 </div>
 
 <!-- Détail mensuel -->
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">Détail mensuel</h2>
+        <h2 class="card-title">{% trans "Détail mensuel" %}</h2>
     </div>
     <div class="table-responsive">
         <table class="table">
             <thead>
                 <tr>
-                    <th>Période</th>
-                    <th class="text-right">TVA collectée</th>
-                    <th class="text-right">TVA déductible</th>
-                    <th class="text-right">TVA due</th>
+                    <th>{% trans "Période" %}</th>
+                    <th class="text-right">{% trans "TVA collectée" %}</th>
+                    <th class="text-right">{% trans "TVA déductible" %}</th>
+                    <th class="text-right">{% trans "TVA due" %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -64,14 +65,14 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="text-center text-secondary">Aucune opération avec TVA pour cet exercice</td>
+                    <td colspan="4" class="text-center text-secondary">{% trans "Aucune opération avec TVA pour cet exercice" %}</td>
                 </tr>
                 {% endfor %}
             </tbody>
             {% if monthly %}
             <tfoot>
                 <tr style="font-weight: 700; border-top: 2px solid var(--border-color, #dee2e6);">
-                    <td>TOTAL</td>
+                    <td>{% trans "TOTAL" %}</td>
                     <td class="text-right">{{ tva_collectee|floatformat:0 }} FCFA</td>
                     <td class="text-right">{{ tva_deductible|floatformat:0 }} FCFA</td>
                     <td class="text-right" style="color: {% if tva_due >= 0 %}var(--danger, #e74c3c){% else %}var(--success, #28a745){% endif %};">
@@ -86,13 +87,12 @@
 
 <!-- Note explicative -->
 <div class="card" style="margin-top: 1rem; padding: 1.25rem; background: var(--bg-secondary, #f8f9fa);">
-    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">📌 Rappel</h3>
+    <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">📌 {% trans "Rappel" %}</h3>
     <ul style="margin: 0; padding-left: 1.5rem; font-size: 0.9rem; color: var(--text-secondary, #6c757d);">
-        <li><strong>TVA collectée</strong> (4431) : TVA facturée sur les ventes aux clients</li>
-        <li><strong>TVA déductible</strong> (4451) : TVA payée sur les achats aux fournisseurs</li>
-        <li><strong>TVA due</strong> = TVA collectée − TVA déductible → montant à reverser à l'État</li>
-        <li>Taux TVA Cameroun : 19,25% (19% + 1,25% CAC)</li>
+        <li><strong>{% trans "TVA collectée" %}</strong> (4431) : {% trans "TVA facturée sur les ventes aux clients" %}</li>
+        <li><strong>{% trans "TVA déductible" %}</strong> (4451) : {% trans "TVA payée sur les achats aux fournisseurs" %}</li>
+        <li>{% blocktrans %}<strong>TVA due</strong> = TVA collectée − TVA déductible → montant à reverser à l'État{% endblocktrans %}</li>
+        <li>{% trans "Taux TVA Cameroun : 19,25% (19% + 1,25% CAC)" %}</li>
     </ul>
 </div>
 {% endblock %}
-

@@ -2,6 +2,7 @@ import os
 import sys
 
 from django.apps import AppConfig
+from django.db.models.signals import post_migrate
 
 
 class CoreConfig(AppConfig):
@@ -9,10 +10,21 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         """
-        Génère le QR code du serveur au démarrage.
+        - Branche le chargement des données par défaut (modules applicatifs,
+          plan comptable) après chaque `migrate`.
+        - Génère le QR code du serveur au démarrage.
         On évite la double exécution en ne lançant que dans le processus principal
         (pas dans le reloader de runserver).
         """
+        from core.signals import seed_default_data
+
+        # Déclenché uniquement pour les migrations de l'app core (sender=self)
+        post_migrate.connect(
+            seed_default_data,
+            sender=self,
+            dispatch_uid='core.seed_default_data',
+        )
+
         # En mode runserver, Django lance 2 processus : le reloader et le serveur.
         # RUN_MAIN='true' indique qu'on est dans le processus fils (le vrai serveur).
         # En production (gunicorn, etc.), RUN_MAIN n'existe pas, donc on exécute aussi.

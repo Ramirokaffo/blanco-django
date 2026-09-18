@@ -28,18 +28,29 @@ class QRCodeService:
         Détecte l'adresse IP locale de la machine.
         Reproduit WIFIService.get_local_ip() de l'ancienne application.
         """
-        print(settings.GET_IP_METHOD)
-        if settings.GET_IP_METHOD == 1:
+        if getattr(settings, 'GET_IP_METHOD', 0) == 1:
             """Get the host IP by finding the default gateway."""
-            result = subprocess.run(
-                ["ip", "route", "show", "default"],
-                capture_output=True,
-                text=True
-            )
-            # Output: "default via 172.17.0.1 dev eth0"
-            gateway = result.stdout.split()[2]
-            return gateway
+            try:
+                result = subprocess.run(
+                    ["ip", "route", "show", "default"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                # Output: "default via 172.17.0.1 dev eth0"
+                parts = result.stdout.split()
+                if len(parts) >= 3:
+                    return parts[2]
+            except (OSError, subprocess.SubprocessError):
+                pass
+            # Repli : détection par socket (ne doit jamais empêcher le démarrage)
+            return QRCodeService._detect_ip_by_socket()
         else:
+            return QRCodeService._detect_ip_by_socket()
+
+    @staticmethod
+    def _detect_ip_by_socket() -> str:
+        if True:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
                 s.connect(("192.255.255.255", 1))
@@ -114,14 +125,9 @@ class QRCodeService:
             # Régénérer le QR code avec la nouvelle IP
             cls.generate_server_qr(port=port)
 
-            # Mettre à jour ALLOWED_HOSTS dynamiquement
+            # Mettre à jour ALLOWED_HOSTS dynamiquement (worker courant)
             if current_ip not in settings.ALLOWED_HOSTS:
                 settings.ALLOWED_HOSTS.append(current_ip)
-
-            # Mettre à jour CORS_ALLOWED_ORIGINS si configuré
-            cors_origins = getattr(settings, "CORS_ALLOWED_ORIGINS", None)
-            if cors_origins is not None and current_ip not in cors_origins:
-                cors_origins.append(current_ip)
 
         return {
             "qr_base64": cls._qr_base64,

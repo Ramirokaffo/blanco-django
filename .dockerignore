@@ -1,5 +1,6 @@
 # Git
 .git
+.git*
 .gitignore
 .gitattributes
 
@@ -31,15 +32,18 @@ db.sqlite3-journal
 *.swo
 *~
 .DS_Store
+*.code-workspace
 
 # Docker
 Dockerfile
 docker-compose.yml
+docker-compose.*.yml
 .dockerignore
 
 # Documentation
 README.md
 *.md
+docs/
 
 # Tests
 .coverage
@@ -47,7 +51,15 @@ htmlcov/
 .pytest_cache/
 .tox/
 
-# Environment
+# Scripts de développement / smoke tests (inutiles dans l'image)
+create_superuser.py
+test_models.py
+init_daily_session.py
+
+# Environment : aucun fichier d'environnement ne doit entrer dans l'image
+# (les variables sont injectées par docker-compose via env_file)
+.env
+.env.*
+*.env
 .env.local
 .env.*.local
-

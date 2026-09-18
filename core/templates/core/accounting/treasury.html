@@ -1,19 +1,20 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Trésorerie - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Trésorerie" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Tableau de bord Trésorerie</h1>
-            <p class="text-secondary">Exercice : {{ exercise }} — Solde total : {{ total_treasury|floatformat:0 }} FCFA</p>
+            <h1>{% trans "Tableau de bord Trésorerie" %}</h1>
+            <p class="text-secondary">{% blocktrans with total=total_treasury|floatformat:0 %}Exercice : {{ exercise }} — Solde total : {{ total }} FCFA{% endblocktrans %}</p>
         </div>
         <div>
-            <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">Crédits clients</a>
-            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">Paiements fourn.</a>
-            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">Journal</a>
+            <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">{% trans "Crédits clients" %}</a>
+            <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">{% trans "Paiements fourn." %}</a>
+            <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">{% trans "Journal" %}</a>
         </div>
     </div>
 </div>
@@ -22,20 +23,20 @@
 <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
     {% for ta in treasury_accounts %}
     <div class="card" style="padding: 1.25rem;">
-        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">{{ ta.account.code }} — {{ ta.account.name }}</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">{{ ta.account.code }} — {% trans ta.account.name %}</div>
         <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">{{ ta.balance|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
     </div>
     {% endfor %}
 
     <!-- Créances clients -->
     <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--warning, #f39c12);">
-        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">411 — Créances clients</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">411 — {% trans "Créances clients" %}</div>
         <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: var(--warning, #f39c12);">{{ clients_balance|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
     </div>
 
     <!-- Dettes fournisseurs -->
     <div class="card" style="padding: 1.25rem; border-left: 3px solid var(--danger, #e74c3c);">
-        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">401 — Dettes fournisseurs</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">401 — {% trans "Dettes fournisseurs" %}</div>
         <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; color: var(--danger, #e74c3c);">{{ suppliers_balance|floatformat:0 }} <small style="font-size:0.7em;">FCFA</small></div>
     </div>
 </div>
@@ -43,18 +44,18 @@
 <!-- Derniers paiements reçus -->
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-header">
-        <h3 class="card-title">Derniers paiements clients reçus</h3>
-        <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">Voir tout</a>
+        <h3 class="card-title">{% trans "Derniers paiements clients reçus" %}</h3>
+        <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">{% trans "Voir tout" %}</a>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Client</th>
-                        <th>Mode</th>
-                        <th class="text-right">Montant</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Client" %}</th>
+                        <th>{% trans "Mode" %}</th>
+                        <th class="text-right">{% trans "Montant" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -66,7 +67,7 @@
                         <td class="text-right">{{ p.amount|floatformat:0 }} FCFA</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4" class="text-center">Aucun paiement récent</td></tr>
+                    <tr><td colspan="4" class="text-center">{% trans "Aucun paiement récent" %}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -77,18 +78,18 @@
 <!-- Derniers paiements fournisseurs -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Derniers paiements fournisseurs</h3>
-        <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">Voir tout</a>
+        <h3 class="card-title">{% trans "Derniers paiements fournisseurs" %}</h3>
+        <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">{% trans "Voir tout" %}</a>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Fournisseur</th>
-                        <th>Mode</th>
-                        <th class="text-right">Montant</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Fournisseur" %}</th>
+                        <th>{% trans "Mode" %}</th>
+                        <th class="text-right">{% trans "Montant" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -100,7 +101,7 @@
                         <td class="text-right">{{ sp.amount|floatformat:0 }} FCFA</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="4" class="text-center">Aucun paiement récent</td></tr>
+                    <tr><td colspan="4" class="text-center">{% trans "Aucun paiement récent" %}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -108,4 +109,3 @@
     </div>
 </div>
 {% endblock %}
-

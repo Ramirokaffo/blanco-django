@@ -19,9 +19,14 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.i18n import JavaScriptCatalog
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Changement de langue (POST language=fr|en, next=...) : cookie LANGUAGE_COOKIE_NAME
+    path("i18n/", include("django.conf.urls.i18n")),
+    # Catalogue de traductions pour le JavaScript (domaine djangojs) : gettext(), ngettext(), interpolate()
+    path("jsi18n/", JavaScriptCatalog.as_view(), name="javascript-catalog"),
     path("api/", include("core.api_urls", namespace="api")),
     path("", include("core.urls")),
 ]

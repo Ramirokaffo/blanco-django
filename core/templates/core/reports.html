@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Rapports - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Rapports" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>Rapports et analyse</h1>
-    <p class="text-secondary">Hub central des rapports financiers et comptables</p>
+    <h1>{% trans "Rapports et analyse" %}</h1>
+    <p class="text-secondary">{% trans "Hub central des rapports financiers et comptables" %}</p>
 </div>
 
 <!-- Rapports financiers -->
@@ -15,12 +15,12 @@
     <!-- Compte de résultat -->
     <div class="card" style="border-left: 4px solid var(--success, #28a745);">
         <div class="card-body" style="padding: 1.5rem;">
-            <h3 style="margin-bottom: 0.5rem;">Compte de résultat</h3>
+            <h3 style="margin-bottom: 0.5rem;">{% trans "Compte de résultat" %}</h3>
             <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 1rem;">
-                Produits (classe 7) vs Charges (classe 6). Calcul du bénéfice ou de la perte de l'exercice.
+                {% trans "Produits (classe 7) vs Charges (classe 6). Calcul du bénéfice ou de la perte de l'exercice." %}
             </p>
             <div style="display: flex; gap: 0.5rem;">
-                <a href="{% url 'income_statement' %}" class="btn btn-primary btn-sm">Consulter</a>
+                <a href="{% url 'income_statement' %}" class="btn btn-primary btn-sm">{% trans "Consulter" %}</a>
                 <a href="{% url 'export_report_csv' 'income_statement' %}" class="btn btn-secondary btn-sm">⬇ CSV</a>
             </div>
         </div>
@@ -29,12 +29,12 @@
     <!-- Bilan comptable -->
     <div class="card" style="border-left: 4px solid var(--primary, #3498db);">
         <div class="card-body" style="padding: 1.5rem;">
-            <h3 style="margin-bottom: 0.5rem;">Bilan comptable</h3>
+            <h3 style="margin-bottom: 0.5rem;">{% trans "Bilan comptable" %}</h3>
             <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 1rem;">
-                Actif (immobilisé, circulant, trésorerie) vs Passif (capitaux, dettes). Vue patrimoniale.
+                {% trans "Actif (immobilisé, circulant, trésorerie) vs Passif (capitaux, dettes). Vue patrimoniale." %}
             </p>
             <div style="display: flex; gap: 0.5rem;">
-                <a href="{% url 'balance_sheet' %}" class="btn btn-primary btn-sm">Consulter</a>
+                <a href="{% url 'balance_sheet' %}" class="btn btn-primary btn-sm">{% trans "Consulter" %}</a>
                 <a href="{% url 'export_report_csv' 'balance_sheet' %}" class="btn btn-secondary btn-sm">⬇ CSV</a>
             </div>
         </div>
@@ -43,13 +43,13 @@
     <!-- Balance âgée -->
     <div class="card" style="border-left: 4px solid var(--warning, #f39c12);">
         <div class="card-body" style="padding: 1.5rem;">
-            <h3 style="margin-bottom: 0.5rem;">Balance âgée</h3>
+            <h3 style="margin-bottom: 0.5rem;">{% trans "Balance âgée" %}</h3>
             <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 1rem;">
-                Suivi des créances clients et dettes fournisseurs par tranche d'ancienneté (0-30, 31-60, 61-90, 90+ jours).
+                {% trans "Suivi des créances clients et dettes fournisseurs par tranche d'ancienneté (0-30, 31-60, 61-90, 90+ jours)." %}
             </p>
             <div style="display: flex; gap: 0.5rem;">
-                <a href="{% url 'aged_balance' %}?type=client" class="btn btn-primary btn-sm">Clients</a>
-                <a href="{% url 'aged_balance' %}?type=supplier" class="btn btn-secondary btn-sm">Fournisseurs</a>
+                <a href="{% url 'aged_balance' %}?type=client" class="btn btn-primary btn-sm">{% trans "Clients" %}</a>
+                <a href="{% url 'aged_balance' %}?type=supplier" class="btn btn-secondary btn-sm">{% trans "Fournisseurs" %}</a>
                 <a href="{% url 'export_report_csv' 'aged_balance' %}" class="btn btn-secondary btn-sm">⬇ CSV</a>
             </div>
         </div>
@@ -58,12 +58,12 @@
     <!-- Marge par produit -->
     <div class="card" style="border-left: 4px solid var(--info, #17a2b8);">
         <div class="card-body" style="padding: 1.5rem;">
-            <h3 style="margin-bottom: 0.5rem;">Marge par produit</h3>
+            <h3 style="margin-bottom: 0.5rem;">{% trans "Marge par produit" %}</h3>
             <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 1rem;">
-                Analyse de la marge brute par produit : chiffre d'affaires − coût d'achat. Identifiez vos produits les plus rentables.
+                {% trans "Analyse de la marge brute par produit : chiffre d'affaires − coût d'achat. Identifiez vos produits les plus rentables." %}
             </p>
             <div style="display: flex; gap: 0.5rem;">
-                <a href="{% url 'product_margins' %}" class="btn btn-primary btn-sm">Consulter</a>
+                <a href="{% url 'product_margins' %}" class="btn btn-primary btn-sm">{% trans "Consulter" %}</a>
                 <a href="{% url 'export_report_csv' 'product_margins' %}" class="btn btn-secondary btn-sm">⬇ CSV</a>
             </div>
         </div>
@@ -72,33 +72,33 @@
     <!-- Déclaration TVA -->
     <div class="card" style="border-left: 4px solid #9b59b6;">
         <div class="card-body" style="padding: 1.5rem;">
-            <h3 style="margin-bottom: 0.5rem;">Déclaration de TVA</h3>
+            <h3 style="margin-bottom: 0.5rem;">{% trans "Déclaration de TVA" %}</h3>
             <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 1rem;">
-                TVA collectée vs TVA déductible. Calcul de la TVA due à l'État avec détail mensuel.
+                {% trans "TVA collectée vs TVA déductible. Calcul de la TVA due à l'État avec détail mensuel." %}
             </p>
-            <a href="{% url 'vat_declaration' %}" class="btn btn-primary btn-sm">Consulter</a>
+            <a href="{% url 'vat_declaration' %}" class="btn btn-primary btn-sm">{% trans "Consulter" %}</a>
         </div>
     </div>
 
     <!-- Rapprochement bancaire -->
     <div class="card" style="border-left: 4px solid #2c3e50;">
         <div class="card-body" style="padding: 1.5rem;">
-            <h3 style="margin-bottom: 0.5rem;">Rapprochement bancaire</h3>
+            <h3 style="margin-bottom: 0.5rem;">{% trans "Rapprochement bancaire" %}</h3>
             <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 1rem;">
-                Comparer les relevés bancaires avec les écritures comptables. Identifier les écarts.
+                {% trans "Comparer les relevés bancaires avec les écritures comptables. Identifier les écarts." %}
             </p>
-            <a href="{% url 'bank_reconciliation' %}" class="btn btn-primary btn-sm">Consulter</a>
+            <a href="{% url 'bank_reconciliation' %}" class="btn btn-primary btn-sm">{% trans "Consulter" %}</a>
         </div>
     </div>
 
     <!-- Clôture d'exercice -->
     <div class="card" style="border-left: 4px solid var(--danger, #e74c3c);">
         <div class="card-body" style="padding: 1.5rem;">
-            <h3 style="margin-bottom: 0.5rem;">Clôture d'exercice</h3>
+            <h3 style="margin-bottom: 0.5rem;">{% trans "Clôture d'exercice" %}</h3>
             <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 1rem;">
-                Clôturer l'exercice comptable, solder les comptes de gestion et créer le report à nouveau.
+                {% trans "Clôturer l'exercice comptable, solder les comptes de gestion et créer le report à nouveau." %}
             </p>
-            <a href="{% url 'exercise_closing' %}" class="btn btn-primary btn-sm">Consulter</a>
+            <a href="{% url 'exercise_closing' %}" class="btn btn-primary btn-sm">{% trans "Consulter" %}</a>
         </div>
     </div>
 </div>
@@ -106,21 +106,21 @@
 <!-- Comptabilité générale -->
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-header">
-        <h3 class="card-title">Comptabilité générale</h3>
+        <h3 class="card-title">{% trans "Comptabilité générale" %}</h3>
     </div>
     <div class="card-body">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
             <a href="{% url 'accounting_journal' %}" class="btn btn-secondary" style="padding: 1rem; text-align: center;">
-                Journal comptable
+                {% trans "Journal comptable" %}
             </a>
             <a href="{% url 'accounting_ledger' %}" class="btn btn-secondary" style="padding: 1rem; text-align: center;">
-                Grand livre
+                {% trans "Grand livre" %}
             </a>
             <a href="{% url 'accounting_balance' %}" class="btn btn-secondary" style="padding: 1rem; text-align: center;">
-                Balance générale
+                {% trans "Balance générale" %}
             </a>
             <a href="{% url 'accounting_chart' %}" class="btn btn-secondary" style="padding: 1rem; text-align: center;">
-                Plan comptable
+                {% trans "Plan comptable" %}
             </a>
         </div>
     </div>
@@ -129,21 +129,21 @@
 <!-- Trésorerie & Paiements -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Trésorerie & Paiements</h3>
+        <h3 class="card-title">{% trans "Trésorerie & Paiements" %}</h3>
     </div>
     <div class="card-body">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
             <a href="{% url 'treasury_dashboard' %}" class="btn btn-secondary" style="padding: 1rem; text-align: center;">
-                 Tableau de bord trésorerie
+                 {% trans "Tableau de bord trésorerie" %}
             </a>
             <a href="{% url 'credit_sales' %}" class="btn btn-secondary" style="padding: 1rem; text-align: center;">
-                 Ventes à crédit
+                 {% trans "Ventes à crédit" %}
             </a>
             <a href="{% url 'supplier_payments' %}" class="btn btn-secondary" style="padding: 1rem; text-align: center;">
-                 Paiements fournisseurs
+                 {% trans "Paiements fournisseurs" %}
             </a>
             <a href="{% url 'invoices' %}" class="btn btn-secondary" style="padding: 1rem; text-align: center;">
-                 Factures
+                 {% trans "Factures" %}
             </a>
         </div>
     </div>

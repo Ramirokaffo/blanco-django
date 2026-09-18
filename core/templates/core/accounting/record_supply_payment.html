@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Paiement fournisseur - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Paiement fournisseur" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -9,10 +9,10 @@
         <div>
             <h1>{{ page_title }}</h1>
             <p class="text-secondary">
-                Fournisseur : {% if supply.supplier %}{{ supply.supplier.name }}{% else %}N/A{% endif %}
-                — Montant total : {{ supply.total_price|floatformat:0 }}FCFA
+                {% if supply.supplier %}{% blocktrans with name=supply.supplier.name %}Fournisseur : {{ name }}{% endblocktrans %}{% else %}{% trans "Fournisseur : N/A" %}{% endif %}
+                {% blocktrans with total=supply.total_price|floatformat:0 %}— Montant total : {{ total }}FCFA{% endblocktrans %}
                 {% if credit_supply %}
-                    — Payé : {{ credit_supply.amount_paid|floatformat:0 }}FCFA — Restant : {{ credit_supply.amount_remaining|floatformat:0 }}FCFA
+                    {% blocktrans with paid=credit_supply.amount_paid|floatformat:0 remaining=credit_supply.amount_remaining|floatformat:0 %}— Payé : {{ paid }}FCFA — Restant : {{ remaining }}FCFA{% endblocktrans %}
                 {% endif %}
             </p>
         </div>
@@ -20,7 +20,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Retour
+            {% trans "Retour" %}
         </a>
     </div>
 </div>
@@ -37,33 +37,33 @@
 <!-- Récapitulatif de l'approvisionnement -->
 <div class="card" style="margin-bottom: 1.5rem;">
     <div class="card-header">
-        <h3 class="card-title">Détails de l'approvisionnement à crédit</h3>
+        <h3 class="card-title">{% trans "Détails de l'approvisionnement à crédit" %}</h3>
     </div>
     <div class="card-body">
         <div class="form-grid">
             <div class="form-group">
-                <label class="form-label">Produit</label>
+                <label class="form-label">{% trans "Produit" %}</label>
                 <p><strong>{{ supply.product.name }}</strong></p>
             </div>
             <div class="form-group">
-                <label class="form-label">Fournisseur</label>
+                <label class="form-label">{% trans "Fournisseur" %}</label>
                 <p><strong>{{ supply.supplier.name|default:"-" }}</strong></p>
             </div>
             <div class="form-group">
-                <label class="form-label">Quantité</label>
+                <label class="form-label">{% trans "Quantité" %}</label>
                 <p><strong>{{ supply.quantity }}</strong></p>
             </div>
             <div class="form-group">
-                <label class="form-label">Prix total</label>
+                <label class="form-label">{% trans "Prix total" %}</label>
                 <p><strong>{{ supply.total_price|floatformat:0 }}FCFA</strong></p>
             </div>
             {% if credit_supply %}
             <div class="form-group">
-                <label class="form-label">Montant payé</label>
+                <label class="form-label">{% trans "Montant payé" %}</label>
                 <p><strong>{{ credit_supply.amount_paid|floatformat:0 }}FCFA</strong></p>
             </div>
             <div class="form-group">
-                <label class="form-label">Montant restant</label>
+                <label class="form-label">{% trans "Montant restant" %}</label>
                 <p><strong style="color: var(--warning, #f39c12);">{{ credit_supply.amount_remaining|floatformat:0 }}FCFA</strong></p>
             </div>
             {% endif %}
@@ -74,7 +74,7 @@
 <!-- Formulaire de paiement -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Enregistrer un paiement</h3>
+        <h3 class="card-title">{% trans "Enregistrer un paiement" %}</h3>
     </div>
     <div class="card-body">
         <form method="post" class="contact-form">
@@ -122,8 +122,8 @@
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Enregistrer le paiement</button>
-                <a href="{% url 'supplies' %}" class="btn btn-secondary">Annuler</a>
+                <button type="submit" class="btn btn-primary">{% trans "Enregistrer le paiement" %}</button>
+                <a href="{% url 'supplies' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
             </div>
         </form>
     </div>
@@ -133,18 +133,18 @@
 {% if payments %}
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Historique des paiements</h3>
+        <h3 class="card-title">{% trans "Historique des paiements" %}</h3>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Mode</th>
-                        <th class="text-right">Montant</th>
-                        <th>Référence</th>
-                        <th>Par</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Mode" %}</th>
+                        <th class="text-right">{% trans "Montant" %}</th>
+                        <th>{% trans "Référence" %}</th>
+                        <th>{% trans "Par" %}</th>
                     </tr>
                 </thead>
                 <tbody>

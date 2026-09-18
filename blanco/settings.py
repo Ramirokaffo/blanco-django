@@ -11,8 +11,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import logging
 import os
-from decouple import config
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,10 +29,11 @@ GET_IP_METHOD = config("GET_IP_METHOD", default=0, cast=int)
 
 local_ip = QRCodeService.get_local_ip()
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=lambda v: [s.strip() for s in v.split(',')])
-ALLOWED_HOSTS.append(local_ip)  # Autoriser l'accès via l'IP locale détectée
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
+if local_ip and local_ip not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(local_ip)  # Autoriser l'accès via l'IP locale détectée
 
-print(ALLOWED_HOSTS)
+logging.getLogger(__name__).debug("ALLOWED_HOSTS=%s", ALLOWED_HOSTS)
 # Application definition
 
 INSTALLED_APPS = [
@@ -49,10 +51,16 @@ INSTALLED_APPS = [
 # Custom User Model
 AUTH_USER_MODEL = 'core.CustomUser'
 
+# Refuse les comptes désactivés OU soft-supprimés (delete_at) à la connexion.
+AUTHENTICATION_BACKENDS = [
+    'core.auth_backends.ActiveStaffBackend',
+]
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -71,6 +79,7 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
+                "django.template.context_processors.i18n",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.qrcode_context",
@@ -138,16 +147,54 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', cast=bool, default=True)
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=lambda v: [s.strip() for s in v.split(',')], default=[])
-CORS_ALLOWED_ORIGINS.append(local_ip)  # Autoriser l'accès via l'IP locale détectée
+# ──── Sécurité transport / cookies ──────────────────────────────────
+# L'application est servie en HTTP sur le LAN ; derrière un reverse proxy TLS,
+# passer USE_HTTPS=True dans l'environnement pour activer les protections.
+USE_HTTPS = config('USE_HTTPS', cast=bool, default=False)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+X_FRAME_OPTIONS = 'DENY'
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default='')
+if USE_HTTPS:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Le HEALTHCHECK Docker interroge l'API en HTTP local
+    SECURE_REDIRECT_EXEMPT = [r'^api/test-connection/$']
+
+# Limitation des tentatives de connexion (vue web /login/)
+LOGIN_RATELIMIT_ATTEMPTS = config('LOGIN_RATELIMIT_ATTEMPTS', cast=int, default=5)
+LOGIN_RATELIMIT_WINDOW_SECONDS = config('LOGIN_RATELIMIT_WINDOW_SECONDS', cast=int, default=15 * 60)
 
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = "fr-fr"
+# Langue source du code (chaînes écrites en français) et langue par défaut
+# lorsque ni cookie ni en-tête Accept-Language ne permettent de choisir.
+LANGUAGE_CODE = "fr"
+
+# Langues proposées par le sélecteur de l'en-tête (vue django.views.i18n.set_language).
+# Les traductions vivent dans locale/<code>/LC_MESSAGES/{django,djangojs}.po ;
+# voir `python manage.py translations --help` (extraction / compilation sans gettext).
+LANGUAGES = [
+    ("fr", "Français"),
+    ("en", "English"),
+]
+
+LOCALE_PATHS = [os.path.join(BASE_DIR, "locale")]
+
+# Le choix de langue est mémorisé dans un cookie (un an), pas en session,
+# afin de survivre à la déconnexion.
+LANGUAGE_COOKIE_NAME = "blanco_language"
+LANGUAGE_COOKIE_AGE = 365 * 24 * 60 * 60
+LANGUAGE_COOKIE_SAMESITE = "Lax"
 
 TIME_ZONE = 'Africa/Douala'
 
@@ -185,12 +232,17 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'core.auth_backends.ActiveStaffTokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # Throttles par portée (login, inscription) : voir core/api_views/auth_views.py
+    'DEFAULT_THROTTLE_RATES': {
+        'login': config('API_LOGIN_THROTTLE', default='10/min'),
+        'signup': config('API_SIGNUP_THROTTLE', default='5/hour'),
+    },
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],

@@ -8,17 +8,19 @@ Correspond aux anciens endpoints Flask:
 """
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.api_permissions import HasModule
 from core.models import Category, Rayon, Gamme, GrammageType
 from core.serializers.product_serializers import (
     CategorySerializer, RayonSerializer, GammeSerializer, GrammageTypeSerializer,
 )
 
+CanReadReferences = HasModule('sales', 'products', 'inventory')
+
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanReadReferences])
 def get_categories(request):
     """
     Liste de toutes les catégories.
@@ -29,7 +31,7 @@ def get_categories(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanReadReferences])
 def get_rayons(request):
     """
     Liste de tous les rayons.
@@ -40,7 +42,7 @@ def get_rayons(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanReadReferences])
 def get_gammes(request):
     """
     Liste de toutes les gammes.
@@ -51,7 +53,7 @@ def get_gammes(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanReadReferences])
 def get_grammage_types(request):
     """
     Liste de tous les types de grammage.
@@ -59,4 +61,3 @@ def get_grammage_types(request):
     """
     grammage_types = GrammageType.objects.filter(delete_at__isnull=True)
     return Response(GrammageTypeSerializer(grammage_types, many=True).data)
-

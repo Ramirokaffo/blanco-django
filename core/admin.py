@@ -4,6 +4,7 @@ Django admin configuration for core models.
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.utils.translation import gettext_lazy as _
 from .models import (
     # User models
     CustomUser, Client, Supplier,
@@ -28,13 +29,43 @@ from .models import (
 
 def configure_admin_site():
     """Configure le site d'administration BLANCO"""
-    admin.site.site_header = "Administration BLANCO"
-    admin.site.site_title = "Administration BLANCO"
-    admin.site.index_title = "Panneau d'administration BLANCO"
-
-
+    admin.site.site_header = _("Administration BLANCO")
+    admin.site.site_title = _("Administration BLANCO")
+    admin.site.index_title = _("Panneau d'administration BLANCO")
 # Appliquer la configuration
 configure_admin_site()
+
+
+class FinancialRecordAdmin(admin.ModelAdmin):
+    """
+    Base pour les pièces financières (ventes, achats, paiements, écritures) :
+    - pas de suppression physique (l'annulation métier passe par les services,
+      qui restaurent le stock et contrepassent l'écriture) ;
+    - les montants sont en lecture seule.
+    """
+    protected_fields = ()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        base = tuple(super().get_readonly_fields(request, obj))
+        if obj is None:
+            return base
+        return tuple(dict.fromkeys(base + tuple(self.protected_fields)))
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop('delete_selected', None)
+        return actions
+
+
+# Le token DRF ne doit pas être lisible en clair dans l'admin
+try:
+    from rest_framework.authtoken.models import TokenProxy
+    admin.site.unregister(TokenProxy)
+except Exception:  # pragma: no cover - déjà désenregistré ou modèle absent
+    pass
 
 # User Models Admin
 @admin.register(CustomUser)
@@ -47,18 +78,18 @@ class CustomUserAdmin(UserAdmin):
 
     # Ajouter les champs personnalisés aux fieldsets
     fieldsets = UserAdmin.fieldsets + (
-        ('Informations supplémentaires', {
+        (_('Informations supplémentaires'), {
             'fields': ('firstname', 'lastname', 'phone_number', 'role', 'gender', 'profil', 'delete_at')
         }),
-        ('Modules autorisés', {
+        (_('Modules autorisés'), {
             'fields': ('allowed_modules',),
-            'description': 'Sélectionnez les modules auxquels cet utilisateur a accès. Les superusers ont accès à tout.'
+            'description': _('Sélectionnez les modules auxquels cet utilisateur a accès. Les superusers ont accès à tout.')
         }),
     )
 
     # Ajouter les champs personnalisés au formulaire de création
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ('Informations supplémentaires', {
+        (_('Informations supplémentaires'), {
             'fields': ('firstname', 'lastname', 'phone_number', 'role', 'gender', 'profil')
         }),
     )
@@ -137,30 +168,33 @@ class ProductImageAdmin(admin.ModelAdmin):
 
 # Sale Models Admin
 @admin.register(Sale)
-class SaleAdmin(admin.ModelAdmin):
+class SaleAdmin(FinancialRecordAdmin):
     list_display = ('id', 'total', 'client', 'staff', 'is_paid', 'is_credit', 'daily', 'create_at')
     list_filter = ('is_paid', 'is_credit', 'create_at')
     search_fields = ('client__firstname', 'client__lastname', 'staff__username')
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
+    protected_fields = ('total', 'is_credit', 'daily', 'delete_at')
 
 
 @admin.register(SaleProduct)
-class SaleProductAdmin(admin.ModelAdmin):
+class SaleProductAdmin(FinancialRecordAdmin):
     list_display = ('sale', 'product', 'quantity', "unit_price", 'get_subtotal')
     list_filter = ('create_at',)
     search_fields = ('sale__id', 'product__name')
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
+    protected_fields = ('sale', 'product', 'quantity', 'unit_price')
 
 
 @admin.register(CreditSale)
-class CreditSaleAdmin(admin.ModelAdmin):
+class CreditSaleAdmin(FinancialRecordAdmin):
     list_display = ('sale', 'amount_paid', 'amount_remaining', 'due_date', 'is_fully_paid', 'create_at')
     list_filter = ('is_fully_paid', 'due_date', 'create_at')
     search_fields = ('sale__id',)
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
+    protected_fields = ('sale', 'amount_paid', 'amount_remaining', 'is_fully_paid')
 
 
 @admin.register(Refund)
@@ -174,12 +208,13 @@ class RefundAdmin(admin.ModelAdmin):
 
 # Inventory Models Admin
 @admin.register(Supply)
-class SupplyAdmin(admin.ModelAdmin):
+class SupplyAdmin(FinancialRecordAdmin):
     list_display = ('product', 'supplier', 'quantity', "purchase_cost", 'selling_price', 'total_price', 'expiration_date', 'create_at')
     list_filter = ('expiration_date', 'create_at')
     search_fields = ('product__name', 'supplier__name')
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
+    protected_fields = ('product', 'quantity', 'purchase_cost', 'total_price', 'is_credit', 'daily', 'delete_at')
 
 
 @admin.register(Inventory)
@@ -271,9 +306,14 @@ class ProductExpenseAdmin(admin.ModelAdmin):
 
 # Comptabilité (Plan comptable & Journal)
 class JournalEntryLineInline(admin.TabularInline):
+    """Lignes d'écriture en consultation seule (l'équilibre débit/crédit est garanti par les services)."""
     model = JournalEntryLine
     extra = 0
-    readonly_fields = ('create_at',)
+    can_delete = False
+    readonly_fields = ('account', 'debit', 'credit', 'description', 'create_at')
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Account)
@@ -286,17 +326,19 @@ class AccountAdmin(admin.ModelAdmin):
 
 
 @admin.register(JournalEntry)
-class JournalEntryAdmin(admin.ModelAdmin):
+class JournalEntryAdmin(FinancialRecordAdmin):
     list_display = ('reference', 'date', 'journal', 'description', 'is_validated', 'exercise')
     list_filter = ('journal', 'is_validated', 'date')
     search_fields = ('reference', 'description')
     ordering = ('-date', '-create_at')
     readonly_fields = ('create_at', 'delete_at',)
+    protected_fields = ('reference', 'journal', 'exercise', 'daily', 'sale', 'supply', 'expense', 'is_validated')
     inlines = [JournalEntryLineInline]
 
 
 @admin.register(JournalEntryLine)
-class JournalEntryLineAdmin(admin.ModelAdmin):
+class JournalEntryLineAdmin(FinancialRecordAdmin):
+    protected_fields = ('entry', 'account', 'debit', 'credit')
     list_display = ('entry', 'account', 'debit', 'credit', 'description')
     list_filter = ('account',)
     search_fields = ('entry__reference', 'account__code', 'description')
@@ -306,7 +348,7 @@ class JournalEntryLineAdmin(admin.ModelAdmin):
 
 # Phase 2 — Paiements & Factures
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(FinancialRecordAdmin):
     list_display = ('credit_sale', 'amount', 'payment_method', 'payment_date', 'staff', 'create_at')
     list_filter = ('payment_method', 'payment_date')
     search_fields = ('credit_sale__sale__id', 'reference')
@@ -315,7 +357,7 @@ class PaymentAdmin(admin.ModelAdmin):
 
 
 @admin.register(SupplierPayment)
-class SupplierPaymentAdmin(admin.ModelAdmin):
+class SupplierPaymentAdmin(FinancialRecordAdmin):
     list_display = ('supplier', 'amount', 'payment_method', 'payment_date', 'staff', 'create_at')
     list_filter = ('payment_method', 'payment_date', 'supplier')
     search_fields = ('supplier__name', 'reference')
@@ -324,7 +366,7 @@ class SupplierPaymentAdmin(admin.ModelAdmin):
 
 
 @admin.register(Invoice)
-class InvoiceAdmin(admin.ModelAdmin):
+class InvoiceAdmin(FinancialRecordAdmin):
     list_display = ('invoice_number', 'sale', 'invoice_date', 'due_date', 'status', 'create_at')
     list_filter = ('status', 'invoice_date')
     search_fields = ('invoice_number', 'sale__id')
@@ -340,28 +382,28 @@ class SystemSettingsAdmin(admin.ModelAdmin):
     readonly_fields = ('updated_at',)
 
     fieldsets = (
-        ('Informations de l\'entreprise', {
+        (_('Informations de l\'entreprise'), {
             'fields': (
                 'company_name', 'company_address', 'company_phone',
                 'company_email', 'company_website', 'company_logo',
             )
         }),
-        ('Informations fiscales / légales', {
+        (_('Informations fiscales / légales'), {
             'fields': ('tax_id', 'trade_register', 'tva_accounting_mode', 'enable_tva_accounting'),
         }),
-        ('Paramètres monétaires', {
+        (_('Paramètres monétaires'), {
             'fields': ('currency_symbol', 'currency_code'),
         }),
-        ('Paramètres de tickets / reçus', {
+        (_('Paramètres de tickets / reçus'), {
             'fields': ('receipt_header', 'receipt_footer'),
         }),
-        ('Paramètres de stock', {
+        (_('Paramètres de stock'), {
             'fields': ('low_stock_threshold',),
         }),
-        ('Paramètres par défaut', {
+        (_('Paramètres par défaut'), {
             'fields': ('default_supply_expense_type',),
         }),
-        ('Métadonnées', {
+        (_('Métadonnées'), {
             'fields': ('updated_at',),
         }),
     )

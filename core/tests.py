@@ -1127,3 +1127,173 @@ class SupplyCancellationTests(TestCase):
         self.assertEqual(supply.total_price, Decimal('11925.00'))
         self.assertTrue(SupplyReturn.objects.filter(supply=supply).exists())
         self.assertContains(response, '1 retour partiel enregistré')
+
+class DefaultDataSeedingTests(TestCase):
+    """Chargement des données de référence (modules applicatifs, plan comptable)."""
+
+    def test_default_data_is_seeded_after_migrate(self):
+        # Le signal post_migrate a tourné lors de la création de la base de test
+        from core.models.settings_models import DEFAULT_MODULES
+        from core.services.accounting_service import DEFAULT_ACCOUNTS
+        from core.models import Account
+
+        self.assertEqual(AppModule.objects.count(), len(DEFAULT_MODULES))
+        self.assertEqual(Account.objects.count(), len(DEFAULT_ACCOUNTS))
+
+    def test_init_modules_command_creates_missing_modules_and_is_idempotent(self):
+        from io import StringIO
+        from django.core.management import call_command
+        from core.models.settings_models import DEFAULT_MODULES
+
+        AppModule.objects.all().delete()
+
+        out = StringIO()
+        call_command('init_modules', stdout=out)
+        self.assertEqual(AppModule.objects.count(), len(DEFAULT_MODULES))
+        self.assertIn(f"{len(DEFAULT_MODULES)} créé(s)", out.getvalue())
+
+        out = StringIO()
+        call_command('init_modules', stdout=out)
+        self.assertEqual(AppModule.objects.count(), len(DEFAULT_MODULES))
+        self.assertIn("0 créé(s)", out.getvalue())
+
+    def test_init_modules_update_realigns_existing_modules(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        module = AppModule.objects.get(code='sales')
+        module.name = 'Nom modifié'
+        module.icon = ''
+        module.order = 99
+        module.is_active = False
+        module.save()
+
+        # Sans --update : rien ne change
+        call_command('init_modules', stdout=StringIO())
+        module.refresh_from_db()
+        self.assertEqual(module.name, 'Nom modifié')
+
+        out = StringIO()
+        call_command('init_modules', '--update', stdout=out)
+        module.refresh_from_db()
+        self.assertEqual(module.name, 'Ventes')
+        self.assertEqual(module.icon, '🛒')
+        self.assertEqual(module.order, 2)
+        self.assertFalse(module.is_active)  # is_active est conservé
+        self.assertIn("1 mis à jour", out.getvalue())
+
+    def test_init_accounts_command_creates_chart_of_accounts(self):
+        from io import StringIO
+        from django.core.management import call_command
+        from core.services.accounting_service import DEFAULT_ACCOUNTS
+        from core.models import Account
+
+        Account.objects.all().delete()
+
+        out = StringIO()
+        call_command('init_accounts', stdout=out)
+        self.assertEqual(Account.objects.count(), len(DEFAULT_ACCOUNTS))
+        self.assertIn(f"{len(DEFAULT_ACCOUNTS)} compte(s) créé(s)", out.getvalue())
+
+        # Idempotent
+        call_command('init_accounts', stdout=StringIO())
+        self.assertEqual(Account.objects.count(), len(DEFAULT_ACCOUNTS))
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class InternationalizationTests(TestCase):
+    """Interface bilingue français / anglais : sélecteur de langue, catalogues et API."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from io import StringIO
+        from django.core.management import call_command
+        from django.utils.translation import trans_real
+
+        # Les .mo ne sont pas versionnés : on les compile depuis les .po (idempotent)
+        call_command('translations', 'compile', stdout=StringIO())
+        trans_real._translations.clear()
+        trans_real._default = None
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-i18n', email='admin-i18n@example.com', password='password123',
+        )
+
+    def _english(self, msgid, domain='django'):
+        """Traduction anglaise attendue, lue dans le .po (évite de figer le texte dans le test)."""
+        from django.conf import settings
+        from babel.messages.pofile import read_po
+        path = f"{settings.LOCALE_PATHS[0]}/en/LC_MESSAGES/{domain}.po"
+        with open(path, 'rb') as fh:
+            catalog = read_po(fh)
+        message = catalog.get(msgid)
+        self.assertIsNotNone(message, f"msgid absent du catalogue {domain} : {msgid!r}")
+        self.assertTrue(message.string, f"msgid non traduit : {msgid!r}")
+        return message.string
+
+    def test_default_language_is_french(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Language'], 'fr')
+        self.assertContains(response, 'Déconnexion')
+        self.assertContains(response, '<html lang="fr">')
+
+    def test_set_language_cookie_switches_to_english(self):
+        from django.conf import settings
+        self.client.force_login(self.user)
+        response = self.client.post(reverse('set_language'), {'language': 'en', 'next': '/'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.client.cookies[settings.LANGUAGE_COOKIE_NAME].value, 'en')
+
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response['Content-Language'], 'en')
+        self.assertContains(response, '<html lang="en">')
+        self.assertContains(response, self._english('Déconnexion'))
+        self.assertNotContains(response, 'Déconnexion')
+        # Le sélecteur marque la langue active
+        self.assertContains(response, 'class="lang-btn active"', count=1)
+
+    def test_accept_language_header_is_honoured_on_login_page(self):
+        response = self.client.get(reverse('login'), HTTP_ACCEPT_LANGUAGE='en')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Language'], 'en')
+        self.assertContains(response, '<html lang="en">')
+
+    def test_javascript_catalog_is_localized(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('javascript-catalog'), HTTP_ACCEPT_LANGUAGE='en')
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn('django.catalog', body)
+        self.assertIn(json.dumps(self._english('Le panier est vide', domain='djangojs')), body)
+
+    def test_api_error_messages_follow_accept_language(self):
+        url = '/api/auth/login/'
+        payload = {'username': 'admin-i18n', 'password': 'mauvais'}
+        fr = self.client.post(url, payload, HTTP_ACCEPT_LANGUAGE='fr').json()
+        en = self.client.post(url, payload, HTTP_ACCEPT_LANGUAGE='en').json()
+        self.assertEqual(fr['errors']['non_field_errors'], ['Identifiants invalides.'])
+        self.assertEqual(en['errors']['non_field_errors'], [self._english('Identifiants invalides.')])
+
+    def test_seeded_reference_names_are_translated_at_render_time(self):
+        from django.utils.translation import gettext, override
+        from core.models import Account
+        AccountingService.init_chart_of_accounts()
+        AppModule.init_default_modules()
+        account = Account.objects.get(code='701')
+        module = AppModule.objects.get(code='dashboard')
+        with override('en'):
+            self.assertEqual(gettext(account.name), self._english(account.name))
+            self.assertIn(self._english(module.name), str(module))  # __str__ = icône + nom traduit
+        with override('fr'):
+            self.assertEqual(gettext(account.name), account.name)
+
+    def test_catalogs_are_complete_and_well_formed(self):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        call_command('translations', 'check', stdout=out)
+        self.assertIn('Toutes les traductions sont complètes', out.getvalue(), out.getvalue())

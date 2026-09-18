@@ -1,4 +1,5 @@
-<nav class="navigation" id="appSidebar" aria-label="Navigation principale">
+{% load i18n %}
+<nav class="navigation" id="appSidebar" aria-label="{% trans "Navigation principale" %}">
     <div class="nav-container">
         <ul class="nav-menu">
             {% if 'dashboard' in user_modules %}
@@ -10,7 +11,7 @@
                         <rect x="3" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
                         <rect x="14" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    <span>Tableau de bord</span>
+                    <span>{% trans "Tableau de bord" %}</span>
                 </a>
             </li>
             {% endif %}
@@ -23,7 +24,7 @@
                         <line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/>
                         <path d="M16 10a4 4 0 0 1-8 0" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    <span>Ventes</span>
+                    <span>{% trans "Ventes" %}</span>
                 </a>
             </li>
             {% endif %}
@@ -36,7 +37,7 @@
                         <polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/>
                         <line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    <span>Produits</span>
+                    <span>{% trans "Produits" %}</span>
                 </a>
             </li>
             {% endif %}
@@ -49,7 +50,7 @@
                         <circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
                         <polyline points="17 11 19 13 23 9" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    <span>Fournisseurs</span>
+                    <span>{% trans "Fournisseurs" %}</span>
                 </a>
             </li>
             {% endif %}
@@ -63,7 +64,7 @@
                         <circle cx="5.5" cy="19" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>
                         <circle cx="18.5" cy="19" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>
                     </svg>
-                    <span>Approvisionnement</span>
+                    <span>{% trans "Approvisionnement" %}</span>
                 </a>
             </li>
             {% endif %}
@@ -75,7 +76,7 @@
                         <line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
                         <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    <span>Dépenses/Recettes</span>
+                    <span>{% trans "Dépenses/Recettes" %}</span>
                 </a>
             </li>
             {% endif %}
@@ -89,7 +90,7 @@
                         <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" stroke-width="2"/>
                         <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    <span>Utilisateurs</span>
+                    <span>{% trans "Utilisateurs" %}</span>
                 </a>
             </li>
             {% endif %}
@@ -105,7 +106,7 @@
                         <polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/>
                         <line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    <span>Inventaire</span>
+                    <span>{% trans "Inventaire" %}</span>
                 </a>
             </li>
             {% endif %}
@@ -121,7 +122,7 @@
                                 <path d="M7 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 <path d="M7 16h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
-                            <span>Comptabilité</span>
+                            <span>{% trans "Comptabilité" %}</span>
                         </span>
                         <svg class="nav-dropdown-caret" width="18" height="18" viewBox="0 0 24 24" fill="none">
                             <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -131,24 +132,24 @@
                     <div class="nav-dropdown-menu">
                         {% if 'accounting' in user_modules %}
                         <div class="nav-dropdown-section">
-                            <div class="nav-dropdown-title">Comptabilité</div>
+                            <div class="nav-dropdown-title">{% trans "Comptabilité" %}</div>
                             <div class="nav-dropdown-links">
-                                <a href="{% url 'accounting_journal' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_journal' or request.resolver_match.url_name == 'accounting_add_entry' %}active{% endif %}">Journal</a>
-                                <a href="{% url 'accounting_ledger' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_ledger' %}active{% endif %}">Grand livre</a>
-                                <a href="{% url 'accounting_balance' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_balance' %}active{% endif %}">Balance</a>
-                                <a href="{% url 'accounting_chart' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_chart' %}active{% endif %}">Plan comptable</a>
+                                <a href="{% url 'accounting_journal' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_journal' or request.resolver_match.url_name == 'accounting_add_entry' %}active{% endif %}">{% trans "Journal" %}</a>
+                                <a href="{% url 'accounting_ledger' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_ledger' %}active{% endif %}">{% trans "Grand livre" %}</a>
+                                <a href="{% url 'accounting_balance' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_balance' %}active{% endif %}">{% trans "Balance" %}</a>
+                                <a href="{% url 'accounting_chart' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'accounting_chart' %}active{% endif %}">{% trans "Plan comptable" %}</a>
                             </div>
                         </div>
                         {% endif %}
 
                         {% if 'treasury' in user_modules %}
                         <div class="nav-dropdown-section">
-                            <div class="nav-dropdown-title">Trésorerie</div>
+                            <div class="nav-dropdown-title">{% trans "Trésorerie" %}</div>
                             <div class="nav-dropdown-links">
-                                <a href="{% url 'treasury_dashboard' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'treasury_dashboard' %}active{% endif %}">Tableau de bord</a>
-                                <a href="{% url 'credit_sales' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'credit_sales' or request.resolver_match.url_name == 'record_credit_payment' %}active{% endif %}">Ventes à crédit</a>
-                                <a href="{% url 'supplier_payments' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'supplier_payments' or request.resolver_match.url_name == 'add_supplier_payment' or request.resolver_match.url_name == 'record_supply_payment' %}active{% endif %}">Paiements fournisseurs</a>
-                                <a href="{% url 'invoices' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'invoices' %}active{% endif %}">Factures</a>
+                                <a href="{% url 'treasury_dashboard' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'treasury_dashboard' %}active{% endif %}">{% trans "Tableau de bord" %}</a>
+                                <a href="{% url 'credit_sales' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'credit_sales' or request.resolver_match.url_name == 'record_credit_payment' %}active{% endif %}">{% trans "Ventes à crédit" %}</a>
+                                <a href="{% url 'supplier_payments' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'supplier_payments' or request.resolver_match.url_name == 'add_supplier_payment' or request.resolver_match.url_name == 'record_supply_payment' %}active{% endif %}">{% trans "Paiements fournisseurs" %}</a>
+                                <a href="{% url 'invoices' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'invoices' %}active{% endif %}">{% trans "Factures" %}</a>
                             </div>
                         </div>
                         {% endif %}
@@ -156,16 +157,16 @@
                         
                         {% if 'reports' in user_modules %}
                         <div class="nav-dropdown-section">
-                            <div class="nav-dropdown-title">Rapports</div>
+                            <div class="nav-dropdown-title">{% trans "Rapports" %}</div>
                             <div class="nav-dropdown-links">
-                                <a href="{% url 'reports' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">Centre de rapports</a>
-                                <a href="{% url 'income_statement' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'income_statement' %}active{% endif %}">Compte de résultat</a>
-                                <a href="{% url 'balance_sheet' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'balance_sheet' %}active{% endif %}">Bilan</a>
-                                <a href="{% url 'aged_balance' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'aged_balance' %}active{% endif %}">Balance âgée</a>
-                                <a href="{% url 'product_margins' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'product_margins' %}active{% endif %}">Marges produits</a>
-                                <a href="{% url 'vat_declaration' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'vat_declaration' %}active{% endif %}">Déclaration TVA</a>
-                                <a href="{% url 'bank_reconciliation' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'bank_reconciliation' %}active{% endif %}">Rapprochement bancaire</a>
-                                <a href="{% url 'exercise_closing' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'exercise_closing' %}active{% endif %}">Clôture d'exercice</a>
+                                <a href="{% url 'reports' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">{% trans "Centre de rapports" %}</a>
+                                <a href="{% url 'income_statement' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'income_statement' %}active{% endif %}">{% trans "Compte de résultat" %}</a>
+                                <a href="{% url 'balance_sheet' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'balance_sheet' %}active{% endif %}">{% trans "Bilan" %}</a>
+                                <a href="{% url 'aged_balance' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'aged_balance' %}active{% endif %}">{% trans "Balance âgée" %}</a>
+                                <a href="{% url 'product_margins' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'product_margins' %}active{% endif %}">{% trans "Marges produits" %}</a>
+                                <a href="{% url 'vat_declaration' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'vat_declaration' %}active{% endif %}">{% trans "Déclaration TVA" %}</a>
+                                <a href="{% url 'bank_reconciliation' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'bank_reconciliation' %}active{% endif %}">{% trans "Rapprochement bancaire" %}</a>
+                                <a href="{% url 'exercise_closing' %}" class="nav-dropdown-link {% if request.resolver_match.url_name == 'exercise_closing' %}active{% endif %}">{% trans "Clôture d'exercice" %}</a>
                             </div>
                         </div>
                         {% endif %}
@@ -184,7 +185,7 @@
                         <path d="M12 16V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                         <path d="M17 16v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    <span>Statistiques</span>
+                    <span>{% trans "Statistiques" %}</span>
                 </a>
             </li>
             {% endif %}

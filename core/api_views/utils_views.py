@@ -4,7 +4,7 @@ Correspond à l'ancien endpoint Flask: GET /test_connexion
 """
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.services.qrcode_service import QRCodeService
@@ -21,11 +21,12 @@ def test_connection(request):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def refresh_qr(request):
     """
     Vérifie si l'IP du serveur a changé et régénère le QR code si nécessaire.
     Retourne le QR code actuel (base64), l'adresse serveur et un flag 'changed'.
+    Authentification requise : l'adresse interne du serveur n'est pas publique.
     """
     result = QRCodeService.refresh_server_qr()
     return Response({
@@ -33,4 +34,3 @@ def refresh_qr(request):
         'server_address': result['server_address'],
         'changed': result['changed'],
     })
-

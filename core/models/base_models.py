@@ -4,6 +4,7 @@ Contains abstract models used by other models.
 """
 
 from django.db import models
+from django.utils.translation import gettext
 
 
 class BaseUser(models.Model):
@@ -25,7 +26,7 @@ class BaseUser(models.Model):
         return f"{self.firstname or ''} {self.lastname or ''}".strip()
     
     def __str__(self):
-        return self.get_full_name() or f"User #{self.id}"
+        return self.get_full_name() or gettext("Utilisateur n°%(id)s") % {'id': self.id}
 
 
 class SoftDeleteModel(models.Model):

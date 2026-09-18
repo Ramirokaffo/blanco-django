@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Paiement crédit - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Paiement crédit" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -51,18 +52,18 @@
     <div class="page-header">
         <div class="header-content">
             <div>
-                <span class="payment-kicker">Suivi de règlement</span>
+                <span class="payment-kicker">{% trans "Suivi de règlement" %}</span>
                 <h1>{{ page_title }}</h1>
                 <p class="text-secondary payment-subtitle">
-                    Client : {% if credit_sale.sale.client %}{{ credit_sale.sale.client.firstname }} {{ credit_sale.sale.client.lastname }}{% else %}N/A{% endif %}
-                    — Solde actuel : {{ credit_sale.amount_remaining|floatformat:0 }} FCFA
+                    {% trans "Client :" %} {% if credit_sale.sale.client %}{{ credit_sale.sale.client.firstname }} {{ credit_sale.sale.client.lastname }}{% else %}{% trans "N/A" %}{% endif %}
+                    — {% blocktrans with balance=credit_sale.amount_remaining|floatformat:0 %}Solde actuel : {{ balance }} FCFA{% endblocktrans %}
                 </p>
             </div>
             <a href="{% url 'credit_sales' %}" class="btn btn-secondary btn-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Retour
+                {% trans "Retour" %}
             </a>
         </div>
     </div>
@@ -79,7 +80,7 @@
         <div class="payment-main">
             <div class="card payment-card">
                 <div class="card-header">
-                    <h3 class="card-title">Enregistrer un paiement</h3>
+                    <h3 class="card-title">{% trans "Enregistrer un paiement" %}</h3>
                 </div>
                 <div class="card-body">
                     <form method="post" class="payment-form">
@@ -94,8 +95,8 @@
                         {% endif %}
 
                         <div class="payment-tip">
-                            <strong>Conseil</strong>
-                            Enregistrez uniquement le montant reçu aujourd’hui. Le solde restant sera recalculé automatiquement.
+                            <strong>{% trans "Conseil" %}</strong>
+                            {% trans "Enregistrez uniquement le montant reçu aujourd’hui. Le solde restant sera recalculé automatiquement." %}
                         </div>
 
                         <div class="form-grid">
@@ -127,8 +128,8 @@
                         </div>
 
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">Enregistrer le paiement</button>
-                            <a href="{% url 'credit_sales' %}" class="btn btn-secondary">Annuler</a>
+                            <button type="submit" class="btn btn-primary">{% trans "Enregistrer le paiement" %}</button>
+                            <a href="{% url 'credit_sales' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
                         </div>
                     </form>
                 </div>
@@ -136,7 +137,7 @@
 
             <div class="card payment-history">
                 <div class="card-header">
-                    <h3 class="card-title">Historique des paiements</h3>
+                    <h3 class="card-title">{% trans "Historique des paiements" %}</h3>
                 </div>
                 <div class="card-body">
                     {% if payments %}
@@ -144,11 +145,11 @@
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Mode</th>
-                                    <th class="text-right">Montant</th>
-                                    <th>Référence</th>
-                                    <th>Par</th>
+                                    <th>{% trans "Date" %}</th>
+                                    <th>{% trans "Mode" %}</th>
+                                    <th class="text-right">{% trans "Montant" %}</th>
+                                    <th>{% trans "Référence" %}</th>
+                                    <th>{% trans "Par" %}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -166,7 +167,7 @@
                     </div>
                     {% else %}
                     <div class="empty-state">
-                        Aucun paiement enregistré pour le moment.
+                        {% trans "Aucun paiement enregistré pour le moment." %}
                     </div>
                     {% endif %}
                 </div>
@@ -176,25 +177,25 @@
         <aside class="payment-side">
             <div class="card payment-card">
                 <div class="card-header">
-                    <h3 class="card-title">Détails de la vente à crédit</h3>
+                    <h3 class="card-title">{% trans "Détails de la vente à crédit" %}</h3>
                 </div>
                 <div class="card-body">
                     <div class="summary-grid">
                         <div class="summary-item">
-                            <span class="summary-label">Total vente</span>
+                            <span class="summary-label">{% trans "Total vente" %}</span>
                             <span class="summary-value">{{ credit_sale.sale.total|floatformat:0 }} FCFA</span>
                         </div>
                         <div class="summary-item">
-                            <span class="summary-label">Déjà payé</span>
+                            <span class="summary-label">{% trans "Déjà payé" %}</span>
                             <span class="summary-value">{{ credit_sale.amount_paid|floatformat:0 }} FCFA</span>
                         </div>
                         <div class="summary-item is-highlight">
-                            <span class="summary-label">Solde restant</span>
+                            <span class="summary-label">{% trans "Solde restant" %}</span>
                             <span class="summary-value">{{ credit_sale.amount_remaining|floatformat:0 }} FCFA</span>
                         </div>
                         <div class="summary-item">
-                            <span class="summary-label">Échéance</span>
-                            <span class="summary-value">{% if credit_sale.due_date %}{{ credit_sale.due_date|date:"d/m/Y" }}{% else %}Non définie{% endif %}</span>
+                            <span class="summary-label">{% trans "Échéance" %}</span>
+                            <span class="summary-value">{% if credit_sale.due_date %}{{ credit_sale.due_date|date:"d/m/Y" }}{% else %}{% trans "Non définie" %}{% endif %}</span>
                         </div>
                     </div>
                 </div>

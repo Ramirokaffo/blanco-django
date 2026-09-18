@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Clôturer l'inventaire - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Clôturer l'inventaire" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/inventory.css' %}">
@@ -11,17 +11,17 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Clôturer l'inventaire</h1>
+            <h1>{% trans "Clôturer l'inventaire" %}</h1>
             <p class="text-secondary">
-                Exercice : {{ exercise.start_date|date:"d/m/Y" }} - {% if exercise.end_date %}{{ exercise.end_date|date:"d/m/Y" }}{% else %}En cours{% endif %}
-                &mdash; {{ total_records }} enregistrement{{ total_records|pluralize }} &mdash; {{ total_products }} produit{{ total_products|pluralize }} distinct{{ total_products|pluralize }}
+                {% trans "Exercice :" %} {{ exercise.start_date|date:"d/m/Y" }} - {% if exercise.end_date %}{{ exercise.end_date|date:"d/m/Y" }}{% else %}{% trans "En cours" %}{% endif %}
+                &mdash; {% blocktrans count counter=total_records|default:0 %}{{ counter }} enregistrement{% plural %}{{ counter }} enregistrements{% endblocktrans %} &mdash; {% blocktrans count counter=total_products|default:0 %}{{ counter }} produit distinct{% plural %}{{ counter }} produits distincts{% endblocktrans %}
             </p>
         </div>
         <a href="{% url 'inventory' %}" class="btn btn-secondary btn-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Retour à la liste
+            {% trans "Retour à la liste" %}
         </a>
     </div>
 </div>
@@ -47,7 +47,7 @@
         </div>
         <div class="stat-info">
             <span class="stat-value">{{ total_valid }}</span>
-            <span class="stat-label">Produits valides (cumulés)</span>
+            <span class="stat-label">{% trans "Produits valides (cumulés)" %}</span>
         </div>
     </div>
     <div class="stat-card stat-invalid">
@@ -58,7 +58,7 @@
         </div>
         <div class="stat-info">
             <span class="stat-value">{{ total_invalid }}</span>
-            <span class="stat-label">Produits invalides (cumulés)</span>
+            <span class="stat-label">{% trans "Produits invalides (cumulés)" %}</span>
         </div>
     </div>
     <div class="stat-card stat-total">
@@ -69,7 +69,7 @@
         </div>
         <div class="stat-info">
             <span class="stat-value">{{ total_count }}</span>
-            <span class="stat-label">Total comptés</span>
+            <span class="stat-label">{% trans "Total comptés" %}</span>
         </div>
     </div>
 </div>
@@ -77,20 +77,20 @@
 <!-- Tableau des produits -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des produits avec quantités cumulées</h3>
+        <h3 class="card-title">{% trans "Liste des produits avec quantités cumulées" %}</h3>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table inventory-table">
                 <thead>
                     <tr>
-                        <th>Code</th>
-                        <th>Produit</th>
-                        <th>Stock actuel</th>
-                        <th>Valides (cumulés)</th>
-                        <th>Invalides (cumulés)</th>
-                        <th>Total comptés</th>
-                        <th>Différence stock</th>
+                        <th>{% trans "Code" %}</th>
+                        <th>{% trans "Produit" %}</th>
+                        <th>{% trans "Stock actuel" %}</th>
+                        <th>{% trans "Valides (cumulés)" %}</th>
+                        <th>{% trans "Invalides (cumulés)" %}</th>
+                        <th>{% trans "Total comptés" %}</th>
+                        <th>{% trans "Différence stock" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -108,7 +108,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center">Aucun produit inventorié pour l'exercice courant.</td>
+                        <td colspan="7" class="text-center">{% trans "Aucun produit inventorié pour l'exercice courant." %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -122,8 +122,8 @@
                     <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
                 <div>
-                    <strong>Attention :</strong> La clôture de l'inventaire mettra à jour le stock de chaque produit
-                    avec la quantité valide cumulée. Cette action est irréversible.
+                    <strong>{% trans "Attention :" %}</strong> {% blocktrans trimmed %}La clôture de l'inventaire mettra à jour le stock de chaque produit
+                    avec la quantité valide cumulée. Cette action est irréversible.{% endblocktrans %}
                 </div>
             </div>
             <form method="post" action="{% url 'close_inventory_confirm' %}" id="closeForm">
@@ -132,7 +132,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    Clôturer l'inventaire
+                    {% trans "Clôturer l'inventaire" %}
                 </button>
             </form>
         </div>
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (closeBtn && closeForm) {
         closeBtn.addEventListener('click', function() {
-            if (confirm('Êtes-vous sûr de vouloir clôturer l\'inventaire ?\n\nLe stock de chaque produit sera mis à jour avec la quantité valide cumulée.\nCette action est irréversible.')) {
+            if (confirm(gettext('Êtes-vous sûr de vouloir clôturer l\'inventaire ?\n\nLe stock de chaque produit sera mis à jour avec la quantité valide cumulée.\nCette action est irréversible.'))) {
                 closeForm.submit();
             }
         });

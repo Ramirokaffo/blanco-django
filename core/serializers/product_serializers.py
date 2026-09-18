@@ -10,6 +10,7 @@ Correspond aux anciens endpoints Flask:
   - POST /create_product
 """
 
+from django.utils.translation import gettext
 from rest_framework import serializers
 from core.models import (
     Product, ProductImage, Category, Gamme, Rayon, GrammageType,
@@ -123,14 +124,16 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
     def validate_code(self, value):
         if Product.objects.filter(code=value).exists():
-            raise serializers.ValidationError("Ce code produit existe déjà.")
+            raise serializers.ValidationError(gettext("Ce code produit existe déjà."))
         return value
 
 
 class ProductUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer pour mettre à jour un produit.
-    Nouveau endpoint: PATCH /api/products/by-code/<product_code>/update
+    Endpoint: PATCH /api/products/<product_id>/update/
+    Le champ ``stock`` est volontairement exclu : le stock ne bouge que par
+    approvisionnement ou inventaire (traçabilité stock / comptabilité).
     """
     code = serializers.CharField(required=False)
     images = serializers.ListField(
@@ -141,7 +144,7 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'code', 'name', 'description', 'brand', 'color',
-            'stock', 'stock_limit', 'max_salable_price', 'actual_price',
+            'stock_limit', 'max_salable_price', 'actual_price',
             'is_price_reducible', 'grammage', 'exp_alert_period',
             'category', 'gamme', 'rayon', 'grammage_type',
             'images', 'last_purchase_price',
@@ -155,8 +158,8 @@ class ProductUpdateSerializer(serializers.ModelSerializer):
         # Vérifier que le code n'existe pas déjà (sauf pour le produit actuel)
         instance = self.instance
         if instance and Product.objects.filter(code=value).exclude(id=instance.id).exists():
-            raise serializers.ValidationError("Ce code produit existe déjà.")
+            raise serializers.ValidationError(gettext("Ce code produit existe déjà."))
         elif not instance and Product.objects.filter(code=value).exists():
-            raise serializers.ValidationError("Ce code produit existe déjà.")
+            raise serializers.ValidationError(gettext("Ce code produit existe déjà."))
         return value
 

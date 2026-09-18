@@ -199,6 +199,39 @@
     color: var(--primary-color);
 }
 
+/* Sélecteur de langue (en-tête) */
+.lang-switcher {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+    background-color: var(--bg-secondary);
+}
+
+.lang-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+}
+
+.lang-btn:hover {
+    color: var(--primary-color);
+}
+
+.lang-btn.active {
+    background-color: var(--bg-primary);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
 [data-theme="light"] .moon-icon {
     display: none;
 }
@@ -906,4 +939,17 @@ body.sidebar-collapsed .nav-dropdown-menu {
     font-size: 13px;
     color: var(--text-secondary);
     margin: 0;
+}
+/* Déconnexion : bouton de formulaire (POST) rendu comme un élément du menu */
+.logout-form {
+    margin: 0;
+}
+button.user-dropdown-item.logout-link {
+    width: 100%;
+    background: none;
+    border: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
 }

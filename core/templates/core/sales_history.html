@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Historique des ventes - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Historique des ventes" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/sales.css' %}">
@@ -12,12 +12,12 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Historique des ventes</h1>
+            <h1>{% trans "Historique des ventes" %}</h1>
             <p class="text-secondary">
                 {% if view_mode == 'products' %}
-                    {{ total_count }} produit{{ total_count|pluralize }} vendu{{ total_count|pluralize }} — Total : {{ total_sales_amount|floatformat:0 }} FCFA
+                    {% blocktrans with total=total_sales_amount|floatformat:0 count counter=total_count %}{{ counter }} produit vendu — Total : {{ total }} FCFA{% plural %}{{ counter }} produits vendus — Total : {{ total }} FCFA{% endblocktrans %}
                 {% else %}
-                    {{ total_count }} vente{{ total_count|pluralize }} — Total : {{ total_sales_amount|floatformat:0 }} FCFA
+                    {% blocktrans with total=total_sales_amount|floatformat:0 count counter=total_count %}{{ counter }} vente — Total : {{ total }} FCFA{% plural %}{{ counter }} ventes — Total : {{ total }} FCFA{% endblocktrans %}
                 {% endif %}
             </p>
         </div>
@@ -26,18 +26,18 @@
             <div class="view-mode-switch">
                 <a href="{% url 'sales_history' %}?view_mode=sales&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}"
                    class="mode-btn {% if view_mode != 'products' %}active{% endif %}">
-                    Ventes
+                    {% trans "Ventes" %}
                 </a>
                 <a href="{% url 'sales_history' %}?view_mode=products&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}"
                    class="mode-btn {% if view_mode == 'products' %}active{% endif %}">
-                    Produits
+                    {% trans "Produits" %}
                 </a>
             </div>
             <a href="{% url 'sales' %}" class="btn btn-secondary btn-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Retour aux ventes
+                {% trans "Retour aux ventes" %}
             </a>
         </div>
     </div>
@@ -66,19 +66,19 @@
         <div class="filters-row">
             <!-- Recherche -->
             <div class="filter-group filter-search">
-                <label class="form-label">Recherche</label>
+                <label class="form-label">{% trans "Recherche" %}</label>
                 {% if view_mode == 'products' %}
-                <input type="text" name="search" class="form-control" placeholder="Produit, client, vendeur, n° vente..." value="{{ current_search }}">
+                <input type="text" name="search" class="form-control" placeholder="{% trans "Produit, client, vendeur, n° vente..." %}" value="{{ current_search }}">
                 {% else %}
-                <input type="text" name="search" class="form-control" placeholder="Client, vendeur, n° vente..." value="{{ current_search }}">
+                <input type="text" name="search" class="form-control" placeholder="{% trans "Client, vendeur, n° vente..." %}" value="{{ current_search }}">
                 {% endif %}
             </div>
 
             <!-- Client -->
             <div class="filter-group">
-                <label class="form-label">Client</label>
+                <label class="form-label">{% trans "Client" %}</label>
                 <select name="client" class="form-control" onchange="this.form.submit()">
-                    <option value="">Tous les clients</option>
+                    <option value="">{% trans "Tous les clients" %}</option>
                     {% for client in clients %}
                     <option value="{{ client.id }}" {% if current_client == client.id|stringformat:"d" %}selected{% endif %}>{{ client.firstname }} {{ client.lastname }}</option>
                     {% endfor %}
@@ -87,9 +87,9 @@
 
             <!-- Vendeur -->
             <div class="filter-group">
-                <label class="form-label">Vendeur</label>
+                <label class="form-label">{% trans "Vendeur" %}</label>
                 <select name="staff" class="form-control" onchange="this.form.submit()">
-                    <option value="">Tous les vendeurs</option>
+                    <option value="">{% trans "Tous les vendeurs" %}</option>
                     {% for member in staff_members %}
                     <option value="{{ member.id }}" {% if current_staff == member.id|stringformat:"d" %}selected{% endif %}>{{ member.get_full_name }}</option>
                     {% endfor %}
@@ -100,34 +100,34 @@
         <div class="filters-row">
             <!-- Type de vente -->
             <div class="filter-group">
-                <label class="form-label">Type</label>
+                <label class="form-label">{% trans "Type" %}</label>
                 <select name="type" class="form-control" onchange="this.form.submit()">
-                    <option value="">Tous</option>
-                    <option value="cash" {% if current_type == 'cash' %}selected{% endif %}>Comptant</option>
-                    <option value="credit" {% if current_type == 'credit' %}selected{% endif %}>Crédit</option>
+                    <option value="">{% trans "Tous" %}</option>
+                    <option value="cash" {% if current_type == 'cash' %}selected{% endif %}>{% trans "Comptant" %}</option>
+                    <option value="credit" {% if current_type == 'credit' %}selected{% endif %}>{% trans "Crédit" %}</option>
                 </select>
             </div>
 
             <!-- Statut paiement -->
             <div class="filter-group">
-                <label class="form-label">Statut</label>
+                <label class="form-label">{% trans "Statut" %}</label>
                 <select name="status" class="form-control" onchange="this.form.submit()">
-                    <option value="">Tous</option>
-                    <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>Payé</option>
-                    <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>Non payé</option>
-                    <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>Annulé</option>
+                    <option value="">{% trans "Tous" %}</option>
+                    <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>{% trans "Payé" %}</option>
+                    <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>{% trans "Non payé" %}</option>
+                    <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>{% trans "Annulé" %}</option>
                 </select>
             </div>
 
             <!-- Date début -->
             <div class="filter-group">
-                <label class="form-label">Date début</label>
+                <label class="form-label">{% trans "Date début" %}</label>
                 <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
             </div>
 
             <!-- Date fin -->
             <div class="filter-group">
-                <label class="form-label">Date fin</label>
+                <label class="form-label">{% trans "Date fin" %}</label>
                 <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
             </div>
         </div>
@@ -137,9 +137,9 @@
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                Filtrer
+                {% trans "Filtrer" %}
             </button>
-            <a href="{% url 'sales_history' %}?view_mode={{ view_mode }}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+            <a href="{% url 'sales_history' %}?view_mode={{ view_mode }}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser" %}</a>
         </div>
     </form>
 </div>
@@ -148,9 +148,9 @@
 <!-- Tableau des produits vendus -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des produits vendus</h3>
+        <h3 class="card-title">{% trans "Liste des produits vendus" %}</h3>
         <div class="pagination-info-header">
-            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+            {% blocktrans with number=page_obj.number num_pages=page_obj.paginator.num_pages %}Page {{ number }} sur {{ num_pages }}{% endblocktrans %}
         </div>
     </div>
     <div class="card-body">
@@ -159,16 +159,16 @@
                 <thead>
                     <tr>
                         <th>#ID</th>
-                        <th>Date</th>
-                        <th>Produit</th>
-                        <th>Catégorie</th>
-                        <th>Prix unitaire</th>
-                        <th>Quantité</th>
-                        <th>Total</th>
-                        <th>Client</th>
-                        <th>Vendeur</th>
-                        <th>Type</th>
-                        <th>Statut</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Produit" %}</th>
+                        <th>{% trans "Catégorie" %}</th>
+                        <th>{% trans "Prix unitaire" %}</th>
+                        <th>{% trans "Quantité" %}</th>
+                        <th>{% trans "Total" %}</th>
+                        <th>{% trans "Client" %}</th>
+                        <th>{% trans "Vendeur" %}</th>
+                        <th>{% trans "Type" %}</th>
+                        <th>{% trans "Statut" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -191,30 +191,30 @@
                             {% if sp.sale.client %}
                                 {{ sp.sale.client }}
                             {% else %}
-                                <span class="text-secondary">Client de passage</span>
+                                <span class="text-secondary">{% trans "Client de passage" %}</span>
                             {% endif %}
                         </td>
                         <td>{{ sp.sale.staff.get_full_name|default:"-" }}</td>
                         <td>
                             {% if sp.sale.is_credit %}
-                                <span class="badge badge-warning">Crédit</span>
+                                <span class="badge badge-warning">{% trans "Crédit" %}</span>
                             {% else %}
-                                <span class="badge badge-success">Comptant</span>
+                                <span class="badge badge-success">{% trans "Comptant" %}</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if sp.sale.delete_at %}
-                                <span class="badge badge-danger">Annulée</span>
+                                <span class="badge badge-danger">{% trans "Annulée" %}</span>
                             {% elif sp.sale.is_paid %}
-                                <span class="badge badge-success">Payé</span>
+                                <span class="badge badge-success">{% trans "Payé" %}</span>
                             {% else %}
-                                <span class="badge badge-danger">Non payé</span>
+                                <span class="badge badge-danger">{% trans "Non payé" %}</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="11" class="text-center text-secondary" style="padding: 2rem;">Aucun produit vendu trouvé.</td>
+                        <td colspan="11" class="text-center text-secondary" style="padding: 2rem;">{% trans "Aucun produit vendu trouvé." %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -227,12 +227,12 @@
 {% if page_obj.paginator.num_pages > 1 %}
 <div class="pagination-container">
     <div class="pagination-info">
-        Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} produit{{ total_count|pluralize }} vendu{{ total_count|pluralize }}
+        {% blocktrans with start=page_obj.start_index end=page_obj.end_index count counter=total_count %}Affichage de {{ start }} à {{ end }} sur {{ counter }} produit vendu{% plural %}Affichage de {{ start }} à {{ end }} sur {{ counter }} produits vendus{% endblocktrans %}
     </div>
     <div class="pagination-buttons">
         {% if page_obj.has_previous %}
         <a href="?page={{ page_obj.previous_page_number }}&view_mode=products&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
-            &laquo; Précédent
+            &laquo; {% trans "Précédent" %}
         </a>
         {% endif %}
 
@@ -246,7 +246,7 @@
 
         {% if page_obj.has_next %}
         <a href="?page={{ page_obj.next_page_number }}&view_mode=products&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
-            Suivant &raquo;
+            {% trans "Suivant" %} &raquo;
         </a>
         {% endif %}
     </div>
@@ -257,9 +257,9 @@
 <!-- Tableau des ventes (mode par défaut) -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des ventes</h3>
+        <h3 class="card-title">{% trans "Liste des ventes" %}</h3>
         <div class="pagination-info-header">
-            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+            {% blocktrans with number=page_obj.number num_pages=page_obj.paginator.num_pages %}Page {{ number }} sur {{ num_pages }}{% endblocktrans %}
         </div>
     </div>
     <div class="card-body">
@@ -268,13 +268,13 @@
                 <thead>
                     <tr>
                         <th>#ID</th>
-                        <th>Date</th>
-                        <th>Client</th>
-                        <th>Vendeur</th>
-                        <th>Montant</th>
-                        <th>Type</th>
-                        <th>Statut</th>
-                        <th>Actions</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Client" %}</th>
+                        <th>{% trans "Vendeur" %}</th>
+                        <th>{% trans "Montant" %}</th>
+                        <th>{% trans "Type" %}</th>
+                        <th>{% trans "Statut" %}</th>
+                        <th>{% trans "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -286,28 +286,28 @@
                             {% if sale.client %}
                                 {{ sale.client }}
                             {% else %}
-                                <span class="text-secondary">Client de passage</span>
+                                <span class="text-secondary">{% trans "Client de passage" %}</span>
                             {% endif %}
                         </td>
                         <td>{{ sale.staff.get_full_name|default:"-" }}</td>
                         <td class="font-weight-bold">{{ sale.total|floatformat:0 }} FCFA</td>
                         <td>
                             {% if sale.is_credit %}
-                                <span class="badge badge-warning">Crédit</span>
+                                <span class="badge badge-warning">{% trans "Crédit" %}</span>
                             {% else %}
-                                <span class="badge badge-success">Comptant</span>
+                                <span class="badge badge-success">{% trans "Comptant" %}</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if sale.delete_at %}
-                                <span class="badge badge-danger">Annulée</span>
+                                <span class="badge badge-danger">{% trans "Annulée" %}</span>
                                 <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.25rem;">
-                                    le {{ sale.delete_at|date:"d/m/Y H:i" }}
+                                    {% blocktrans with date=sale.delete_at|date:"d/m/Y H:i" %}le {{ date }}{% endblocktrans %}
                                 </div>
                             {% elif sale.is_paid %}
-                                <span class="badge badge-success">Payé</span>
+                                <span class="badge badge-success">{% trans "Payé" %}</span>
                             {% else %}
-                                <span class="badge badge-danger">Non payé</span>
+                                <span class="badge badge-danger">{% trans "Non payé" %}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -317,8 +317,8 @@
                                     <button
                                         type="button"
                                         class="btn-icon js-sale-actions-toggle"
-                                        title="Actions sur la vente"
-                                        aria-label="Ouvrir les actions de la vente"
+                                        title="{% trans "Actions sur la vente" %}"
+                                        aria-label="{% trans "Ouvrir les actions de la vente" %}"
                                         aria-expanded="false"
                                     >
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -330,26 +330,26 @@
                                     <div class="sale-actions-dropdown">
                                         {% if sale.is_credit and sale.credit_info and not sale.credit_info.is_fully_paid %}
                                         <a href="{% url 'record_credit_payment' sale.credit_info.id %}" class="sale-actions-item">
-                                            Payer
+                                            {% trans "Payer" %}
                                         </a>
                                         {% endif %}
                                         <button type="button" class="sale-actions-item js-open-sale-modal" data-modal-target="partialReturnModal{{ sale.id }}">
-                                            Retour partiel
+                                            {% trans "Retour partiel" %}
                                         </button>
                                         <button type="button" class="sale-actions-item sale-actions-item-danger js-open-sale-modal" data-modal-target="cancelSaleModal{{ sale.id }}">
-                                            Annuler
+                                            {% trans "Annuler" %}
                                         </button>
                                     </div>
                                 </div>
                                 {% else %}
-                                <span class="text-secondary" style="font-size: 0.85rem;">Annulation enregistrée</span>
+                                <span class="text-secondary" style="font-size: 0.85rem;">{% trans "Annulation enregistrée" %}</span>
                                 {% endif %}
                                 {% if sale.sale_returns.all|length %}
                                 <div class="text-secondary" style="font-size: 0.75rem; margin-top: 0.35rem;">
-                                    {{ sale.sale_returns.all|length }} retour{{ sale.sale_returns.all|length|pluralize }} partiel{{ sale.sale_returns.all|length|pluralize }} enregistré{{ sale.sale_returns.all|length|pluralize }}
+                                    {% blocktrans count counter=sale.sale_returns.all|length %}{{ counter }} retour partiel enregistré{% plural %}{{ counter }} retours partiels enregistrés{% endblocktrans %}
                                 </div>
                                 {% endif %}
-                                <button class="btn-icon js-print-sale" data-sale-id="{{ sale.id }}" title="Imprimer la facture">
+                                <button class="btn-icon js-print-sale" data-sale-id="{{ sale.id }}" title="{% trans "Imprimer la facture" %}">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                         <path d="M4 5V2h8v3M4 11H2V7h12v4h-2" stroke="currentColor" stroke-width="1.5"/>
                                         <rect x="4" y="9" width="8" height="5" stroke="currentColor" stroke-width="1.5"/>
@@ -360,7 +360,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center text-secondary" style="padding: 2rem;">Aucune vente trouvée.</td>
+                        <td colspan="8" class="text-center text-secondary" style="padding: 2rem;">{% trans "Aucune vente trouvée." %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -374,8 +374,8 @@
     <div class="modal sale-action-modal" id="partialReturnModal{{ sale.id }}">
         <div class="modal-content sale-action-modal-content">
             <div class="modal-header">
-                <h3>Retour partiel — Vente #{{ sale.id }}</h3>
-                <button type="button" class="modal-close js-close-sale-modal" aria-label="Fermer">&times;</button>
+                <h3>{% blocktrans with id=sale.id %}Retour partiel — Vente #{{ id }}{% endblocktrans %}</h3>
+                <button type="button" class="modal-close js-close-sale-modal" aria-label="{% trans "Fermer" %}">&times;</button>
             </div>
             <div class="modal-body">
                 <form method="post" action="{% url 'partial_return_sale' sale.id %}" class="sale-action-form">
@@ -388,7 +388,7 @@
                             <div class="sale-action-line">
                                 <div class="sale-action-line-label">
                                     <strong>{{ sale_product.product.name }}</strong>
-                                    <span class="text-secondary">Reste {{ sale_product.quantity }} × {{ sale_product.unit_price|floatformat:0 }} FCFA</span>
+                                    <span class="text-secondary">{% blocktrans with quantity=sale_product.quantity price=sale_product.unit_price|floatformat:0 %}Reste {{ quantity }} × {{ price }} FCFA{% endblocktrans %}</span>
                                 </div>
                                 <input
                                     type="number"
@@ -406,7 +406,7 @@
 
                     <div class="sale-action-fields">
                         <div class="form-group">
-                            <label class="form-label">Mode de remboursement</label>
+                            <label class="form-label">{% trans "Mode de remboursement" %}</label>
                             <select name="refund_payment_method" class="form-control">
                                 {% for value, label in payment_method_choices %}
                                 <option value="{{ value }}">{{ label }}</option>
@@ -414,15 +414,16 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Motif</label>
-                            <textarea name="reason" class="form-control" rows="3" required placeholder="Motif du retour partiel / avoir client"></textarea>
+                            <label class="form-label">{% trans "Motif" %}</label>
+                            <textarea name="reason" class="form-control" rows="3" required placeholder="{% trans "Motif du retour partiel / avoir client" %}"></textarea>
                         </div>
                     </div>
 
                     <div class="sale-action-form-actions">
-                        <button type="button" class="btn btn-secondary js-close-sale-modal">Fermer</button>
-                        <button type="submit" class="btn btn-primary" onclick="return confirm('Confirmer le retour partiel de cette vente ?');">
-                            Valider le retour
+                        <button type="button" class="btn btn-secondary js-close-sale-modal">{% trans "Fermer" %}</button>
+                        {% trans "Confirmer le retour partiel de cette vente ?" as confirm_return_label %}
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('{{ confirm_return_label|escapejs }}');">
+                            {% trans "Valider le retour" %}
                         </button>
                     </div>
                 </form>
@@ -433,8 +434,8 @@
     <div class="modal sale-action-modal" id="cancelSaleModal{{ sale.id }}">
         <div class="modal-content sale-action-modal-content">
             <div class="modal-header">
-                <h3>Annuler la vente #{{ sale.id }}</h3>
-                <button type="button" class="modal-close js-close-sale-modal" aria-label="Fermer">&times;</button>
+                <h3>{% blocktrans with id=sale.id %}Annuler la vente #{{ id }}{% endblocktrans %}</h3>
+                <button type="button" class="modal-close js-close-sale-modal" aria-label="{% trans "Fermer" %}">&times;</button>
             </div>
             <div class="modal-body">
                 <form method="post" action="{% url 'cancel_sale' sale.id %}" class="sale-action-form">
@@ -443,7 +444,7 @@
 
                     <div class="sale-action-fields">
                         <div class="form-group">
-                            <label class="form-label">Mode de remboursement</label>
+                            <label class="form-label">{% trans "Mode de remboursement" %}</label>
                             <select name="refund_payment_method" class="form-control">
                                 {% for value, label in payment_method_choices %}
                                 <option value="{{ value }}">{{ label }}</option>
@@ -451,15 +452,16 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Motif</label>
-                            <textarea name="reason" class="form-control" rows="3" required placeholder="Motif d'annulation / retour client"></textarea>
+                            <label class="form-label">{% trans "Motif" %}</label>
+                            <textarea name="reason" class="form-control" rows="3" required placeholder="{% trans "Motif d'annulation / retour client" %}"></textarea>
                         </div>
                     </div>
 
                     <div class="sale-action-form-actions">
-                        <button type="button" class="btn btn-secondary js-close-sale-modal">Fermer</button>
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('Confirmer l\'annulation de cette vente ?');">
-                            Confirmer l'annulation
+                        <button type="button" class="btn btn-secondary js-close-sale-modal">{% trans "Fermer" %}</button>
+                        {% trans "Confirmer l'annulation de cette vente ?" as confirm_cancel_label %}
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('{{ confirm_cancel_label|escapejs }}');">
+                            {% trans "Confirmer l'annulation" %}
                         </button>
                     </div>
                 </form>
@@ -473,12 +475,12 @@
 {% if page_obj.paginator.num_pages > 1 %}
 <div class="pagination-container">
     <div class="pagination-info">
-        Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} vente{{ total_count|pluralize }}
+        {% blocktrans with start=page_obj.start_index end=page_obj.end_index count counter=total_count %}Affichage de {{ start }} à {{ end }} sur {{ counter }} vente{% plural %}Affichage de {{ start }} à {{ end }} sur {{ counter }} ventes{% endblocktrans %}
     </div>
     <div class="pagination-buttons">
         {% if page_obj.has_previous %}
         <a href="?page={{ page_obj.previous_page_number }}&view_mode=sales&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
-            &laquo; Précédent
+            &laquo; {% trans "Précédent" %}
         </a>
         {% endif %}
 
@@ -492,7 +494,7 @@
 
         {% if page_obj.has_next %}
         <a href="?page={{ page_obj.next_page_number }}&view_mode=sales&search={{ current_search }}&client={{ current_client }}&staff={{ current_staff }}&type={{ current_type }}&status={{ current_status }}&date_from={{ current_date_from }}&date_to={{ current_date_to }}" class="pagination-btn">
-            Suivant &raquo;
+            {% trans "Suivant" %} &raquo;
         </a>
         {% endif %}
     </div>

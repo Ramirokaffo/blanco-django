@@ -1,0 +1,844 @@
+# English translations for Blanco.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the Blanco project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Blanco 1.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-07 01:04+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: en\n"
+"Language-Team: en <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: core/static/js/login.js:15
+msgid "Masquer le mot de passe"
+msgstr "Hide password"
+
+#: core/static/js/login.js:15
+msgid "Afficher le mot de passe"
+msgstr "Show password"
+
+#: core/static/js/main.js:51
+msgid "Ouvrir la navigation latérale"
+msgstr "Open side navigation"
+
+#: core/static/js/main.js:51
+msgid "Fermer la navigation latérale"
+msgstr "Close side navigation"
+
+#: core/static/js/main.js:111
+msgid "Historique des ventes"
+msgstr "Sales history"
+
+#: core/static/js/main.js:111
+msgid "vente historique liste"
+msgstr "sale sales history list"
+
+#: core/static/js/main.js:112
+msgid "Ajouter un approvisionnement"
+msgstr "Add a supply"
+
+#: core/static/js/main.js:112
+msgid "approvisionner ajouter créer stock"
+msgstr "supply supplies restock add create stock purchase"
+
+#: core/static/js/main.js:113
+msgid "Ajouter un inventaire"
+msgstr "Add an inventory"
+
+#: core/static/js/main.js:113
+msgid "inventaire ajouter créer"
+msgstr "inventory stock count add create"
+
+#: core/static/js/main.js:114
+msgid "Historique des inventaires"
+msgstr "Inventory history"
+
+#: core/static/js/main.js:114
+msgid "inventaire historique liste"
+msgstr "inventory stock count history list"
+
+#: core/static/js/main.js:115
+msgid "Clôture inventaire"
+msgstr "Inventory closing"
+
+#: core/static/js/main.js:115
+msgid "inventaire clôturer fermer"
+msgstr "inventory stock count close closing"
+
+#: core/static/js/main.js:116
+msgid "Ajouter un client"
+msgstr "Add a customer"
+
+#: core/static/js/main.js:116
+msgid "client ajouter créer contact"
+msgstr "customer client add create contact"
+
+#: core/static/js/main.js:117
+msgid "Ajouter un fournisseur"
+msgstr "Add a supplier"
+
+#: core/static/js/main.js:117
+msgid "fournisseur ajouter créer"
+msgstr "supplier vendor add create"
+
+#: core/static/js/main.js:118
+msgid "Ajouter une dépense"
+msgstr "Add an expense"
+
+#: core/static/js/main.js:118
+msgid "dépense ajouter créer"
+msgstr "expense spending add create"
+
+#: core/static/js/main.js:119
+msgid "Résumé journalier"
+msgstr "Daily summary"
+
+#: core/static/js/main.js:119
+msgid "journée résumé quotidien bilan"
+msgstr "day daily summary business day overview"
+
+#: core/static/js/main.js:120
+msgid "Clôture journalière"
+msgstr "Day closing"
+
+#: core/static/js/main.js:120
+msgid "journée clôturer fermer quotidien"
+msgstr "day daily close closing business day end of day"
+
+#: core/static/js/main.js:121
+msgid "Migration de données"
+msgstr "Data migration"
+
+#: core/static/js/main.js:121
+msgid "migration données importer"
+msgstr "migration data import legacy"
+
+#: core/static/js/main.js:122
+msgid "Journal comptable"
+msgstr "Accounting journal"
+
+#: core/static/js/main.js:122
+msgid "comptabilité journal écritures"
+msgstr "accounting journal entries bookkeeping"
+
+#: core/static/js/main.js:123
+msgid "Grand livre"
+msgstr "General ledger"
+
+#: core/static/js/main.js:123
+msgid "comptabilité grand livre comptes"
+msgstr "accounting general ledger accounts"
+
+#: core/static/js/main.js:124
+msgid "Balance des comptes"
+msgstr "Trial balance"
+
+#: core/static/js/main.js:124
+msgid "comptabilité balance comptes"
+msgstr "accounting trial balance accounts"
+
+#: core/static/js/main.js:125
+msgid "Plan comptable"
+msgstr "Chart of accounts"
+
+#: core/static/js/main.js:125
+msgid "comptabilité plan comptes"
+msgstr "accounting chart of accounts"
+
+#: core/static/js/main.js:126
+msgid "Ventes à crédit"
+msgstr "Credit sales"
+
+#: core/static/js/main.js:126
+msgid "crédit vente impayé"
+msgstr "credit sale sales unpaid outstanding receivable"
+
+#: core/static/js/main.js:127
+msgid "Paiements fournisseurs"
+msgstr "Supplier payments"
+
+#: core/static/js/main.js:127
+msgid "paiement fournisseur"
+msgstr "payment supplier payable"
+
+#: core/static/js/main.js:128
+msgid "Factures"
+msgstr "Invoices"
+
+#: core/static/js/main.js:128
+msgid "facture facturation"
+msgstr "invoice invoicing billing"
+
+#: core/static/js/main.js:129
+msgid "Compte de résultat"
+msgstr "Income statement"
+
+#: core/static/js/main.js:129
+msgid "résultat bénéfice perte"
+msgstr "income statement result profit loss"
+
+#: core/static/js/main.js:130
+msgid "Bilan comptable"
+msgstr "Balance sheet"
+
+#: core/static/js/main.js:130
+msgid "bilan actif passif"
+msgstr "balance sheet assets liabilities"
+
+#: core/static/js/main.js:131
+msgid "Balance âgée"
+msgstr "Aged balance"
+
+#: core/static/js/main.js:131
+msgid "balance âgée créance"
+msgstr "aged balance receivable receivables"
+
+#: core/static/js/main.js:132
+msgid "Marges produits"
+msgstr "Product margins"
+
+#: core/static/js/main.js:132
+msgid "marge produit rentabilité"
+msgstr "margin product profitability"
+
+#: core/static/js/main.js:133
+msgid "Déclaration TVA"
+msgstr "VAT return"
+
+#: core/static/js/main.js:133
+msgid "tva taxe déclaration"
+msgstr "vat tax return declaration"
+
+#: core/static/js/main.js:134
+msgid "Rapprochement bancaire"
+msgstr "Bank reconciliation"
+
+#: core/static/js/main.js:134
+msgid "banque rapprochement"
+msgstr "bank reconciliation statement"
+
+#: core/static/js/main.js:135
+msgid "Clôture d'exercice"
+msgstr "Year-end closing"
+
+#: core/static/js/main.js:135
+msgid "exercice clôture fermer"
+msgstr "fiscal year closing close year-end"
+
+#: core/static/js/main.js:140
+msgid "Tableau de bord"
+msgstr "Dashboard"
+
+#: core/static/js/main.js:140
+msgid "dashboard accueil résumé statistiques"
+msgstr "dashboard home summary overview statistics"
+
+#: core/static/js/main.js:141
+msgid "vendre caisse encaisser ticket"
+msgstr "sell checkout cash register till receipt ticket pos"
+
+#: core/static/js/main.js:142
+msgid "Produits"
+msgstr "Products"
+
+#: core/static/js/main.js:142
+msgid "article produit catalogue stock"
+msgstr "item article product catalogue stock"
+
+#: core/static/js/main.js:143
+msgid "Fournisseurs"
+msgstr "Suppliers"
+
+#: core/static/js/main.js:143
+msgid "fournisseur partenaire"
+msgstr "supplier vendor partner"
+
+#: core/static/js/main.js:144
+msgid "Approvisionnement"
+msgstr "Supplies"
+
+#: core/static/js/main.js:144
+msgid "approvisionner stock entrée"
+msgstr "supply restock stock purchase inbound receiving"
+
+#: core/static/js/main.js:145
+msgid "dépense charge sortie argent"
+msgstr "expense spending cost outflow money"
+
+#: core/static/js/main.js:146
+msgid "Utilisateurs"
+msgstr "Users"
+
+#: core/static/js/main.js:146
+msgid "utilisateur contact client personnel"
+msgstr "user contact customer client staff"
+
+#: core/static/js/main.js:147
+msgid "Inventaire"
+msgstr "Inventory"
+
+#: core/static/js/main.js:147
+msgid "inventaire stock comptage"
+msgstr "inventory stock count counting"
+
+#: core/static/js/main.js:148
+msgid "Comptabilité"
+msgstr "Accounting"
+
+#: core/static/js/main.js:148
+msgid "comptable écriture journal"
+msgstr "accounting entry journal bookkeeping"
+
+#: core/static/js/main.js:149
+msgid "Trésorerie"
+msgstr "Treasury"
+
+#: core/static/js/main.js:149
+msgid "trésorerie caisse banque argent"
+msgstr "treasury cash bank money"
+
+#: core/static/js/main.js:150
+msgid "Rapports"
+msgstr "Reports"
+
+#: core/static/js/main.js:150
+msgid "rapport statistique export"
+msgstr "report statistics export"
+
+#: core/static/js/main.js:151
+msgid "Paramètres"
+msgstr "Settings"
+
+#: core/static/js/main.js:151
+msgid "paramètre réglage configuration"
+msgstr "setting settings configuration preferences"
+
+#: core/static/js/main.js:172
+msgid "Aucune fonctionnalité trouvée"
+msgstr "No feature found"
+
+#: core/static/js/sales.js:214
+#, python-format
+msgid "Quantité de \"%(name)s\" mise à jour"
+msgstr "Quantity of \"%(name)s\" updated"
+
+#: core/static/js/sales.js:216
+#, python-format
+msgid "Stock insuffisant pour \"%(name)s\". Stock disponible: %(stock)s"
+msgstr "Insufficient stock for \"%(name)s\". Available stock: %(stock)s"
+
+#: core/static/js/sales.js:228
+#, python-format
+msgid "\"%(name)s\" ajouté au panier"
+msgstr "\"%(name)s\" added to cart"
+
+#: core/static/js/sales.js:240
+msgid "Le panier est vide"
+msgstr "The cart is empty"
+
+#: core/static/js/sales.js:257
+msgid "Diminuer"
+msgstr "Decrease"
+
+#: core/static/js/sales.js:268
+msgid "Augmenter"
+msgstr "Increase"
+
+#: core/static/js/sales.js:278 core/static/js/sales.js:703
+msgid "Voir détails"
+msgstr "View details"
+
+#: core/static/js/sales.js:284
+msgid "Retirer"
+msgstr "Remove"
+
+#: core/static/js/sales.js:311
+msgid "Prix invalide. Le prix doit être supérieur ou égal à 0."
+msgstr "Invalid price. The price must be greater than or equal to 0."
+
+#: core/static/js/sales.js:323
+#, python-format
+msgid "Quantité invalide. Stock disponible: %(stock)s"
+msgstr "Invalid quantity. Available stock: %(stock)s"
+
+#: core/static/js/sales.js:334
+#, python-format
+msgid "Stock maximum atteint pour \"%(name)s\". Stock disponible: %(stock)s"
+msgstr "Maximum stock reached for \"%(name)s\". Available stock: %(stock)s"
+
+#: core/static/js/sales.js:344
+msgid "La quantité minimale est 1. Utilisez le bouton de suppression pour retirer l'article."
+msgstr "The minimum quantity is 1. Use the remove button to take the item out of the cart."
+
+#: core/static/js/sales.js:388
+msgid "Aucune image disponible"
+msgstr "No image available"
+
+#: core/static/js/sales.js:404
+msgid "Marque:"
+msgstr "Brand:"
+
+#: core/static/js/sales.js:410
+msgid "Couleur:"
+msgstr "Colour:"
+
+#: core/static/js/sales.js:415
+msgid "Stock disponible:"
+msgstr "Available stock:"
+
+#: core/static/js/sales.js:420
+msgid "Prix actuel:"
+msgstr "Current price:"
+
+#: core/static/js/sales.js:426
+msgid "Prix maximum:"
+msgstr "Maximum price:"
+
+#: core/static/js/sales.js:431
+msgid "Prix modifiable:"
+msgstr "Adjustable price:"
+
+#: core/static/js/sales.js:432
+msgid "✓ Oui"
+msgstr "✓ Yes"
+
+#: core/static/js/sales.js:432
+msgid "✗ Non"
+msgstr "✗ No"
+
+#: core/static/js/sales.js:436
+msgid "Catégorie:"
+msgstr "Category:"
+
+#: core/static/js/sales.js:442
+msgid "Gamme:"
+msgstr "Range:"
+
+#: core/static/js/sales.js:448
+msgid "Rayon:"
+msgstr "Department:"
+
+#: core/static/js/sales.js:454
+msgid "Grammage:"
+msgstr "Weight:"
+
+#: core/static/js/sales.js:460
+msgid "Description:"
+msgstr "Description:"
+
+#: core/static/js/sales.js:472
+msgid "Erreur lors du chargement des détails du produit."
+msgstr "Error loading product details."
+
+#: core/static/js/sales.js:473 core/static/js/sales.js:1106
+msgid "Fermer"
+msgstr "Close"
+
+#: core/static/js/sales.js:488
+msgid "Voulez-vous vraiment vider le panier ?"
+msgstr "Do you really want to empty the cart?"
+
+#: core/static/js/sales.js:516
+msgid "Le panier est vide. Veuillez ajouter des produits avant de valider la vente."
+msgstr "The cart is empty. Please add products before confirming the sale."
+
+#: core/static/js/sales.js:526
+msgid "Veuillez sélectionner une date d'échéance pour la vente à crédit."
+msgstr "Please select a due date for the credit sale."
+
+#: core/static/js/sales.js:547
+#, python-format
+msgid "Validation de la vente en cours... Montant total: %(total)s"
+msgstr "Processing the sale... Total amount: %(total)s"
+
+#: core/static/js/sales.js:570
+msgid "✓ Vente enregistrée avec succès!"
+msgstr "✓ Sale recorded successfully!"
+
+#: core/static/js/sales.js:581
+msgid "Erreur lors de l'enregistrement de la vente"
+msgstr "Error recording the sale"
+
+#: core/static/js/sales.js:585
+msgid "Erreurs sur les articles:"
+msgstr "Item errors:"
+
+#: core/static/js/sales.js:589
+#, python-format
+msgid "Article %(n)s"
+msgstr "Item %(n)s"
+
+#: core/static/js/sales.js:611
+msgid "Une erreur inattendue s'est produite."
+msgstr "An unexpected error occurred."
+
+#: core/static/js/sales.js:679
+msgid "Aucune vente trouvée"
+msgstr "No sales found"
+
+#: core/static/js/sales.js:688
+msgid "Client de passage"
+msgstr "Walk-in customer"
+
+#: core/static/js/sales.js:693 core/static/js/sales.js:799 core/static/js/sales.js:1066
+msgid "Crédit"
+msgstr "Credit"
+
+#: core/static/js/sales.js:694 core/static/js/sales.js:799 core/static/js/sales.js:1066
+msgid "Comptant"
+msgstr "Cash"
+
+#: core/static/js/sales.js:698 core/static/js/sales.js:810 core/static/js/sales.js:927
+#: core/static/js/sales.js:1067
+msgid "Payé"
+msgstr "Paid"
+
+#: core/static/js/sales.js:699 core/static/js/sales.js:810 core/static/js/sales.js:1067
+msgid "Non payé"
+msgstr "Unpaid"
+
+#: core/static/js/sales.js:709 core/static/js/sales.js:1103
+msgid "Imprimer"
+msgstr "Print"
+
+#: core/static/js/sales.js:722
+msgid "Erreur lors de la recherche des ventes"
+msgstr "Error searching sales"
+
+#: core/static/js/sales.js:364 core/static/js/sales.js:760
+msgid "Chargement des détails..."
+msgstr "Loading details..."
+
+#: core/static/js/sales.js:785
+#, python-format
+msgid "Vente #%(id)s"
+msgstr "Sale #%(id)s"
+
+#: core/static/js/sales.js:788
+msgid "Client:"
+msgstr "Customer:"
+
+#: core/static/js/sales.js:791
+msgid "Vendeur:"
+msgstr "Salesperson:"
+
+#: core/static/js/sales.js:794
+msgid "Date:"
+msgstr "Date:"
+
+#: core/static/js/sales.js:797
+msgid "Type:"
+msgstr "Type:"
+
+#: core/static/js/sales.js:804
+msgid "Date d'échéance:"
+msgstr "Due date:"
+
+#: core/static/js/sales.js:808
+msgid "Statut:"
+msgstr "Status:"
+
+#: core/static/js/sales.js:816
+msgid "Articles"
+msgstr "Items"
+
+#: core/static/js/sales.js:821
+msgid "Produit"
+msgstr "Product"
+
+#: core/static/js/sales.js:822
+msgid "Code"
+msgstr "Code"
+
+#: core/static/js/sales.js:823
+msgid "Quantité"
+msgstr "Quantity"
+
+#: core/static/js/sales.js:824
+msgid "Prix unitaire"
+msgstr "Unit price"
+
+#: core/static/js/sales.js:825
+msgid "Sous-total"
+msgstr "Subtotal"
+
+#: core/static/js/sales.js:835
+msgid "Total:"
+msgstr "Total:"
+
+#: core/static/js/sales.js:844
+msgid "Erreur lors du chargement des détails"
+msgstr "Error loading details"
+
+#: core/static/js/sales.js:880
+msgid "Impossible de charger les détails de la vente pour l'impression."
+msgstr "Unable to load the sale details for printing."
+
+#: core/static/js/sales.js:888
+msgid "Le navigateur a bloqué l'ouverture de la fenêtre. Veuillez autoriser les popups."
+msgstr "The browser blocked the window from opening. Please allow pop-ups."
+
+#: core/static/js/sales.js:901
+msgid "Merci pour votre achat !"
+msgstr "Thank you for your purchase!"
+
+#: core/static/js/sales.js:926
+msgid "** CREDIT **"
+msgstr "** CREDIT **"
+
+#: core/static/js/sales.js:928
+msgid "Reste"
+msgstr "Outstanding"
+
+#: core/static/js/sales.js:929
+msgid "Échéance"
+msgstr "Due date"
+
+#: core/static/js/sales.js:938
+#, python-format
+msgid "Ticket #%(id)s"
+msgstr "Receipt #%(id)s"
+
+#: core/static/js/sales.js:1057
+msgid "Tél:"
+msgstr "Tel:"
+
+#: core/static/js/sales.js:1064
+#, python-format
+msgid "FACTURE N° %(id)s"
+msgstr "INVOICE No. %(id)s"
+
+#: core/static/js/sales.js:1065
+msgid "Date"
+msgstr "Date"
+
+#: core/static/js/sales.js:1066
+msgid "Type"
+msgstr "Type"
+
+#: core/static/js/sales.js:1067
+msgid "Statut"
+msgstr "Status"
+
+#: core/static/js/sales.js:1072
+msgid "Client"
+msgstr "Customer"
+
+#: core/static/js/sales.js:1072
+msgid "Passage"
+msgstr "Walk-in"
+
+#: core/static/js/sales.js:1073
+msgid "Vendeur"
+msgstr "Salesperson"
+
+#: core/static/js/sales.js:1078
+msgid "ARTICLES"
+msgstr "ITEMS"
+
+#: core/static/js/sales.js:1085
+msgid "TOTAL"
+msgstr "TOTAL"
+
+#: core/templates/core/accounting/add_entry.html:177
+msgid "-- Sélectionner un compte --"
+msgstr "-- Select an account --"
+
+#: core/templates/core/accounting/add_entry.html:201
+msgid "Libellé (optionnel)"
+msgstr "Description (optional)"
+
+#: core/templates/core/accounting/add_entry.html:205
+msgid "Supprimer"
+msgstr "Remove"
+
+#: core/templates/core/accounting/add_entry.html:262
+msgid "Écriture équilibrée ✓"
+msgstr "Entry balanced ✓"
+
+#: core/templates/core/accounting/add_entry.html:266
+#, python-format
+msgid "Écriture non équilibrée (différence: %(diff)s)"
+msgstr "Entry not balanced (difference: %(diff)s)"
+
+#: core/static/js/sales.js:161 core/static/js/sales.js:665 core/templates/core/inventory_add.html:169
+msgid "Recherche en cours..."
+msgstr "Searching..."
+
+#: core/static/js/sales.js:184 core/templates/core/inventory_add.html:179
+msgid "Aucun produit trouvé"
+msgstr "No products found"
+
+#: core/static/js/sales.js:197 core/static/js/sales.js:399 core/templates/core/inventory_add.html:186
+msgid "Code:"
+msgstr "Code:"
+
+#: core/static/js/sales.js:198 core/templates/core/inventory_add.html:187
+msgid "Stock:"
+msgstr "Stock:"
+
+#: core/static/js/sales.js:177 core/templates/core/inventory_add.html:200
+msgid "Erreur lors de la recherche"
+msgstr "Search error"
+
+#: core/templates/core/inventory_close_summary.html:152
+msgid ""
+"Êtes-vous sûr de vouloir clôturer l'inventaire ?\n"
+"\n"
+"Le stock de chaque produit sera mis à jour avec la quantité valide cumulée.\n"
+"Cette action est irréversible."
+msgstr ""
+"Are you sure you want to close the inventory?\n"
+"\n"
+"The stock of each product will be updated with the cumulative valid quantity.\n"
+"This action is irreversible."
+
+#: core/templates/core/sales.html:584
+msgid "Saisissez le montant en caisse"
+msgstr "Enter the cash on hand"
+
+#: core/templates/core/sales.html:587
+#, python-format
+msgid "Surplus de %(amount)s"
+msgstr "Surplus of %(amount)s"
+
+#: core/templates/core/sales.html:590
+#, python-format
+msgid "Manquant de %(amount)s"
+msgstr "Shortage of %(amount)s"
+
+#: core/templates/core/sales.html:593
+msgid "Caisse équilibrée"
+msgstr "Cash balanced"
+
+#: core/templates/core/sales.html:638 core/templates/core/sales.html:700
+msgid "Erreur de connexion au serveur."
+msgstr "Server connection error."
+
+#: core/templates/core/sales.html:665
+msgid "Veuillez remplir le montant du cash en main."
+msgstr "Please enter the cash on hand amount."
+
+#: core/templates/core/sales.html:671
+msgid "Clôture en cours..."
+msgstr "Closing..."
+
+#: core/templates/core/sales.html:694
+msgid "Une erreur est survenue."
+msgstr "An error occurred."
+
+#: core/templates/core/sales.html:696 core/templates/core/sales.html:702
+msgid "Confirmer la clôture"
+msgstr "Confirm closing"
+
+#: core/templates/core/statistics_clients.html:50
+msgid "Nouveaux clients"
+msgstr "New customers"
+
+#: core/templates/core/statistics_clients.html:53 core/templates/core/statistics_clients.html:59
+#: core/templates/core/statistics_products.html:52 core/templates/core/statistics_products.html:59
+#: core/templates/core/statistics_sales.html:52 core/templates/core/statistics_sales.html:73
+msgid "CA"
+msgstr "Revenue"
+
+#: core/static/js/main.js:141 core/templates/core/statistics_clients.html:53
+#: core/templates/core/statistics_personnel.html:52 core/templates/core/statistics_personnel.html:73
+#: core/templates/core/statistics_sales.html:52
+msgid "Ventes"
+msgstr "Sales"
+
+#: core/templates/core/statistics_clients.html:59
+msgid "Encours"
+msgstr "Outstanding"
+
+#: core/templates/core/statistics_expenses.html:50
+msgid "Net"
+msgstr "Net"
+
+#: core/templates/core/statistics_expenses.html:50 core/templates/core/statistics_expenses.html:59
+msgid "Recettes"
+msgstr "Receipts"
+
+#: core/static/js/main.js:145 core/templates/core/statistics_expenses.html:50
+#: core/templates/core/statistics_expenses.html:59
+msgid "Dépenses"
+msgstr "Expenses"
+
+#: core/templates/core/statistics_personnel.html:52 core/templates/core/statistics_personnel.html:73
+msgid "Actions stock"
+msgstr "Stock actions"
+
+#: core/templates/core/statistics_personnel.html:52 core/templates/core/statistics_personnel.html:73
+#: core/templates/core/statistics_suppliers.html:53 core/templates/core/statistics_supplies.html:50
+msgid "Approvisionnements"
+msgstr "Supplies"
+
+#: core/templates/core/statistics_personnel.html:66
+msgid "Effectif"
+msgstr "Headcount"
+
+#: core/templates/core/statistics_products.html:52 core/templates/core/statistics_supplies.html:50
+#: core/templates/core/statistics_supplies.html:59
+msgid "Quantités"
+msgstr "Quantities"
+
+#: core/templates/core/statistics_suppliers.html:50
+msgid "Nouveaux fournisseurs"
+msgstr "New suppliers"
+
+#: core/templates/core/statistics_suppliers.html:53 core/templates/core/statistics_supplies.html:50
+#: core/templates/core/statistics_supplies.html:59
+msgid "Montant"
+msgstr "Amount"
+
+#: core/templates/core/statistics_suppliers.html:59
+msgid "Montant approvisionné"
+msgstr "Amount supplied"
+
+#: core/templates/core/statistics_suppliers.html:59
+msgid "Dette restante"
+msgstr "Outstanding debt"
+
+#: core/templates/core/supplies_add.html:241 core/templates/core/supplies_add.html:246
+msgid "Non renseigné"
+msgstr "Not specified"
+
+#: core/templates/core/supplies_add.html:436 core/templates/core/supplies_add.html:496
+#, python-format
+msgid "Dépense liée à l'approvisionnement de %(product)s (%(quantity)s x %(price)sFCFA)"
+msgstr "Expense linked to the supply of %(product)s (%(quantity)s x %(price)s FCFA)"
+
+#: core/templates/core/supplies_add.html:451
+msgid "La dépense a été créée automatiquement."
+msgstr "The expense was created automatically."
+
+#: core/templates/core/supplies_add.html:453
+msgid "Attention: La dépense automatique n'a pas pu être créée."
+msgstr "Warning: the automatic expense could not be created."
+
+#: core/templates/core/supplies_add.html:459 core/templates/core/supplies_add.html:479
+#: core/templates/core/supplies_add.html:504
+msgid "Succès!"
+msgstr "Success!"
+
+#: core/templates/core/supplies_add.html:479
+msgid "La création automatique de la dépense a échoué. Vous pouvez la créer manuellement."
+msgstr "Automatic expense creation failed. You can create it manually."
+
+#: core/templates/core/supplies_add.html:505
+msgid "La page d'ajout de dépenses a été ouverte dans un nouvel onglet."
+msgstr "The add expense page has been opened in a new tab."
+
+#: core/templates/core/supplies_add.html:525
+msgid "Une erreur est survenue lors de l'enregistrement."
+msgstr "An error occurred while saving."
+

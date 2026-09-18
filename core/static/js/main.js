@@ -1,3 +1,22 @@
+// Échapper une valeur avant insertion dans du HTML (texte ou attribut) : & < > " ' `
+// null / undefined donnent une chaîne vide. Disponible globalement (main.js est chargé sur toutes les pages).
+window.escapeHtml = function (value) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    const entities = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '`': '&#96;'
+    };
+    return String(value).replace(/[&<>"'`]/g, function (char) {
+        return entities[char];
+    });
+};
+
 // Restaurer l'état de la sidebar le plus tôt possible
 try {
     const savedSidebarState = localStorage.getItem('sidebarCollapsed');
@@ -29,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
             sidebarToggle.setAttribute(
                 'aria-label',
-                collapsed ? 'Ouvrir la navigation latérale' : 'Fermer la navigation latérale'
+                collapsed ? gettext('Ouvrir la navigation latérale') : gettext('Fermer la navigation latérale')
             );
         }
 
@@ -89,47 +108,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         // Sous-pages qui n'apparaissent pas dans la nav principale
         const subPages = [
-            { name: 'Historique des ventes', url: '/sales/history/', keywords: 'vente historique liste', icon: '🧾' },
-            { name: 'Ajouter un approvisionnement', url: '/supplies/add/', keywords: 'approvisionner ajouter créer stock', icon: '➕' },
-            { name: 'Ajouter un inventaire', url: '/inventory/add/', keywords: 'inventaire ajouter créer', icon: '➕' },
-            { name: 'Historique des inventaires', url: '/inventory/history/', keywords: 'inventaire historique liste', icon: '📋' },
-            { name: 'Clôture inventaire', url: '/inventory/close/', keywords: 'inventaire clôturer fermer', icon: '🔒' },
-            { name: 'Ajouter un client', url: '/contacts/clients/add/', keywords: 'client ajouter créer contact', icon: '➕' },
-            { name: 'Ajouter un fournisseur', url: '/suppliers/add/', keywords: 'fournisseur ajouter créer', icon: '➕' },
-            { name: 'Ajouter une dépense', url: '/expenses/add/', keywords: 'dépense ajouter créer', icon: '➕' },
-            { name: 'Résumé journalier', url: '/daily/summary/', keywords: 'journée résumé quotidien bilan', icon: '📊' },
-            { name: 'Clôture journalière', url: '/daily/close/', keywords: 'journée clôturer fermer quotidien', icon: '🔒' },
-            { name: 'Migration de données', url: '/settings/migration/', keywords: 'migration données importer', icon: '🔄' },
-            { name: 'Journal comptable', url: '/accounting/journal/', keywords: 'comptabilité journal écritures', icon: '📒' },
-            { name: 'Grand livre', url: '/accounting/ledger/', keywords: 'comptabilité grand livre comptes', icon: '📒' },
-            { name: 'Balance des comptes', url: '/accounting/balance/', keywords: 'comptabilité balance comptes', icon: '📒' },
-            { name: 'Plan comptable', url: '/accounting/chart/', keywords: 'comptabilité plan comptes', icon: '📒' },
-            { name: 'Ventes à crédit', url: '/accounting/credit-sales/', keywords: 'crédit vente impayé', icon: '💳' },
-            { name: 'Paiements fournisseurs', url: '/accounting/supplier-payments/', keywords: 'paiement fournisseur', icon: '💰' },
-            { name: 'Factures', url: '/accounting/invoices/', keywords: 'facture facturation', icon: '🧾' },
-            { name: 'Compte de résultat', url: '/accounting/income-statement/', keywords: 'résultat bénéfice perte', icon: '📈' },
-            { name: 'Bilan comptable', url: '/accounting/balance-sheet/', keywords: 'bilan actif passif', icon: '📊' },
-            { name: 'Balance âgée', url: '/accounting/aged-balance/', keywords: 'balance âgée créance', icon: '📊' },
-            { name: 'Marges produits', url: '/accounting/product-margins/', keywords: 'marge produit rentabilité', icon: '📊' },
-            { name: 'Déclaration TVA', url: '/accounting/vat-declaration/', keywords: 'tva taxe déclaration', icon: '📄' },
-            { name: 'Rapprochement bancaire', url: '/accounting/bank-reconciliation/', keywords: 'banque rapprochement', icon: '🏦' },
-            { name: 'Clôture d\'exercice', url: '/accounting/exercise-closing/', keywords: 'exercice clôture fermer', icon: '🔒' },
+            { name: gettext('Historique des ventes'), url: '/sales/history/', keywords: gettext('vente historique liste'), icon: '🧾' },
+            { name: gettext('Ajouter un approvisionnement'), url: '/supplies/add/', keywords: gettext('approvisionner ajouter créer stock'), icon: '➕' },
+            { name: gettext('Ajouter un inventaire'), url: '/inventory/add/', keywords: gettext('inventaire ajouter créer'), icon: '➕' },
+            { name: gettext('Historique des inventaires'), url: '/inventory/history/', keywords: gettext('inventaire historique liste'), icon: '📋' },
+            { name: gettext('Clôture inventaire'), url: '/inventory/close/', keywords: gettext('inventaire clôturer fermer'), icon: '🔒' },
+            { name: gettext('Ajouter un client'), url: '/contacts/clients/add/', keywords: gettext('client ajouter créer contact'), icon: '➕' },
+            { name: gettext('Ajouter un fournisseur'), url: '/suppliers/add/', keywords: gettext('fournisseur ajouter créer'), icon: '➕' },
+            { name: gettext('Ajouter une dépense'), url: '/expenses/add/', keywords: gettext('dépense ajouter créer'), icon: '➕' },
+            { name: gettext('Résumé journalier'), url: '/daily/summary/', keywords: gettext('journée résumé quotidien bilan'), icon: '📊' },
+            { name: gettext('Clôture journalière'), url: '/daily/close/', keywords: gettext('journée clôturer fermer quotidien'), icon: '🔒' },
+            { name: gettext('Migration de données'), url: '/settings/migration/', keywords: gettext('migration données importer'), icon: '🔄' },
+            { name: gettext('Journal comptable'), url: '/accounting/journal/', keywords: gettext('comptabilité journal écritures'), icon: '📒' },
+            { name: gettext('Grand livre'), url: '/accounting/ledger/', keywords: gettext('comptabilité grand livre comptes'), icon: '📒' },
+            { name: gettext('Balance des comptes'), url: '/accounting/balance/', keywords: gettext('comptabilité balance comptes'), icon: '📒' },
+            { name: gettext('Plan comptable'), url: '/accounting/chart/', keywords: gettext('comptabilité plan comptes'), icon: '📒' },
+            { name: gettext('Ventes à crédit'), url: '/accounting/credit-sales/', keywords: gettext('crédit vente impayé'), icon: '💳' },
+            { name: gettext('Paiements fournisseurs'), url: '/accounting/supplier-payments/', keywords: gettext('paiement fournisseur'), icon: '💰' },
+            { name: gettext('Factures'), url: '/accounting/invoices/', keywords: gettext('facture facturation'), icon: '🧾' },
+            { name: gettext('Compte de résultat'), url: '/accounting/income-statement/', keywords: gettext('résultat bénéfice perte'), icon: '📈' },
+            { name: gettext('Bilan comptable'), url: '/accounting/balance-sheet/', keywords: gettext('bilan actif passif'), icon: '📊' },
+            { name: gettext('Balance âgée'), url: '/accounting/aged-balance/', keywords: gettext('balance âgée créance'), icon: '📊' },
+            { name: gettext('Marges produits'), url: '/accounting/product-margins/', keywords: gettext('marge produit rentabilité'), icon: '📊' },
+            { name: gettext('Déclaration TVA'), url: '/accounting/vat-declaration/', keywords: gettext('tva taxe déclaration'), icon: '📄' },
+            { name: gettext('Rapprochement bancaire'), url: '/accounting/bank-reconciliation/', keywords: gettext('banque rapprochement'), icon: '🏦' },
+            { name: gettext('Clôture d\'exercice'), url: '/accounting/exercise-closing/', keywords: gettext('exercice clôture fermer'), icon: '🔒' },
         ];
         subPages.forEach(function(sp) { sp.keywords = sp.keywords || ''; features.push(sp); });
         // Ajouter des keywords aux pages principales
         const kwMap = {
-            'Tableau de bord': 'dashboard accueil résumé statistiques',
-            'Ventes': 'vendre caisse encaisser ticket',
-            'Produits': 'article produit catalogue stock',
-            'Fournisseurs': 'fournisseur partenaire',
-            'Approvisionnement': 'approvisionner stock entrée',
-            'Dépenses': 'dépense charge sortie argent',
-            'Utilisateurs': 'utilisateur contact client personnel',
-            'Inventaire': 'inventaire stock comptage',
-            'Comptabilité': 'comptable écriture journal',
-            'Trésorerie': 'trésorerie caisse banque argent',
-            'Rapports': 'rapport statistique export',
-            'Paramètres': 'paramètre réglage configuration',
+            [gettext('Tableau de bord')]: gettext('dashboard accueil résumé statistiques'),
+            [gettext('Ventes')]: gettext('vendre caisse encaisser ticket'),
+            [gettext('Produits')]: gettext('article produit catalogue stock'),
+            [gettext('Fournisseurs')]: gettext('fournisseur partenaire'),
+            [gettext('Approvisionnement')]: gettext('approvisionner stock entrée'),
+            [gettext('Dépenses')]: gettext('dépense charge sortie argent'),
+            [gettext('Utilisateurs')]: gettext('utilisateur contact client personnel'),
+            [gettext('Inventaire')]: gettext('inventaire stock comptage'),
+            [gettext('Comptabilité')]: gettext('comptable écriture journal'),
+            [gettext('Trésorerie')]: gettext('trésorerie caisse banque argent'),
+            [gettext('Rapports')]: gettext('rapport statistique export'),
+            [gettext('Paramètres')]: gettext('paramètre réglage configuration'),
         };
         features.forEach(function(f) {
             if (!f.keywords && kwMap[f.name]) { f.keywords = kwMap[f.name]; }
@@ -150,14 +169,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderResults(results) {
         if (!searchResultsDropdown) return;
         if (results.length === 0) {
-            searchResultsDropdown.innerHTML = '<div class="search-result-empty">Aucune fonctionnalité trouvée</div>';
+            searchResultsDropdown.innerHTML = '<div class="search-result-empty">' + gettext('Aucune fonctionnalité trouvée') + '</div>';
             searchResultsDropdown.classList.add('active');
             return;
         }
         searchResultsDropdown.innerHTML = results.map(function(r, i) {
-            return '<a href="' + r.url + '" class="search-result-item' + (i === selectedIndex ? ' selected' : '') + '" data-index="' + i + '">'
-                + '<span class="search-result-icon">' + r.icon + '</span>'
-                + '<span class="search-result-name">' + r.name + '</span>'
+            return '<a href="' + escapeHtml(r.url) + '" class="search-result-item' + (i === selectedIndex ? ' selected' : '') + '" data-index="' + i + '">'
+                + '<span class="search-result-icon">' + escapeHtml(r.icon) + '</span>'
+                + '<span class="search-result-name">' + escapeHtml(r.name) + '</span>'
                 + '</a>';
         }).join('');
         searchResultsDropdown.classList.add('active');
@@ -328,12 +347,12 @@ function initScrollAnimations() {
 
 // Fonction utilitaire pour formater les nombres
 function formatNumber(num) {
-    return new Intl.NumberFormat('fr-FR').format(num);
+    return new Intl.NumberFormat(document.documentElement.lang || 'fr').format(num);
 }
 
 // Fonction utilitaire pour formater les montants
 function formatCurrency(amount) {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat(document.documentElement.lang || 'fr', {
         style: 'currency',
         currency: 'XOF'
     }).format(amount);
@@ -341,7 +360,7 @@ function formatCurrency(amount) {
 
 // Fonction utilitaire pour formater les dates
 function formatDate(date) {
-    return new Intl.DateTimeFormat('fr-FR', {
+    return new Intl.DateTimeFormat(document.documentElement.lang || 'fr', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'

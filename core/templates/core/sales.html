@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Ventes - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Ventes" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/sales.css' %}">
@@ -11,16 +11,16 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Gestion des ventes</h1>
+            <h1>{% trans "Gestion des ventes" %}</h1>
             <p class="text-secondary">
                 {% if view_mode == 'products' %}
                     {% if sale_products %}
-                        {{ sale_products|length }} produit{{ sale_products|pluralize }} vendu{{ sale_products|pluralize }} — Total : {{ total_revenue|floatformat:0 }} FCFA
+                        {% blocktrans with total=total_revenue|floatformat:0 count counter=sale_products|length %}{{ counter }} produit vendu — Total : {{ total }} FCFA{% plural %}{{ counter }} produits vendus — Total : {{ total }} FCFA{% endblocktrans %}
                     {% else %}
-                        Aucun produit vendu
+                        {% trans "Aucun produit vendu" %}
                     {% endif %}
                 {% else %}
-                    Créez et gérez vos ventes
+                    {% trans "Créez et gérez vos ventes" %}
                 {% endif %}
             </p>
         </div>
@@ -29,11 +29,11 @@
             <div class="view-mode-switch">
                 <a href="{% url 'sales' %}?view_mode=sales&search={{ current_search }}"
                    class="mode-btn {% if view_mode != 'products' %}active{% endif %}">
-                    Ventes
+                    {% trans "Ventes" %}
                 </a>
                 <a href="{% url 'sales' %}?view_mode=products&search={{ current_search }}"
                    class="mode-btn {% if view_mode == 'products' %}active{% endif %}">
-                    Produits
+                    {% trans "Produits" %}
                 </a>
             </div>
             <a href="{% url 'sales_history' %}" class="btn btn-secondary">
@@ -41,25 +41,25 @@
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
                     <polyline points="12 6 12 12 16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Historique
+                {% trans "Historique" %}
             </a>
             <a href="{% url 'credit_sales' %}" class="btn btn-secondary">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                Crédits
+                {% trans "Crédits" %}
             </a>
             <button class="btn btn-danger" id="closeDailyBtn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                Clôturer la journée
+                {% trans "Clôturer la journée" %}
             </button>
             <button class="btn btn-primary" id="newSaleBtn">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                     <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                Nouvelle vente
+                {% trans "Nouvelle vente" %}
             </button>
         </div>
     </div>
@@ -70,12 +70,12 @@
     <div class="new-sale-section" id="newSaleSection" style="display: none;">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">Nouvelle vente</h3>
+                <h3 class="card-title">{% trans "Nouvelle vente" %}</h3>
                 <button class="btn btn-secondary btn-sm" id="closeSaleBtn">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    Fermer
+                    {% trans "Fermer" %}
                 </button>
             </div>
             <div class="card-body">
@@ -86,10 +86,10 @@
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle; margin-right: 8px;">
                                 <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
-                            Rechercher un produit
+                            {% trans "Rechercher un produit" %}
                         </label>
                         <div class="product-search">
-                            <input type="text" class="form-control" id="productSearch" placeholder="Tapez le nom, code ou scannez le code-barres..." autofocus>
+                            <input type="text" class="form-control" id="productSearch" placeholder="{% trans "Tapez le nom, code ou scannez le code-barres..." %}" autofocus>
                             <div class="search-results" id="searchResults"></div>
                         </div>
                     </div>
@@ -101,18 +101,18 @@
                         <svg class="toggle-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>Options avancées</span>
+                        <span>{% trans "Options avancées" %}</span>
                     </button>
 
                     <div class="collapsible-content" id="advancedOptions">
                         <div class="sale-form-grid">
                             <!-- Informations client -->
                             <div class="form-section">
-                                <h4>Informations client</h4>
+                                <h4>{% trans "Informations client" %}</h4>
                                 <div class="form-group">
-                                    <label class="form-label">Client</label>
+                                    <label class="form-label">{% trans "Client" %}</label>
                                     <select class="form-control" id="clientSelect">
-                                        <option value="">Client de passage</option>
+                                        <option value="">{% trans "Client de passage" %}</option>
                                         {% for client in clients %}
                                         <option value="{{ client.id }}">{{ client.firstname }} {{ client.lastname }}</option>
                                         {% endfor %}
@@ -122,34 +122,34 @@
 
                             <!-- Type de vente -->
                             <div class="form-section">
-                                <h4>Type de vente</h4>
+                                <h4>{% trans "Type de vente" %}</h4>
                                 <div class="form-group">
                                     <div class="radio-group">
                                         <label class="radio-7 radio-label">
                                             <input type="radio" name="saleType" value="cash" checked>
-                                            <span>Comptant</span>
+                                            <span>{% trans "Comptant" %}</span>
                                         </label>
                                         <label class="radio-label">
                                             <input type="radio" name="saleType" value="credit">
-                                            <span>Crédit</span>
+                                            <span>{% trans "Crédit" %}</span>
                                         </label>
                                     </div>
                                 </div>
                                 <div class="form-group" id="creditDateGroup" style="display: none;">
-                                    <label class="form-label">Date d'échéance</label>
+                                    <label class="form-label">{% trans "Date d'échéance" %}</label>
                                     <input type="date" class="form-control" id="dueDate">
                                 </div>
                             </div>
 
                             <!-- Mode de paiement -->
                             <div class="form-section" id="paymentMethodSection">
-                                <h4>Mode de paiement</h4>
+                                <h4>{% trans "Mode de paiement" %}</h4>
                                 <div class="form-group">
                                     <select class="form-control" id="paymentMethodSelect">
-                                        <option value="CASH" selected>Espèces</option>
-                                        <option value="MOBILE_MONEY">Mobile Money</option>
-                                        <option value="BANK_TRANSFER">Virement bancaire</option>
-                                        <option value="CHECK">Chèque</option>
+                                        <option value="CASH" selected>{% trans "Espèces" %}</option>
+                                        <option value="MOBILE_MONEY">{% trans "Mobile Money" %}</option>
+                                        <option value="BANK_TRANSFER">{% trans "Virement bancaire" %}</option>
+                                        <option value="CHECK">{% trans "Chèque" %}</option>
                                     </select>
                                 </div>
                             </div>
@@ -159,7 +159,7 @@
 
                 <!-- Panier -->
                 <div class="cart-section">
-                    <h4>Panier</h4>
+                    <h4>{% trans "Panier" %}</h4>
 
                     <!-- Zone de notification -->
                     <div id="saleNotification" class="sale-notification" style="display: none;">
@@ -174,16 +174,16 @@
                         <table class="table cart-table">
                             <thead>
                                 <tr>
-                                    <th>Produit</th>
-                                    <th>Prix unitaire</th>
-                                    <th>Quantité</th>
-                                    <th>Sous-total</th>
-                                    <th>Action</th>
+                                    <th>{% trans "Produit" %}</th>
+                                    <th>{% trans "Prix unitaire" %}</th>
+                                    <th>{% trans "Quantité" %}</th>
+                                    <th>{% trans "Sous-total" %}</th>
+                                    <th>{% trans "Action" %}</th>
                                 </tr>
                             </thead>
                             <tbody id="cartItems">
                                 <tr class="empty-cart">
-                                    <td colspan="5" class="text-center">Le panier est vide</td>
+                                    <td colspan="5" class="text-center">{% trans "Le panier est vide" %}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -200,19 +200,19 @@
                             <span id="totalDiscount">0 FCFA</span>
                         </div> -->
                         <div class="total-row total-final">
-                            <span>Total:</span>
+                            <span>{% trans "Total:" %}</span>
                             <span id="grandTotal">0 FCFA</span>
                         </div>
                     </div>
 
                     <!-- Boutons d'action -->
                     <div class="cart-actions">
-                        <button class="btn btn-secondary" id="clearCartBtn">Vider le panier</button>
+                        <button class="btn btn-secondary" id="clearCartBtn">{% trans "Vider le panier" %}</button>
                         <button class="btn btn-success" id="completeSaleBtn" disabled>
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                                 <path d="M16 6L7.5 14.5L4 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                            Valider la vente
+                            {% trans "Valider la vente" %}
                         </button>
                     </div>
                 </div>
@@ -230,12 +230,12 @@
                 </svg>
             </div>
             <div class="revenue-info">
-                <div class="revenue-label">Recette totale du jour</div>
+                <div class="revenue-label">{% trans "Recette totale du jour" %}</div>
                 <div class="revenue-amount">{{ total_revenue|floatformat:0 }} FCFA</div>
                 {% if current_daily %}
                     <div class="revenue-date">{{ current_daily.start_date|date:"d/m/Y" }}</div>
                 {% else %}
-                    <div class="revenue-date text-danger">Aucun Daily actif</div>
+                    <div class="revenue-date text-danger">{% trans "Aucun Daily actif" %}</div>
                 {% endif %}
             </div>
         </div>
@@ -244,9 +244,9 @@
             <div class="card-header">
                 <h3 class="card-title">
                     {% if view_mode == 'products' %}
-                        Produits vendus aujourd'hui
+                        {% trans "Produits vendus aujourd'hui" %}
                     {% else %}
-                        Ventes du jour
+                        {% trans "Ventes du jour" %}
                     {% endif %}
                 </h3>
                 <div class="header-actions">
@@ -257,9 +257,9 @@
                                    name="search"
                                    placeholder="
                                    {% if view_mode == 'products' %}
-                                       Rechercher par produit, client, vendeur...
+                                       {% trans "Rechercher par produit, client, vendeur..." %}
                                    {% else %}
-                                       Rechercher par client, vendeur, produit, montant...
+                                       {% trans "Rechercher par client, vendeur, produit, montant..." %}
                                    {% endif %}"
                                    value="{{ current_search|default:'' }}">
                             <button type="submit" class="btn btn-primary btn-sm" style="margin-left: 8px;">
@@ -278,25 +278,25 @@
                             <tr>
                                 {% if view_mode == 'products' %}
                                 <th>#ID</th>
-                                <th>Date</th>
-                                <th>Produit</th>
-                                <th>Catégorie</th>
-                                <th>Prix unitaire</th>
-                                <th>Quantité</th>
-                                <th>Total</th>
-                                <th>Client</th>
-                                <th>Vendeur</th>
-                                <th>Type</th>
-                                <th>Statut</th>
+                                <th>{% trans "Date" %}</th>
+                                <th>{% trans "Produit" %}</th>
+                                <th>{% trans "Catégorie" %}</th>
+                                <th>{% trans "Prix unitaire" %}</th>
+                                <th>{% trans "Quantité" %}</th>
+                                <th>{% trans "Total" %}</th>
+                                <th>{% trans "Client" %}</th>
+                                <th>{% trans "Vendeur" %}</th>
+                                <th>{% trans "Type" %}</th>
+                                <th>{% trans "Statut" %}</th>
                                 {% else %}
                                 <th>#ID</th>
-                                <th>Date</th>
-                                <th>Client</th>
-                                <th>Vendeur</th>
-                                <th>Montant</th>
-                                <th>Type</th>
-                                <th>Statut</th>
-                                <th>Actions</th>
+                                <th>{% trans "Date" %}</th>
+                                <th>{% trans "Client" %}</th>
+                                <th>{% trans "Vendeur" %}</th>
+                                <th>{% trans "Montant" %}</th>
+                                <th>{% trans "Type" %}</th>
+                                <th>{% trans "Statut" %}</th>
+                                <th>{% trans "Actions" %}</th>
                                 {% endif %}
                             </tr>
                         </thead>
@@ -321,28 +321,28 @@
                                     {% if sp.sale.client %}
                                         {{ sp.sale.client }}
                                     {% else %}
-                                        <span class="text-secondary">Client de passage</span>
+                                        <span class="text-secondary">{% trans "Client de passage" %}</span>
                                     {% endif %}
                                 </td>
                                 <td>{{ sp.sale.staff.get_full_name|default:"-" }}</td>
                                 <td>
                                     {% if sp.sale.is_credit %}
-                                        <span class="badge badge-warning">Crédit</span>
+                                        <span class="badge badge-warning">{% trans "Crédit" %}</span>
                                     {% else %}
-                                        <span class="badge badge-success">Comptant</span>
+                                        <span class="badge badge-success">{% trans "Comptant" %}</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     {% if sp.sale.is_paid %}
-                                        <span class="badge badge-success">Payé</span>
+                                        <span class="badge badge-success">{% trans "Payé" %}</span>
                                     {% else %}
-                                        <span class="badge badge-danger">Non payé</span>
+                                        <span class="badge badge-danger">{% trans "Non payé" %}</span>
                                     {% endif %}
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="11" class="text-center text-secondary" style="padding: 2rem;">Aucun produit vendu trouvé.</td>
+                                <td colspan="11" class="text-center text-secondary" style="padding: 2rem;">{% trans "Aucun produit vendu trouvé." %}</td>
                             </tr>
                             {% endfor %}
                             {% else %}
@@ -354,42 +354,42 @@
                                     {% if sale.client %}
                                         {{ sale.client }}
                                     {% else %}
-                                        <span class="text-secondary">Client de passage</span>
+                                        <span class="text-secondary">{% trans "Client de passage" %}</span>
                                     {% endif %}
                                 </td>
                                 <td>{{ sale.staff }}</td>
                                 <td class="font-weight-bold">{{ sale.total|floatformat:0 }} FCFA</td>
                                 <td>
                                     {% if sale.is_credit %}
-                                        <span class="badge badge-warning">Crédit</span>
+                                        <span class="badge badge-warning">{% trans "Crédit" %}</span>
                                     {% else %}
-                                        <span class="badge badge-success">Comptant</span>
+                                        <span class="badge badge-success">{% trans "Comptant" %}</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     {% if sale.is_paid %}
-                                        <span class="badge badge-success">Payé</span>
+                                        <span class="badge badge-success">{% trans "Payé" %}</span>
                                     {% else %}
-                                        <span class="badge badge-danger">Non payé</span>
+                                        <span class="badge badge-danger">{% trans "Non payé" %}</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     <div class="action-buttons">
                                         {% if sale.is_credit and sale.credit_info and not sale.credit_info.is_fully_paid %}
-                                        <a href="{% url 'record_credit_payment' sale.credit_info.id %}" class="btn btn-primary btn-sm" title="Enregistrer un paiement">
+                                        <a href="{% url 'record_credit_payment' sale.credit_info.id %}" class="btn btn-primary btn-sm" title="{% trans "Enregistrer un paiement" %}">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                                                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                             </svg>
-                                            Payer
+                                            {% trans "Payer" %}
                                         </a>
                                         {% endif %}
-                                        <button class="btn-icon" onclick="viewSale({{ sale.id }})" title="Voir détails">
+                                        <button class="btn-icon" onclick="viewSale({{ sale.id }})" title="{% trans "Voir détails" %}">
                                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                                 <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.5"/>
                                                 <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
                                             </svg>
                                         </button>
-                                        <button class="btn-icon" onclick="printSale({{ sale.id }})" title="Imprimer">
+                                        <button class="btn-icon" onclick="printSale({{ sale.id }})" title="{% trans "Imprimer" %}">
                                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                                 <path d="M4 5V2h8v3M4 11H2V7h12v4h-2" stroke="currentColor" stroke-width="1.5"/>
                                                 <rect x="4" y="9" width="8" height="5" stroke="currentColor" stroke-width="1.5"/>
@@ -400,7 +400,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="8" class="text-center">Aucune vente trouvée</td>
+                                <td colspan="8" class="text-center">{% trans "Aucune vente trouvée" %}</td>
                             </tr>
                             {% endfor %}
                             {% endif %}
@@ -412,9 +412,9 @@
                 <div class="pagination-container">
                     <div class="pagination-info">
                         {% if view_mode == 'products' %}
-                        Affichage de {{ sale_products|length }} produit{{ sale_products|pluralize }} vendu{{ sale_products|pluralize }}
+                        {% blocktrans count counter=sale_products|length %}Affichage de {{ counter }} produit vendu{% plural %}Affichage de {{ counter }} produits vendus{% endblocktrans %}
                         {% else %}
-                        Affichage de {{ sales|length }} vente(s)
+                        {% blocktrans with counter=sales|length %}Affichage de {{ counter }} vente(s){% endblocktrans %}
                         {% endif %}
                     </div>
                     <div class="pagination">
@@ -430,7 +430,7 @@
 <div class="modal" id="saleDetailsModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Détails de la vente</h3>
+            <h3>{% trans "Détails de la vente" %}</h3>
             <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="modal-body" id="saleDetailsContent">
@@ -443,13 +443,13 @@
 <div class="modal" id="productDetailsModal">
     <div class="modal-content modal-large">
         <div class="modal-header">
-            <h3>Détails du produit</h3>
+            <h3>{% trans "Détails du produit" %}</h3>
             <button class="modal-close" onclick="closeProductModal()">&times;</button>
         </div>
         <div class="modal-body" id="productDetailsContent">
             <div class="loading-spinner">
                 <div class="spinner"></div>
-                <p>Chargement des détails...</p>
+                <p>{% trans "Chargement des détails..." %}</p>
             </div>
         </div>
     </div>
@@ -459,14 +459,14 @@
 <div class="modal" id="closeDailyModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Clôturer la journée</h3>
+            <h3>{% trans "Clôturer la journée" %}</h3>
             <button class="modal-close" onclick="closeCloseDailyModal()">&times;</button>
         </div>
         <div class="modal-body">
             <!-- Chargement -->
             <div id="closeDailyLoading" class="loading-spinner">
                 <div class="spinner"></div>
-                <p>Chargement des données de la journée...</p>
+                <p>{% trans "Chargement des données de la journée..." %}</p>
             </div>
 
             <!-- Contenu du formulaire -->
@@ -478,27 +478,27 @@
                             <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
                         </svg>
-                        Résumé de la journée — <span id="closeDailyDate"></span>
+                        {% trans "Résumé de la journée" %} — <span id="closeDailyDate"></span>
                     </h4>
                     <div class="summary-grid">
                         <div class="summary-item summary-cashfloat">
-                            <span class="summary-label">Fond de caisse précédent</span>
+                            <span class="summary-label">{% trans "Fond de caisse précédent" %}</span>
                             <span class="summary-value" id="summaryPrevCashFloat">0 FCFA</span>
                         </div>
                         <div class="summary-item summary-sales">
-                            <span class="summary-label">Total Ventes</span>
+                            <span class="summary-label">{% trans "Total Ventes" %}</span>
                             <span class="summary-value" id="summaryTotalSales">0 FCFA</span>
                         </div>
                         <div class="summary-item summary-expenses">
-                            <span class="summary-label">Total Dépenses</span>
+                            <span class="summary-label">{% trans "Total Dépenses" %}</span>
                             <span class="summary-value" id="summaryTotalExpenses">0 FCFA</span>
                         </div>
                         <div class="summary-item summary-expected">
-                            <span class="summary-label">Cash attendu</span>
+                            <span class="summary-label">{% trans "Cash attendu" %}</span>
                             <span class="summary-value" id="summaryExpectedCash">0 FCFA</span>
                         </div>
                         <div class="summary-item summary-balance">
-                            <span class="summary-label">Solde net (écart)</span>
+                            <span class="summary-label">{% trans "Solde net (écart)" %}</span>
                             <span class="summary-value" id="summaryNetBalance">— FCFA</span>
                             <span class="summary-hint" id="summaryBalanceHint"></span>
                         </div>
@@ -506,38 +506,38 @@
                 </div>
 
                 <!-- Formulaire de clôture -->
-                <form id="closeDailyForm">
+                <form id="closeDailyForm" method="post">
                     <div class="close-daily-form-grid">
                         <div class="form-group">
                             <label class="form-label" for="cashInHand">
-                                Montant du cash en main (FCFA) <span class="required">*</span>
+                                {% trans "Montant du cash en main (FCFA)" %} <span class="required">*</span>
                             </label>
                             <input type="number" class="form-control" id="cashInHand"
-                                   placeholder="Ex: 150000" step="1" min="0" required>
+                                   placeholder="{% trans "Ex: 150000" %}" step="1" min="0" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="cashFloat">
-                                Nouveau fond de caisse (FCFA)
+                                {% trans "Nouveau fond de caisse (FCFA)" %}
                             </label>
                             <input type="number" class="form-control" id="cashFloat"
-                                   placeholder="Ex: 50000" step="1" min="0">
+                                   placeholder="{% trans "Ex: 50000" %}" step="1" min="0">
                         </div>
                         <div class="form-group form-group-full">
-                            <label class="form-label" for="closeDailyNotes">Notes (optionnel)</label>
+                            <label class="form-label" for="closeDailyNotes">{% trans "Notes (optionnel)" %}</label>
                             <textarea class="form-control" id="closeDailyNotes" rows="3"
-                                      placeholder="Observations ou notes sur la journée..."></textarea>
+                                      placeholder="{% trans "Observations ou notes sur la journée..." %}"></textarea>
                         </div>
                     </div>
 
                     <div class="close-daily-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeCloseDailyModal()">
-                            Annuler
+                            {% trans "Annuler" %}
                         </button>
                         <button type="submit" class="btn btn-danger" id="confirmCloseDaily">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                            Confirmer la clôture
+                            {% trans "Confirmer la clôture" %}
                         </button>
                     </div>
                 </form>
@@ -553,7 +553,7 @@
     // Paramètres système injectés pour les factures
     window.SYSTEM_SETTINGS = {
         companyName: "{{ system_settings.company_name|escapejs }}",
-        companyLogo: "{% if system_settings.company_logo %}{{ system_settings.company_logo.url }}{% endif %}",
+        companyLogo: "{% if system_settings.company_logo %}{{ system_settings.company_logo.url|escapejs }}{% endif %}",
         companyAddress: "{{ system_settings.company_address|escapejs }}",
         companyPhone: "{{ system_settings.company_phone|escapejs }}",
         companyEmail: "{{ system_settings.company_email|escapejs }}",
@@ -581,16 +581,16 @@
         if (cashInHandVal === 0 && document.getElementById('cashInHand').value === '') {
             balanceEl.textContent = '— FCFA';
             balanceEl.className = 'summary-value';
-            hintEl.textContent = 'Saisissez le montant en caisse';
+            hintEl.textContent = gettext('Saisissez le montant en caisse');
         } else if (netBalance > 0) {
             balanceEl.className = 'summary-value text-positive';
-            hintEl.textContent = 'Surplus de ' + formatMoney(netBalance);
+            hintEl.textContent = interpolate(gettext('Surplus de %(amount)s'), {amount: formatMoney(netBalance)}, true);
         } else if (netBalance < 0) {
             balanceEl.className = 'summary-value text-negative';
-            hintEl.textContent = 'Manquant de ' + formatMoney(Math.abs(netBalance));
+            hintEl.textContent = interpolate(gettext('Manquant de %(amount)s'), {amount: formatMoney(Math.abs(netBalance))}, true);
         } else {
             balanceEl.className = 'summary-value text-positive';
-            hintEl.textContent = 'Caisse équilibrée';
+            hintEl.textContent = gettext('Caisse équilibrée');
         }
     }
 
@@ -629,13 +629,13 @@
 
                 content.style.display = 'block';
             } else {
-                content.innerHTML = '<div class="error-message"><p>' + data.message + '</p></div>';
+                content.innerHTML = '<div class="error-message"><p>' + escapeHtml(data.message) + '</p></div>';
                 content.style.display = 'block';
             }
         })
         .catch(err => {
             loading.style.display = 'none';
-            content.innerHTML = '<div class="error-message"><p>Erreur de connexion au serveur.</p></div>';
+            content.innerHTML = '<div class="error-message"><p>' + gettext('Erreur de connexion au serveur.') + '</p></div>';
             content.style.display = 'block';
         });
     });
@@ -662,13 +662,13 @@
         const notes = document.getElementById('closeDailyNotes').value;
 
         if (!cashInHand) {
-            alert('Veuillez remplir le montant du cash en main.');
+            alert(gettext('Veuillez remplir le montant du cash en main.'));
             return;
         }
 
         const confirmBtn = document.getElementById('confirmCloseDaily');
         confirmBtn.disabled = true;
-        confirmBtn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> Clôture en cours...';
+        confirmBtn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> ' + gettext('Clôture en cours...');
 
         fetch("{% url 'close_daily' %}", {
             method: 'POST',
@@ -691,15 +691,15 @@
                 alert(data.message);
                 window.location.reload();
             } else {
-                alert(data.message || 'Une erreur est survenue.');
+                alert(data.message || gettext('Une erreur est survenue.'));
                 confirmBtn.disabled = false;
-                confirmBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Confirmer la clôture';
+                confirmBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> ' + gettext('Confirmer la clôture');
             }
         })
         .catch(err => {
-            alert('Erreur de connexion au serveur.');
+            alert(gettext('Erreur de connexion au serveur.'));
             confirmBtn.disabled = false;
-            confirmBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Confirmer la clôture';
+            confirmBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> ' + gettext('Confirmer la clôture');
         });
     });
 </script>

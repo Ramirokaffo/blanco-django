@@ -1,53 +1,141 @@
-{% load static %}
+{% load static i18n %}
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion - {{ system_settings.company_name }}</title>
+    <title>{% trans "Connexion" %} - {{ system_settings.company_name }}</title>
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/theme.css' %}">
     <link rel="stylesheet" href="{% static 'css/login.css' %}">
 </head>
-<body data-theme="light">
-    <div class="login-wrapper">
-        <div class="login-card">
-            <!-- Logo / initiale -->
-            {% if system_settings.company_logo %}
-                <img src="{{ system_settings.company_logo.url }}" alt="Logo" class="login-logo">
-            {% else %}
-                <div class="login-logo-placeholder">{{ system_settings.company_name|first }}</div>
-            {% endif %}
+<body data-theme="light" class="login-page">
+    {# Applique le thème sauvegardé avant le premier rendu pour éviter un flash #}
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('theme') === 'dark') {
+                    document.body.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
 
-            <div class="login-company">{{ system_settings.company_name }}</div>
-            <p class="login-subtitle">Connectez-vous pour continuer</p>
+    <!-- Décor d'arrière-plan -->
+    <div class="login-bg" aria-hidden="true"></div>
+
+    <!-- Bascule clair / sombre -->
+    <button type="button" class="login-theme-toggle" id="themeToggle" aria-label="{% trans "Changer de thème" %}" title="{% trans "Changer de thème" %}">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2m0 18v2M21 12h-2M5 12H3m15.364-7.364l-1.414 1.414M7.05 16.95l-1.414 1.414m12.728 0l-1.414-1.414M7.05 7.05L5.636 5.636"/>
+        </svg>
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+    </button>
+
+    <!-- Sélecteur de langue (cookie via django.views.i18n.set_language) -->
+    <form method="post" action="{% url 'set_language' %}" class="login-lang-switcher" aria-label="{% trans "Langue" %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        {% for lang_code, lang_name in LANGUAGES %}
+        <button type="submit" name="language" value="{{ lang_code }}" class="lang-btn{% if lang_code == LANGUAGE_CODE %} active{% endif %}" title="{{ lang_name }}"{% if lang_code == LANGUAGE_CODE %} aria-current="true"{% endif %}>{{ lang_code|upper }}</button>
+        {% endfor %}
+    </form>
+
+    <main class="login-wrapper">
+        <div class="login-card">
+            <header class="login-header">
+                {% if system_settings.company_logo %}
+                    <img src="{{ system_settings.company_logo.url }}" alt="{% blocktrans with name=system_settings.company_name %}Logo {{ name }}{% endblocktrans %}" class="login-logo">
+                {% else %}
+                    <div class="login-logo-placeholder" aria-hidden="true">{{ system_settings.company_name|first|upper }}</div>
+                {% endif %}
+
+                <h1 class="login-company">{{ system_settings.company_name }}</h1>
+                <p class="login-subtitle">{% trans "Connectez-vous pour continuer" %}</p>
+            </header>
 
             {% if error %}
-                <div class="login-error">{{ error }}</div>
+                <div class="login-error" role="alert" id="login-error">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <span>{{ error }}</span>
+                </div>
             {% endif %}
 
-            <form method="post" class="login-form" action="{% url 'login' %}">
+            <form method="post" class="login-form" action="{% url 'login' %}" novalidate>
                 {% csrf_token %}
                 {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
                 <div class="login-field">
-                    <label for="id_username">Nom d'utilisateur</label>
-                    <input type="text" id="id_username" name="username" autofocus
-                           placeholder="Entrez votre identifiant" required>
+                    <label for="id_username">{% trans "Nom d'utilisateur" %}</label>
+                    <div class="login-input-wrap">
+                        <span class="login-input-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                        </span>
+                        <input type="text" id="id_username" name="username"
+                               value="{{ username }}"
+                               autocomplete="username" autocapitalize="none" spellcheck="false"
+                               placeholder="{% trans "Entrez votre identifiant" %}" required
+                               {% if not username %}autofocus{% endif %}
+                               {% if error %}aria-describedby="login-error"{% endif %}>
+                    </div>
                 </div>
 
                 <div class="login-field">
-                    <label for="id_password">Mot de passe</label>
-                    <input type="password" id="id_password" name="password"
-                           placeholder="Entrez votre mot de passe" required>
+                    <label for="id_password">{% trans "Mot de passe" %}</label>
+                    <div class="login-input-wrap has-toggle">
+                        <span class="login-input-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                        </span>
+                        <input type="password" id="id_password" name="password"
+                               autocomplete="current-password"
+                               placeholder="{% trans "Entrez votre mot de passe" %}" required
+                               {% if username %}autofocus{% endif %}
+                               {% if error %}aria-describedby="login-error"{% endif %}>
+                        <button type="button" class="login-toggle-pwd" id="togglePassword"
+                                aria-label="{% trans "Afficher le mot de passe" %}" aria-pressed="false" title="{% trans "Afficher le mot de passe" %}">
+                            <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                <line x1="1" y1="1" x2="23" y2="23"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
-                <button type="submit" class="login-btn">Se connecter</button>
+                <button type="submit" class="login-btn" id="loginSubmit">
+                    <span class="login-spinner" aria-hidden="true"></span>
+                    <span class="login-btn-label">{% trans "Se connecter" %}</span>
+                    <svg class="login-btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                </button>
             </form>
-        </div>
-    </div>
 
+            <footer class="login-footer">
+                &copy; {% now "Y" %} {{ system_settings.company_name }} &middot; {% trans "Espace de gestion" %}
+            </footer>
+        </div>
+    </main>
+
+    <script src="{% url 'javascript-catalog' %}?lang={{ LANGUAGE_CODE }}"></script>
     <script src="{% static 'js/theme.js' %}"></script>
+    <script src="{% static 'js/login.js' %}"></script>
 </body>
 </html>
-

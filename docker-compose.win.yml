@@ -1,29 +1,44 @@
+# Variante Windows (Docker Desktop) : réseau bridge, ports publiés.
+# Dans ce mode, le service web joint MySQL par son nom de service : MYSQL_HOST=mysql
 services:
 
   mysql:
     image: mysql:8.0
     container_name: blanco-mysql
     restart: unless-stopped
+    # Seules les variables MYSQL_* sont transmises (pas de env_file : inutile de
+    # donner SECRET_KEY & co. au conteneur MySQL). Les valeurs viennent de .env.
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    env_file:
-      - .env
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      # Publié uniquement sur la boucle locale de l'hôte (le service web passe par
+      # le réseau compose interne, non concerné par cette publication).
+      - "127.0.0.1:3306:3306"
+    healthcheck:
+      # $$ : non interpolé par compose ; le mot de passe est lu dans l'environnement
+      # du conteneur (MYSQL_PWD) et n'apparaît pas en argument de ligne de commande.
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   web:
+    # Recommandé en production : figer une version immuable plutôt que :latest,
+    # ex. ramirokaffo/blanco:1.2.3 ou ramirokaffo/blanco@sha256:<digest>
     image: ramirokaffo/blanco:latest
     container_name: blanco_web
     restart: unless-stopped
     env_file:
       - .env
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:

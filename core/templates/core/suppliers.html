@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Fournisseurs - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Fournisseurs" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/contacts.css' %}">
@@ -11,14 +11,14 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Fournisseurs</h1>
-            <p class="text-secondary">Gestion des fournisseurs ({{ total_count }} enregistrement{{ total_count|pluralize }})</p>
+            <h1>{% trans "Fournisseurs" %}</h1>
+            <p class="text-secondary">{% blocktrans count counter=total_count|default:0 %}Gestion des fournisseurs ({{ counter }} enregistrement){% plural %}Gestion des fournisseurs ({{ counter }} enregistrements){% endblocktrans %}</p>
         </div>
         <a href="{% url 'add_supplier' %}" class="btn btn-primary btn-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
-            Nouveau fournisseur
+            {% trans "Nouveau fournisseur" %}
         </a>
     </div>
 </div>
@@ -39,8 +39,8 @@
     <form method="get" action="{% url 'suppliers' %}" class="filters-form">
         <div class="filters-row">
             <div class="filter-group filter-search">
-                <label class="form-label">Recherche</label>
-                <input type="text" name="search" class="form-control" placeholder="Nom, téléphone, NIU..." value="{{ current_search }}">
+                <label class="form-label">{% trans "Recherche" %}</label>
+                <input type="text" name="search" class="form-control" placeholder="{% trans "Nom, téléphone, NIU..." %}" value="{{ current_search }}">
             </div>
         </div>
         <div class="filters-actions">
@@ -48,9 +48,9 @@
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                Rechercher
+                {% trans "Rechercher" %}
             </button>
-            <a href="{% url 'suppliers' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+            <a href="{% url 'suppliers' %}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser" %}</a>
         </div>
     </form>
 </div>
@@ -58,9 +58,9 @@
 <!-- Tableau -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des fournisseurs</h3>
+        <h3 class="card-title">{% trans "Liste des fournisseurs" %}</h3>
         <div class="pagination-info-header">
-            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+            {% blocktrans with number=page_obj.number num_pages=page_obj.paginator.num_pages %}Page {{ number }} sur {{ num_pages }}{% endblocktrans %}
         </div>
     </div>
     <div class="card-body">
@@ -68,12 +68,12 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Nom</th>
-                        <th>Téléphone</th>
-                        <th>Email</th>
-                        <th>NIU</th>
-                        <th>Adresse</th>
-                        <th class="text-center">Actions</th>
+                        <th>{% trans "Nom" %}</th>
+                        <th>{% trans "Téléphone" %}</th>
+                        <th>{% trans "Email" %}</th>
+                        <th>{% trans "NIU" %}</th>
+                        <th>{% trans "Adresse" %}</th>
+                        <th class="text-center">{% trans "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -85,7 +85,7 @@
                         <td>{{ supplier.niu|default:"-" }}</td>
                         <td>{{ supplier.address|default:"-"|truncatechars:40 }}</td>
                         <td class="text-center">
-                            <a href="{% url 'edit_supplier' supplier.id %}" class="btn-icon" title="Modifier">
+                            <a href="{% url 'edit_supplier' supplier.id %}" class="btn-icon" title="{% trans "Modifier" %}">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -95,7 +95,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center">Aucun fournisseur trouvé</td>
+                        <td colspan="6" class="text-center">{% trans "Aucun fournisseur trouvé" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -106,7 +106,7 @@
         {% if page_obj.paginator.num_pages > 1 %}
         <div class="pagination-container">
             <div class="pagination-info">
-                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }}
+                {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=total_count %}Affichage de {{ start }} à {{ end }} sur {{ total }}{% endblocktrans %}
             </div>
             <div class="pagination">
                 {% if page_obj.has_previous %}

@@ -3,17 +3,20 @@ Vues pour la gestion des ventes.
 Correspond à l'ancien endpoint Flask: POST /sale
 """
 
+from django.utils.translation import gettext as _
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.api_permissions import HasModule
 from core.serializers.sale_serializers import SaleCreateSerializer, SaleSerializer
 from core.services.sale_service import SaleService
 
+CanSell = HasModule('sales')
+
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanSell])
 def create_sale(request):
     """
     Créer une vente.
@@ -29,7 +32,7 @@ def create_sale(request):
             sale_data = SaleSerializer(sale).data
             return Response({
                 'status': 1,
-                'message': 'Vente créée avec succès',
+                'message': _("Vente créée avec succès"),
                 'sale': sale_data,
             }, status=status.HTTP_201_CREATED)
         except ValueError as e:
@@ -45,7 +48,7 @@ def create_sale(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanSell])
 def search_sales(request):
     """
     Rechercher des ventes du Daily en cours.
@@ -58,15 +61,14 @@ def search_sales(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanSell])
 def get_sale_details(request, sale_id):
     """
     Détails d'une vente par ID.
     """
     sale = SaleService.get_by_id(sale_id)
     if not sale:
-        return Response({'error': 'Vente introuvable'},
+        return Response({'error': _("Vente introuvable")},
                         status=status.HTTP_404_NOT_FOUND)
     serializer = SaleSerializer(sale)
     return Response(serializer.data)
-

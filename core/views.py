@@ -10,6 +10,8 @@ from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.formats import date_format
+from django.utils.translation import gettext as _, pgettext
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from core.models.sale_models import Sale, SaleProduct, CreditSale
@@ -34,36 +36,152 @@ from core.services.sale_service import SaleService
 from core.services.supply_service import SupplyService
 from core.decorators import module_required
 
+import csv
+import logging
+import re
+
+from django.conf import settings as django_settings
+from django.core.cache import cache
+from django.http import HttpResponse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.debug import sensitive_post_parameters
+from django.views.decorators.http import require_http_methods
+
+logger = logging.getLogger(__name__)
 
 
+def _safe_next(request, default):
+    """Retourne le paramètre ``next`` seulement s'il pointe vers ce site."""
+    candidate = request.POST.get('next') or request.GET.get('next') or ''
+    if candidate and url_has_allowed_host_and_scheme(
+        candidate,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return candidate
+    return default
+
+
+_CSV_FORMULA_PREFIX = re.compile(r'^[=+@\t\r]|^-(?!\d)')
+
+
+class _SafeCsvWriter:
+    """
+    Enveloppe csv.writer qui neutralise l'injection de formules tableur :
+    une cellule commençant par = + @ (ou - suivi d'autre chose qu'un chiffre)
+    est préfixée d'une apostrophe. Les nombres négatifs restent des nombres.
+    """
+
+    def __init__(self, writer):
+        self._writer = writer
+
+    @staticmethod
+    def _clean(value):
+        if isinstance(value, str) and value and _CSV_FORMULA_PREFIX.match(value):
+            return "'" + value
+        return value
+
+    def writerow(self, row):
+        self._writer.writerow([self._clean(v) for v in row])
+
+    def writerows(self, rows):
+        for row in rows:
+            self.writerow(row)
+
+
+def _client_ip(request):
+    return request.META.get('REMOTE_ADDR', '') or 'unknown'
+
+
+def _clean_date_param(request, name, default=''):
+    """Paramètre de filtre date : renvoyé tel quel s'il est une date ISO valide, sinon ``default``."""
+    raw = (request.GET.get(name) or '').strip()
+    if not raw:
+        return default
+    try:
+        return raw if parse_date(raw) else default
+    except ValueError:
+        return default
+
+
+def _clean_int_param(request, name, default=''):
+    """Paramètre de filtre identifiant : chaîne de chiffres ou ``default``."""
+    raw = (request.GET.get(name) or '').strip()
+    return raw if raw.isdigit() else default
+
+
+def _login_ratelimit_keys(request, username):
+    ip = _client_ip(request)
+    return (
+        f"login-fail:ip:{ip}",
+        f"login-fail:user:{ip}:{(username or '').lower()[:150]}",
+    )
+
+
+def _login_is_blocked(request, username):
+    max_attempts = django_settings.LOGIN_RATELIMIT_ATTEMPTS
+    ip_key, user_key = _login_ratelimit_keys(request, username)
+    # Par couple (IP, identifiant) : max_attempts ; par IP seule : 4x plus large
+    return (
+        cache.get(user_key, 0) >= max_attempts
+        or cache.get(ip_key, 0) >= max_attempts * 4
+    )
+
+
+def _login_register_failure(request, username):
+    window = django_settings.LOGIN_RATELIMIT_WINDOW_SECONDS
+    for key in _login_ratelimit_keys(request, username):
+        try:
+            cache.incr(key)
+        except ValueError:
+            cache.set(key, 1, window)
+
+
+def _login_reset_failures(request, username):
+    cache.delete_many(list(_login_ratelimit_keys(request, username)))
+
+
+
+@sensitive_post_parameters('password')
+@require_http_methods(['GET', 'POST'])
 def login_view(request):
     """Vue de connexion personnalisée (accessible aux non-admins)."""
     if request.user.is_authenticated:
         return redirect('dashboard')
 
     error = None
+    username = ''
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
-        if username and password:
+        if _login_is_blocked(request, username):
+            minutes = max(1, django_settings.LOGIN_RATELIMIT_WINDOW_SECONDS // 60)
+            error = _(
+                "Trop de tentatives de connexion. Réessayez dans %(minutes)s minute(s)."
+            ) % {'minutes': minutes}
+        elif username and password:
             user = authenticate(request, username=username, password=password)
             if user is not None:
+                _login_reset_failures(request, username)
                 auth_login(request, user)
-                next_url = request.GET.get('next') or request.POST.get('next') or '/'
-                return redirect(next_url)
+                # ``next`` n'est suivi que s'il reste sur ce site (anti open redirect)
+                return redirect(_safe_next(request, '/'))
             else:
-                error = "Nom d'utilisateur ou mot de passe incorrect."
+                _login_register_failure(request, username)
+                error = _("Nom d'utilisateur ou mot de passe incorrect.")
         else:
-            error = "Veuillez remplir tous les champs."
+            error = _("Veuillez remplir tous les champs.")
 
     return render(request, 'core/login.html', {
         'error': error,
-        'next': request.GET.get('next', ''),
+        'username': username,
+        'next': _safe_next(request, ''),
     })
 
 
+@require_POST
 def logout_view(request):
-    """Déconnexion et redirection vers la page de login."""
+    """Déconnexion (POST uniquement : un simple lien/image ne peut plus déconnecter)."""
     auth_logout(request)
     return redirect('login')
 
@@ -181,7 +299,7 @@ def dashboard(request):
     total_products = Product.objects.filter(delete_at__isnull=True).count()
 
     context = {
-        'page_title': 'Tableau de bord',
+        'page_title': _('Tableau de bord'),
         'current_daily': current_daily,
         # KPI principaux
         'total_revenue': total_revenue,
@@ -334,7 +452,7 @@ def statistics(request):
     ).order_by('-total_quantity', 'name')[:6]
 
     context = {
-        'page_title': 'Statistiques',
+        'page_title': _('Statistiques'),
         'currency': settings_obj.currency_symbol,
         'generated_at': timezone.now(),
         'current_daily': current_daily,
@@ -415,12 +533,15 @@ def product_statistics(request):
 
     def format_period_label(start, end):
         if start and end:
-            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+            return _("Du %(start)s au %(end)s") % {
+                'start': start.strftime('%d/%m/%Y'),
+                'end': end.strftime('%d/%m/%Y'),
+            }
         if start:
-            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+            return _("Depuis le %(start)s") % {'start': start.strftime('%d/%m/%Y')}
         if end:
-            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
-        return "Toutes les données disponibles"
+            return _("Jusqu'au %(end)s") % {'end': end.strftime('%d/%m/%Y')}
+        return _("Toutes les données disponibles")
 
     def chart_bucket_for_range(start, end):
         if not start and not end:
@@ -443,7 +564,7 @@ def product_statistics(request):
             bucket_date = bucket_value
 
         if bucket_kind == 'month':
-            return bucket_date.strftime('%b %Y')
+            return date_format(bucket_date, 'M Y')
         if bucket_kind == 'week':
             week_end = bucket_date + timedelta(days=6)
             return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
@@ -454,11 +575,11 @@ def product_statistics(request):
 
     period = request.GET.get('period', '30d')
     search = request.GET.get('search', '').strip()
-    category_id = request.GET.get('category', '')
+    category_id = _clean_int_param(request, 'category')
     gamme_id = request.GET.get('gamme', '')
     rayon_id = request.GET.get('rayon', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
 
     parsed_date_from = parse_date(date_from) if date_from else None
     parsed_date_to = parse_date(date_to) if date_to else None
@@ -469,10 +590,10 @@ def product_statistics(request):
         date_to = parsed_date_to.isoformat()
 
     period_options = {
-        '7d': ('7 derniers jours', 6),
-        '30d': ('30 derniers jours', 29),
-        '90d': ('90 derniers jours', 89),
-        '365d': ('12 derniers mois', 364),
+        '7d': (_('7 derniers jours'), 6),
+        '30d': (_('30 derniers jours'), 29),
+        '90d': (_('90 derniers jours'), 89),
+        '365d': (_('12 derniers mois'), 364),
     }
 
     if date_from or date_to:
@@ -481,7 +602,7 @@ def product_statistics(request):
         period = '30d'
 
     if period == 'custom':
-        period_name = 'Période personnalisée'
+        period_name = _('Période personnalisée')
         range_start = parsed_date_from
         range_end = parsed_date_to
     else:
@@ -594,13 +715,13 @@ def product_statistics(request):
         ).order_by('-product_count', '-stock_units', 'category__name')[:8]
     )
     category_chart = {
-        'labels': [row['category__name'] or 'Sans catégorie' for row in category_rows],
+        'labels': [row['category__name'] or _('Sans catégorie') for row in category_rows],
         'counts': [int(row['product_count'] or 0) for row in category_rows],
         'stock': [int(row['stock_units'] or 0) for row in category_rows],
     }
 
     stock_health_chart = {
-        'labels': ['Disponible', 'Stock bas', 'Rupture'],
+        'labels': [_('Disponible'), _('Stock bas'), _('Rupture')],
         'values': [healthy_stock_count, low_stock_count, out_of_stock_count],
     }
 
@@ -609,7 +730,7 @@ def product_statistics(request):
     rayons = Rayon.objects.filter(delete_at__isnull=True).order_by('name')
 
     context = {
-        'page_title': 'Statistiques produits',
+        'page_title': _('Statistiques produits'),
         'currency': settings_obj.currency_symbol,
         'generated_at': timezone.now(),
         'period_name': period_name,
@@ -655,12 +776,15 @@ def sales_statistics(request):
 
     def format_period_label(start, end):
         if start and end:
-            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+            return _("Du %(start)s au %(end)s") % {
+                'start': start.strftime('%d/%m/%Y'),
+                'end': end.strftime('%d/%m/%Y'),
+            }
         if start:
-            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+            return _("Depuis le %(start)s") % {'start': start.strftime('%d/%m/%Y')}
         if end:
-            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
-        return "Toutes les données disponibles"
+            return _("Jusqu'au %(end)s") % {'end': end.strftime('%d/%m/%Y')}
+        return _("Toutes les données disponibles")
 
     def chart_bucket_for_range(start, end):
         if not start and not end:
@@ -683,7 +807,7 @@ def sales_statistics(request):
             bucket_date = bucket_value
 
         if bucket_kind == 'month':
-            return bucket_date.strftime('%b %Y')
+            return date_format(bucket_date, 'M Y')
         if bucket_kind == 'week':
             week_end = bucket_date + timedelta(days=6)
             return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
@@ -698,12 +822,12 @@ def sales_statistics(request):
 
     period = request.GET.get('period', '30d')
     search = request.GET.get('search', '').strip()
-    client_id = request.GET.get('client', '')
-    staff_id = request.GET.get('staff', '')
+    client_id = _clean_int_param(request, 'client')
+    staff_id = _clean_int_param(request, 'staff')
     sale_type = request.GET.get('type', '')
     payment_status = request.GET.get('status', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
 
     parsed_date_from = parse_date(date_from) if date_from else None
     parsed_date_to = parse_date(date_to) if date_to else None
@@ -714,10 +838,10 @@ def sales_statistics(request):
         date_to = parsed_date_to.isoformat()
 
     period_options = {
-        '7d': ('7 derniers jours', 6),
-        '30d': ('30 derniers jours', 29),
-        '90d': ('90 derniers jours', 89),
-        '365d': ('12 derniers mois', 364),
+        '7d': (_('7 derniers jours'), 6),
+        '30d': (_('30 derniers jours'), 29),
+        '90d': (_('90 derniers jours'), 89),
+        '365d': (_('12 derniers mois'), 364),
     }
 
     if date_from or date_to:
@@ -726,7 +850,7 @@ def sales_statistics(request):
         period = '30d'
 
     if period == 'custom':
-        period_name = 'Période personnalisée'
+        period_name = _('Période personnalisée')
         range_start = parsed_date_from
         range_end = parsed_date_to
     else:
@@ -802,12 +926,12 @@ def sales_statistics(request):
     }
 
     payment_status_chart = {
-        'labels': ['Payées', 'Non payées'],
+        'labels': [_('Payées'), _('Non payées')],
         'values': [paid_sales_count, unpaid_sales_count],
     }
 
     sale_type_chart = {
-        'labels': ['Comptant', 'Crédit'],
+        'labels': [_('Comptant'), _('Crédit')],
         'values': [cash_sales_count, credit_sales_count],
     }
 
@@ -823,7 +947,7 @@ def sales_statistics(request):
     )
     staff_performance_chart = {
         'labels': [
-            format_person_label(row['staff__firstname'], row['staff__lastname'], 'Non assigné')
+            format_person_label(row['staff__firstname'], row['staff__lastname'], _('Non assigné'))
             for row in staff_rows
         ],
         'revenue': [float(row['total_revenue'] or 0) for row in staff_rows],
@@ -842,7 +966,7 @@ def sales_statistics(request):
     )
     top_clients = [
         {
-            'label': format_person_label(row['client__firstname'], row['client__lastname'], 'Client comptoir'),
+            'label': format_person_label(row['client__firstname'], row['client__lastname'], _('Client comptoir')),
             'total_revenue': row['total_revenue'] or 0,
             'total_sales': row['total_sales'] or 0,
         }
@@ -854,7 +978,7 @@ def sales_statistics(request):
     staff_members = CustomUser.objects.filter(delete_at__isnull=True, is_active=True).order_by('firstname', 'lastname')
 
     context = {
-        'page_title': 'Statistiques ventes',
+        'page_title': _('Statistiques ventes'),
         'currency': settings_obj.currency_symbol,
         'generated_at': timezone.now(),
         'period_name': period_name,
@@ -899,12 +1023,15 @@ def client_statistics(request):
 
     def format_period_label(start, end):
         if start and end:
-            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+            return _("Du %(start)s au %(end)s") % {
+                'start': start.strftime('%d/%m/%Y'),
+                'end': end.strftime('%d/%m/%Y'),
+            }
         if start:
-            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+            return _("Depuis le %(start)s") % {'start': start.strftime('%d/%m/%Y')}
         if end:
-            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
-        return "Toutes les données disponibles"
+            return _("Jusqu'au %(end)s") % {'end': end.strftime('%d/%m/%Y')}
+        return _("Toutes les données disponibles")
 
     def chart_bucket_for_range(field_name, start, end):
         if not start and not end:
@@ -927,7 +1054,7 @@ def client_statistics(request):
             bucket_date = bucket_value
 
         if bucket_kind == 'month':
-            return bucket_date.strftime('%b %Y')
+            return date_format(bucket_date, 'M Y')
         if bucket_kind == 'week':
             week_end = bucket_date + timedelta(days=6)
             return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
@@ -944,8 +1071,8 @@ def client_statistics(request):
     search = request.GET.get('search', '').strip()
     gender = request.GET.get('gender', '').strip()
     activity = request.GET.get('activity', '').strip()
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
 
     parsed_date_from = parse_date(date_from) if date_from else None
     parsed_date_to = parse_date(date_to) if date_to else None
@@ -956,10 +1083,10 @@ def client_statistics(request):
         date_to = parsed_date_to.isoformat()
 
     period_options = {
-        '7d': ('7 derniers jours', 6),
-        '30d': ('30 derniers jours', 29),
-        '90d': ('90 derniers jours', 89),
-        '365d': ('12 derniers mois', 364),
+        '7d': (_('7 derniers jours'), 6),
+        '30d': (_('30 derniers jours'), 29),
+        '90d': (_('90 derniers jours'), 89),
+        '365d': (_('12 derniers mois'), 364),
     }
 
     if date_from or date_to:
@@ -968,7 +1095,7 @@ def client_statistics(request):
         period = '30d'
 
     if period == 'custom':
-        period_name = 'Période personnalisée'
+        period_name = _('Période personnalisée')
         range_start = parsed_date_from
         range_end = parsed_date_to
     else:
@@ -1089,7 +1216,7 @@ def client_statistics(request):
         clients_queryset.values('gender').annotate(total_clients=Count('id')).order_by('-total_clients', 'gender')
     )
     gender_distribution_chart = {
-        'labels': [row['gender'] or 'Non renseigné' for row in gender_rows],
+        'labels': [row['gender'] or _('Non renseigné') for row in gender_rows],
         'values': [int(row['total_clients'] or 0) for row in gender_rows],
     }
 
@@ -1139,7 +1266,7 @@ def client_statistics(request):
         client_id = row['client_id']
         debt_data = outstanding_map.get(client_id, {})
         top_clients.append({
-            'label': format_person_label(row['client__firstname'], row['client__lastname'], 'Client comptoir'),
+            'label': format_person_label(row['client__firstname'], row['client__lastname'], _('Client comptoir')),
             'total_revenue': row['total_revenue'] or 0,
             'total_sales': int(row['total_sales'] or 0),
             'outstanding_total': debt_data.get('total_outstanding', 0),
@@ -1160,20 +1287,20 @@ def client_statistics(request):
         has_sales = activity_data.get('total_sales', 0) > 0
         has_debt = debt_data.get('total_outstanding', 0) > 0
         if has_debt:
-            status_label = 'Débiteur'
+            status_label = _('Débiteur')
             status_class = 'warning'
         elif has_sales:
-            status_label = 'Actif'
+            status_label = _('Actif')
             status_class = 'success'
         else:
-            status_label = 'Inactif'
+            status_label = _('Inactif')
             status_class = 'secondary'
 
         recent_clients.append({
-            'label': client.get_full_name() or f'Client #{client.id}',
+            'label': client.get_full_name() or _('Client #%(id)s') % {'id': client.id},
             'phone_number': client.phone_number or '-',
             'email': client.email or '-',
-            'gender': client.gender or 'Non renseigné',
+            'gender': client.gender or _('Non renseigné'),
             'create_at': client.create_at,
             'last_sale_at': activity_data.get('last_sale_at'),
             'total_sales': activity_data.get('total_sales', 0),
@@ -1183,7 +1310,7 @@ def client_statistics(request):
         })
 
     context = {
-        'page_title': 'Statistiques clients',
+        'page_title': _('Statistiques clients'),
         'currency': settings_obj.currency_symbol,
         'generated_at': timezone.now(),
         'period_name': period_name,
@@ -1227,12 +1354,15 @@ def supplier_statistics(request):
 
     def format_period_label(start, end):
         if start and end:
-            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+            return _("Du %(start)s au %(end)s") % {
+                'start': start.strftime('%d/%m/%Y'),
+                'end': end.strftime('%d/%m/%Y'),
+            }
         if start:
-            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+            return _("Depuis le %(start)s") % {'start': start.strftime('%d/%m/%Y')}
         if end:
-            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
-        return "Toutes les données disponibles"
+            return _("Jusqu'au %(end)s") % {'end': end.strftime('%d/%m/%Y')}
+        return _("Toutes les données disponibles")
 
     def chart_bucket_for_range(field_name, start, end):
         if not start and not end:
@@ -1255,7 +1385,7 @@ def supplier_statistics(request):
             bucket_date = bucket_value
 
         if bucket_kind == 'month':
-            return bucket_date.strftime('%b %Y')
+            return date_format(bucket_date, 'M Y')
         if bucket_kind == 'week':
             week_end = bucket_date + timedelta(days=6)
             return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
@@ -1268,8 +1398,8 @@ def supplier_statistics(request):
     period = request.GET.get('period', '30d')
     search = request.GET.get('search', '').strip()
     activity = request.GET.get('activity', '').strip()
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
 
     parsed_date_from = parse_date(date_from) if date_from else None
     parsed_date_to = parse_date(date_to) if date_to else None
@@ -1280,10 +1410,10 @@ def supplier_statistics(request):
         date_to = parsed_date_to.isoformat()
 
     period_options = {
-        '7d': ('7 derniers jours', 6),
-        '30d': ('30 derniers jours', 29),
-        '90d': ('90 derniers jours', 89),
-        '365d': ('12 derniers mois', 364),
+        '7d': (_('7 derniers jours'), 6),
+        '30d': (_('30 derniers jours'), 29),
+        '90d': (_('90 derniers jours'), 89),
+        '365d': (_('12 derniers mois'), 364),
     }
 
     if date_from or date_to:
@@ -1292,7 +1422,7 @@ def supplier_statistics(request):
         period = '30d'
 
     if period == 'custom':
-        period_name = 'Période personnalisée'
+        period_name = _('Période personnalisée')
         range_start = parsed_date_from
         range_end = parsed_date_to
     else:
@@ -1474,7 +1604,7 @@ def supplier_statistics(request):
         supplier_id = row['supplier_id']
         debt_data = outstanding_map.get(supplier_id, {})
         top_suppliers.append({
-            'label': row['supplier__name'] or f'Fournisseur #{supplier_id}',
+            'label': row['supplier__name'] or _('Fournisseur #%(id)s') % {'id': supplier_id},
             'total_amount': row['total_amount'] or 0,
             'total_supplies': int(row['total_supplies'] or 0),
             'outstanding_total': debt_data.get('total_outstanding', 0),
@@ -1496,17 +1626,17 @@ def supplier_statistics(request):
         has_supplies = activity_data.get('total_supplies', 0) > 0
         has_debt = debt_data.get('total_outstanding', 0) > 0
         if has_debt:
-            status_label = 'À régler'
+            status_label = _('À régler')
             status_class = 'warning'
         elif has_supplies:
-            status_label = 'Actif'
+            status_label = _('Actif')
             status_class = 'success'
         else:
-            status_label = 'Inactif'
+            status_label = _('Inactif')
             status_class = 'secondary'
 
         recent_suppliers.append({
-            'label': supplier.name or f'Fournisseur #{supplier.id}',
+            'label': supplier.name or _('Fournisseur #%(id)s') % {'id': supplier.id},
             'phone_number': supplier.contact_phone or '-',
             'email': supplier.contact_email or '-',
             'niu': supplier.niu or '-',
@@ -1520,7 +1650,7 @@ def supplier_statistics(request):
         })
 
     context = {
-        'page_title': 'Statistiques fournisseurs',
+        'page_title': _('Statistiques fournisseurs'),
         'currency': settings_obj.currency_symbol,
         'generated_at': timezone.now(),
         'period_name': period_name,
@@ -1562,12 +1692,15 @@ def supply_statistics(request):
 
     def format_period_label(start, end):
         if start and end:
-            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+            return _("Du %(start)s au %(end)s") % {
+                'start': start.strftime('%d/%m/%Y'),
+                'end': end.strftime('%d/%m/%Y'),
+            }
         if start:
-            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+            return _("Depuis le %(start)s") % {'start': start.strftime('%d/%m/%Y')}
         if end:
-            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
-        return "Toutes les données disponibles"
+            return _("Jusqu'au %(end)s") % {'end': end.strftime('%d/%m/%Y')}
+        return _("Toutes les données disponibles")
 
     def chart_bucket_for_range(field_name, start, end):
         if not start and not end:
@@ -1590,7 +1723,7 @@ def supply_statistics(request):
             bucket_date = bucket_value
 
         if bucket_kind == 'month':
-            return bucket_date.strftime('%b %Y')
+            return date_format(bucket_date, 'M Y')
         if bucket_kind == 'week':
             week_end = bucket_date + timedelta(days=6)
             return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
@@ -1598,19 +1731,19 @@ def supply_statistics(request):
 
     def format_person_label(firstname, lastname, username):
         full_name = f"{firstname or ''} {lastname or ''}".strip()
-        return full_name or username or 'Non assigné'
+        return full_name or username or _('Non assigné')
 
     settings_obj = SystemSettings.get_settings()
     today = timezone.localdate()
 
     period = request.GET.get('period', '30d')
     search = request.GET.get('search', '').strip()
-    supplier_id = request.GET.get('supplier', '').strip()
-    staff_id = request.GET.get('staff', '').strip()
+    supplier_id = _clean_int_param(request, 'supplier')
+    staff_id = _clean_int_param(request, 'staff')
     supply_type = request.GET.get('type', '').strip()
     payment_status = request.GET.get('status', '').strip()
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
 
     parsed_date_from = parse_date(date_from) if date_from else None
     parsed_date_to = parse_date(date_to) if date_to else None
@@ -1621,10 +1754,10 @@ def supply_statistics(request):
         date_to = parsed_date_to.isoformat()
 
     period_options = {
-        '7d': ('7 derniers jours', 6),
-        '30d': ('30 derniers jours', 29),
-        '90d': ('90 derniers jours', 89),
-        '365d': ('12 derniers mois', 364),
+        '7d': (_('7 derniers jours'), 6),
+        '30d': (_('30 derniers jours'), 29),
+        '90d': (_('90 derniers jours'), 89),
+        '365d': (_('12 derniers mois'), 364),
     }
 
     if date_from or date_to:
@@ -1633,7 +1766,7 @@ def supply_statistics(request):
         period = '30d'
 
     if period == 'custom':
-        period_name = 'Période personnalisée'
+        period_name = _('Période personnalisée')
         range_start = parsed_date_from
         range_end = parsed_date_to
     else:
@@ -1724,12 +1857,12 @@ def supply_statistics(request):
     }
 
     payment_status_chart = {
-        'labels': ['Payés', 'Non payés'],
+        'labels': [_('Payés'), _('Non payés')],
         'values': [paid_supplies_count, unpaid_supplies_count],
     }
 
     supply_type_chart = {
-        'labels': ['Comptant', 'Crédit'],
+        'labels': [_('Comptant'), _('Crédit')],
         'values': [cash_supplies_count, credit_supplies_count],
     }
 
@@ -1746,7 +1879,7 @@ def supply_statistics(request):
         ).order_by('-total_amount', '-total_quantity', 'product__name')[:8]
     )
     top_products_chart = {
-        'labels': [row['product__name'] or f"Produit #{row['product_id']}" for row in top_product_rows],
+        'labels': [row['product__name'] or _("Produit #%(id)s") % {'id': row['product_id']} for row in top_product_rows],
         'amounts': [float(row['total_amount'] or 0) for row in top_product_rows],
         'quantities': [int(row['total_quantity'] or 0) for row in top_product_rows],
     }
@@ -1772,7 +1905,7 @@ def supply_statistics(request):
     for row in top_supplier_rows:
         supplier_key = row['supplier_id']
         top_suppliers.append({
-            'label': row['supplier__name'] or 'Sans fournisseur',
+            'label': row['supplier__name'] or _('Sans fournisseur'),
             'total_supplies': int(row['total_supplies'] or 0),
             'total_quantity': int(row['total_quantity'] or 0),
             'total_amount': row['total_amount'] or 0,
@@ -1782,7 +1915,7 @@ def supply_statistics(request):
     recent_supplies = list(supplies_queryset[:8])
 
     context = {
-        'page_title': 'Statistiques approvisionnements',
+        'page_title': _('Statistiques approvisionnements'),
         'currency': settings_obj.currency_symbol,
         'generated_at': timezone.now(),
         'period_name': period_name,
@@ -1832,12 +1965,15 @@ def expense_statistics(request):
 
     def format_period_label(start, end):
         if start and end:
-            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+            return _("Du %(start)s au %(end)s") % {
+                'start': start.strftime('%d/%m/%Y'),
+                'end': end.strftime('%d/%m/%Y'),
+            }
         if start:
-            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+            return _("Depuis le %(start)s") % {'start': start.strftime('%d/%m/%Y')}
         if end:
-            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
-        return "Toutes les données disponibles"
+            return _("Jusqu'au %(end)s") % {'end': end.strftime('%d/%m/%Y')}
+        return _("Toutes les données disponibles")
 
     def chart_bucket_for_range(field_name, start, end):
         if not start and not end:
@@ -1860,7 +1996,7 @@ def expense_statistics(request):
             bucket_date = bucket_value
 
         if bucket_kind == 'month':
-            return bucket_date.strftime('%b %Y')
+            return date_format(bucket_date, 'M Y')
         if bucket_kind == 'week':
             week_end = bucket_date + timedelta(days=6)
             return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
@@ -1868,18 +2004,18 @@ def expense_statistics(request):
 
     def format_person_label(firstname, lastname, username):
         full_name = f"{firstname or ''} {lastname or ''}".strip()
-        return full_name or username or 'Non assigné'
+        return full_name or username or _('Non assigné')
 
     settings_obj = SystemSettings.get_settings()
     today = timezone.localdate()
 
     period = request.GET.get('period', '30d')
     search = request.GET.get('search', '').strip()
-    staff_id = request.GET.get('staff', '').strip()
-    expense_type_id = request.GET.get('expense_type', '').strip()
+    staff_id = _clean_int_param(request, 'staff')
+    expense_type_id = _clean_int_param(request, 'expense_type')
     recipe_type_id = request.GET.get('recipe_type', '').strip()
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
 
     parsed_date_from = parse_date(date_from) if date_from else None
     parsed_date_to = parse_date(date_to) if date_to else None
@@ -1890,10 +2026,10 @@ def expense_statistics(request):
         date_to = parsed_date_to.isoformat()
 
     period_options = {
-        '7d': ('7 derniers jours', 6),
-        '30d': ('30 derniers jours', 29),
-        '90d': ('90 derniers jours', 89),
-        '365d': ('12 derniers mois', 364),
+        '7d': (_('7 derniers jours'), 6),
+        '30d': (_('30 derniers jours'), 29),
+        '90d': (_('90 derniers jours'), 89),
+        '365d': (_('12 derniers mois'), 364),
     }
 
     if date_from or date_to:
@@ -1902,7 +2038,7 @@ def expense_statistics(request):
         period = '30d'
 
     if period == 'custom':
-        period_name = 'Période personnalisée'
+        period_name = _('Période personnalisée')
         range_start = parsed_date_from
         range_end = parsed_date_to
     else:
@@ -2006,7 +2142,7 @@ def expense_statistics(request):
 
     top_expense_types = [
         {
-            'label': row['expense_type__name'] or 'Sans type',
+            'label': row['expense_type__name'] or _('Sans type'),
             'total_amount': row['total_amount'] or 0,
             'total_operations': int(row['total_operations'] or 0),
         }
@@ -2017,7 +2153,7 @@ def expense_statistics(request):
     ]
     top_recipe_types = [
         {
-            'label': row['recipe_type__name'] or 'Sans type',
+            'label': row['recipe_type__name'] or _('Sans type'),
             'total_amount': row['total_amount'] or 0,
             'total_operations': int(row['total_operations'] or 0),
         }
@@ -2081,8 +2217,8 @@ def expense_statistics(request):
     for expense in expenses_queryset[:6]:
         recent_operations.append({
             'kind': 'expense',
-            'kind_label': 'Dépense',
-            'type_label': expense.expense_type.name if expense.expense_type else 'Sans type',
+            'kind_label': _('Dépense'),
+            'type_label': expense.expense_type.name if expense.expense_type else _('Sans type'),
             'description': expense.description or '-',
             'staff_label': format_person_label(
                 getattr(expense.staff, 'firstname', None),
@@ -2095,8 +2231,8 @@ def expense_statistics(request):
     for recipe in recipes_queryset[:6]:
         recent_operations.append({
             'kind': 'recipe',
-            'kind_label': 'Recette',
-            'type_label': recipe.recipe_type.name if recipe.recipe_type else 'Sans type',
+            'kind_label': _('Recette'),
+            'type_label': recipe.recipe_type.name if recipe.recipe_type else _('Sans type'),
             'description': recipe.description or '-',
             'staff_label': format_person_label(
                 getattr(recipe.staff, 'firstname', None),
@@ -2110,7 +2246,7 @@ def expense_statistics(request):
     recent_operations = recent_operations[:10]
 
     context = {
-        'page_title': 'Statistiques dépenses & recettes',
+        'page_title': _('Statistiques dépenses & recettes'),
         'currency': settings_obj.currency_symbol,
         'generated_at': timezone.now(),
         'period_name': period_name,
@@ -2156,12 +2292,15 @@ def personnel_statistics(request):
 
     def format_period_label(start, end):
         if start and end:
-            return f"Du {start.strftime('%d/%m/%Y')} au {end.strftime('%d/%m/%Y')}"
+            return _("Du %(start)s au %(end)s") % {
+                'start': start.strftime('%d/%m/%Y'),
+                'end': end.strftime('%d/%m/%Y'),
+            }
         if start:
-            return f"Depuis le {start.strftime('%d/%m/%Y')}"
+            return _("Depuis le %(start)s") % {'start': start.strftime('%d/%m/%Y')}
         if end:
-            return f"Jusqu'au {end.strftime('%d/%m/%Y')}"
-        return "Toutes les données disponibles"
+            return _("Jusqu'au %(end)s") % {'end': end.strftime('%d/%m/%Y')}
+        return _("Toutes les données disponibles")
 
     def chart_bucket_for_range(field_name, start, end):
         if not start and not end:
@@ -2184,7 +2323,7 @@ def personnel_statistics(request):
             bucket_date = bucket_value
 
         if bucket_kind == 'month':
-            return bucket_date.strftime('%b %Y')
+            return date_format(bucket_date, 'M Y')
         if bucket_kind == 'week':
             week_end = bucket_date + timedelta(days=6)
             return f"{bucket_date.strftime('%d/%m')} → {week_end.strftime('%d/%m')}"
@@ -2192,7 +2331,7 @@ def personnel_statistics(request):
 
     def format_person_label(firstname, lastname, username):
         full_name = f"{firstname or ''} {lastname or ''}".strip()
-        return full_name or username or 'Utilisateur'
+        return full_name or username or _('Utilisateur')
 
     settings_obj = SystemSettings.get_settings()
     today = timezone.localdate()
@@ -2203,8 +2342,8 @@ def personnel_statistics(request):
     role = request.GET.get('role', '').strip()
     gender = request.GET.get('gender', '').strip()
     module_code = request.GET.get('module', '').strip()
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
 
     parsed_date_from = parse_date(date_from) if date_from else None
     parsed_date_to = parse_date(date_to) if date_to else None
@@ -2215,10 +2354,10 @@ def personnel_statistics(request):
         date_to = parsed_date_to.isoformat()
 
     period_options = {
-        '7d': ('7 derniers jours', 6),
-        '30d': ('30 derniers jours', 29),
-        '90d': ('90 derniers jours', 89),
-        '365d': ('12 derniers mois', 364),
+        '7d': (_('7 derniers jours'), 6),
+        '30d': (_('30 derniers jours'), 29),
+        '90d': (_('90 derniers jours'), 89),
+        '365d': (_('12 derniers mois'), 364),
     }
 
     if date_from or date_to:
@@ -2227,7 +2366,7 @@ def personnel_statistics(request):
         period = '30d'
 
     if period == 'custom':
-        period_name = 'Période personnalisée'
+        period_name = _('Période personnalisée')
         range_start = parsed_date_from
         range_end = parsed_date_to
     else:
@@ -2323,7 +2462,7 @@ def personnel_statistics(request):
     contributor_rate = round((active_contributors_count / total_staff) * 100, 1) if total_staff else 0
 
     status_distribution_chart = {
-        'labels': ['Actifs', 'Inactifs'],
+        'labels': [_('Actifs'), _('Inactifs')],
         'values': [active_staff_count, inactive_staff_count],
     }
 
@@ -2331,14 +2470,14 @@ def personnel_statistics(request):
         staff_queryset.values('role').annotate(total_users=Count('id')).order_by('-total_users', 'role')[:8]
     )
     role_distribution_chart = {
-        'labels': [row['role'] or 'Non renseigné' for row in role_rows],
+        'labels': [row['role'] or _('Non renseigné') for row in role_rows],
         'values': [int(row['total_users'] or 0) for row in role_rows],
     }
 
     sales_bucket, bucket_kind = chart_bucket_for_range('create_at', range_start, range_end)
-    supplies_bucket, _ = chart_bucket_for_range('create_at', range_start, range_end)
-    inventories_bucket, _ = chart_bucket_for_range('create_at', range_start, range_end)
-    daily_bucket, _ = chart_bucket_for_range('create_at', range_start, range_end)
+    supplies_bucket, _unused = chart_bucket_for_range('create_at', range_start, range_end)
+    inventories_bucket, _unused = chart_bucket_for_range('create_at', range_start, range_end)
+    daily_bucket, _unused = chart_bucket_for_range('create_at', range_start, range_end)
 
     sales_trend_rows = list(
         sales_queryset.annotate(bucket=sales_bucket).values('bucket').annotate(total_sales=Count('id')).order_by('bucket')
@@ -2414,15 +2553,15 @@ def personnel_statistics(request):
         top_staff.append({
             'label': sales_data.get('label') or member.get_full_name() or member.username,
             'username': member.username,
-            'role': member.role or 'Non renseigné',
-            'status_label': 'Actif' if member.is_active else 'Inactif',
+            'role': member.role or _('Non renseigné'),
+            'status_label': _('Actif') if member.is_active else _('Inactif'),
             'sales_count': sales_total,
             'supply_count': supply_count,
             'stock_actions': stock_count,
             'total_actions': total_actions,
             'total_revenue': sales_data.get('total_revenue', 0),
             'module_count': len(active_modules),
-            'modules_label': ', '.join(active_modules) or 'Aucun module',
+            'modules_label': ', '.join(active_modules) or _('Aucun module'),
         })
 
     top_staff = sorted(
@@ -2443,16 +2582,16 @@ def personnel_statistics(request):
         recent_staff.append({
             'label': member.get_full_name() or member.username,
             'username': member.username,
-            'role': member.role or 'Non renseigné',
-            'gender': member.gender or 'Non renseigné',
-            'status_label': 'Actif' if member.is_active else 'Inactif',
+            'role': member.role or _('Non renseigné'),
+            'gender': member.gender or _('Non renseigné'),
+            'status_label': _('Actif') if member.is_active else _('Inactif'),
             'status_class': 'success' if member.is_active else 'warning',
-            'modules_label': ', '.join(active_modules) or 'Aucun module',
+            'modules_label': ', '.join(active_modules) or _('Aucun module'),
             'date_joined': member.date_joined,
         })
 
     context = {
-        'page_title': 'Statistiques personnel',
+        'page_title': _('Statistiques personnel'),
         'currency': settings_obj.currency_symbol,
         'generated_at': timezone.now(),
         'period_name': period_name,
@@ -2566,7 +2705,7 @@ def sales(request):
     clients_list = Client.objects.filter(delete_at__isnull=True).order_by('firstname')
 
     context = {
-        'page_title': 'Ventes',
+        'page_title': _('Ventes'),
         'sales': sales_list,
         'sale_products': sale_products_list,
         'clients': clients_list,
@@ -2585,12 +2724,12 @@ def sales_history(request):
     from django.db.models import Sum, F
 
     search = request.GET.get('search', '').strip()
-    client_id = request.GET.get('client', '')
-    staff_id = request.GET.get('staff', '')
+    client_id = _clean_int_param(request, 'client')
+    staff_id = _clean_int_param(request, 'staff')
     sale_type = request.GET.get('type', '')
     payment_status = request.GET.get('status', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
     page_number = request.GET.get('page', 1)
     view_mode = request.GET.get('view_mode', 'sales')  # 'sales' or 'products'
 
@@ -2655,7 +2794,7 @@ def sales_history(request):
         staff_list = CustomUser.objects.filter(delete_at__isnull=True, is_active=True).order_by('firstname')
 
         context = {
-            'page_title': 'Historique des ventes - Produits',
+            'page_title': _('Historique des ventes - Produits'),
             'page_obj': page_obj,
             'sale_products': page_obj.object_list,
             'view_mode': 'products',
@@ -2732,7 +2871,7 @@ def sales_history(request):
     staff_list = CustomUser.objects.filter(delete_at__isnull=True, is_active=True).order_by('firstname')
 
     context = {
-        'page_title': 'Historique des ventes',
+        'page_title': _('Historique des ventes'),
         'page_obj': page_obj,
         'sales': page_obj.object_list,
         'view_mode': 'sales',
@@ -2763,7 +2902,7 @@ def cancel_sale(request, sale_id):
         id=sale_id,
     )
     form = SaleCancellationForm(request.POST, sale=sale)
-    redirect_to = request.POST.get('next') or 'sales_history'
+    redirect_to = _safe_next(request, 'sales_history')
 
     if form.is_valid():
         try:
@@ -2778,18 +2917,20 @@ def cancel_sale(request, sale_id):
             if refund_amount > 0:
                 messages.success(
                     request,
-                    f'Vente #{sale.id} annulée. Remboursement tracé : {refund_amount:,.0f} FCFA.'
+                    _('Vente #%(id)s annulée. Remboursement tracé : %(amount)s FCFA.') % {
+                        'id': sale.id, 'amount': f'{refund_amount:,.0f}',
+                    }
                 )
             else:
                 messages.success(
                     request,
-                    f'Vente #{sale.id} annulée. Aucune sortie de trésorerie n\'était nécessaire.'
+                    _("Vente #%(id)s annulée. Aucune sortie de trésorerie n'était nécessaire.") % {'id': sale.id}
                 )
     else:
         error_text = ' '.join(
             ' '.join(errors) for errors in form.errors.values()
         )
-        messages.error(request, error_text or "Impossible d'annuler la vente.")
+        messages.error(request, error_text or _("Impossible d'annuler la vente."))
 
     return redirect(redirect_to)
 
@@ -2804,7 +2945,7 @@ def partial_return_sale(request, sale_id):
         id=sale_id,
     )
     form = SalePartialReturnForm(request.POST, sale=sale)
-    redirect_to = request.POST.get('next') or 'sales_history'
+    redirect_to = _safe_next(request, 'sales_history')
 
     if form.is_valid():
         try:
@@ -2820,20 +2961,22 @@ def partial_return_sale(request, sale_id):
             if refund_amount > 0:
                 messages.success(
                     request,
-                    f'Retour partiel enregistré sur la vente #{sale.id} '
-                    f'({sale_return.total:,.0f} FCFA). Remboursement tracé : {refund_amount:,.0f} FCFA.'
+                    _('Retour partiel enregistré sur la vente #%(id)s (%(total)s FCFA). Remboursement tracé : %(amount)s FCFA.') % {
+                        'id': sale.id, 'total': f'{sale_return.total:,.0f}', 'amount': f'{refund_amount:,.0f}',
+                    }
                 )
             else:
                 messages.success(
                     request,
-                    f'Retour partiel enregistré sur la vente #{sale.id} '
-                    f'({sale_return.total:,.0f} FCFA). Aucune sortie de trésorerie supplémentaire n\'était nécessaire.'
+                    _("Retour partiel enregistré sur la vente #%(id)s (%(total)s FCFA). Aucune sortie de trésorerie supplémentaire n'était nécessaire.") % {
+                        'id': sale.id, 'total': f'{sale_return.total:,.0f}',
+                    }
                 )
     else:
         error_text = ' '.join(
             ' '.join(errors) for errors in form.errors.values()
         )
-        messages.error(request, error_text or "Impossible d'enregistrer le retour partiel.")
+        messages.error(request, error_text or _("Impossible d'enregistrer le retour partiel."))
 
     return redirect(redirect_to)
 
@@ -2848,7 +2991,7 @@ def cancel_supply(request, supply_id):
         id=supply_id,
     )
     form = SupplyCancellationForm(request.POST, supply=supply)
-    redirect_to = request.POST.get('next') or 'supplies'
+    redirect_to = _safe_next(request, 'supplies')
 
     if form.is_valid():
         try:
@@ -2863,18 +3006,20 @@ def cancel_supply(request, supply_id):
             if refund_amount > 0:
                 messages.success(
                     request,
-                    f'Approvisionnement #{supply.id} annulé. Remboursement fournisseur tracé : {refund_amount:,.0f} FCFA.'
+                    _('Approvisionnement #%(id)s annulé. Remboursement fournisseur tracé : %(amount)s FCFA.') % {
+                        'id': supply.id, 'amount': f'{refund_amount:,.0f}',
+                    }
                 )
             else:
                 messages.success(
                     request,
-                    f'Approvisionnement #{supply.id} annulé. Aucun remboursement fournisseur supplémentaire n\'était attendu.'
+                    _("Approvisionnement #%(id)s annulé. Aucun remboursement fournisseur supplémentaire n'était attendu.") % {'id': supply.id}
                 )
     else:
         error_text = ' '.join(
             ' '.join(errors) for errors in form.errors.values()
         )
-        messages.error(request, error_text or "Impossible d'annuler l'approvisionnement.")
+        messages.error(request, error_text or _("Impossible d'annuler l'approvisionnement."))
 
     return redirect(redirect_to)
 
@@ -2889,7 +3034,7 @@ def partial_return_supply(request, supply_id):
         id=supply_id,
     )
     form = SupplyPartialReturnForm(request.POST, supply=supply)
-    redirect_to = request.POST.get('next') or 'supplies'
+    redirect_to = _safe_next(request, 'supplies')
 
     if form.is_valid():
         try:
@@ -2905,20 +3050,22 @@ def partial_return_supply(request, supply_id):
             if refund_amount > 0:
                 messages.success(
                     request,
-                    f"Retour partiel enregistré sur l'approvisionnement #{supply.id} "
-                    f'({supply_return.total:,.0f} FCFA). Remboursement fournisseur tracé : {refund_amount:,.0f} FCFA.'
+                    _("Retour partiel enregistré sur l'approvisionnement #%(id)s (%(total)s FCFA). Remboursement fournisseur tracé : %(amount)s FCFA.") % {
+                        'id': supply.id, 'total': f'{supply_return.total:,.0f}', 'amount': f'{refund_amount:,.0f}',
+                    }
                 )
             else:
                 messages.success(
                     request,
-                    f"Retour partiel enregistré sur l'approvisionnement #{supply.id} "
-                    f'({supply_return.total:,.0f} FCFA). Aucune entrée de trésorerie supplémentaire n\'était attendue.'
+                    _("Retour partiel enregistré sur l'approvisionnement #%(id)s (%(total)s FCFA). Aucune entrée de trésorerie supplémentaire n'était attendue.") % {
+                        'id': supply.id, 'total': f'{supply_return.total:,.0f}',
+                    }
                 )
     else:
         error_text = ' '.join(
             ' '.join(errors) for errors in form.errors.values()
         )
-        messages.error(request, error_text or "Impossible d'enregistrer le retour partiel.")
+        messages.error(request, error_text or _("Impossible d'enregistrer le retour partiel."))
 
     return redirect(redirect_to)
 
@@ -2929,7 +3076,7 @@ def products(request):
     """Vue de la page des produits avec pagination et filtres"""
     # Récupérer les paramètres de filtre
     search = request.GET.get('search', '').strip()
-    category_id = request.GET.get('category', '')
+    category_id = _clean_int_param(request, 'category')
     gamme_id = request.GET.get('gamme', '')
     rayon_id = request.GET.get('rayon', '')
     stock_status = request.GET.get('stock_status', '')
@@ -2968,7 +3115,7 @@ def products(request):
     rayons = Rayon.objects.filter(delete_at__isnull=True).order_by('name')
 
     context = {
-        'page_title': 'Produits',
+        'page_title': _('Produits'),
         'page_obj': page_obj,
         'products': page_obj.object_list,
         'categories': categories,
@@ -3018,14 +3165,14 @@ INVENTORY_PER_PAGE_CHOICES = [10, 25, 50, 100]
 def inventory(request):
     """Vue de la page de l'inventaire avec pagination et filtres"""
     search = request.GET.get('search', '').strip()
-    staff_id = request.GET.get('staff', '')
-    exercise_id = request.GET.get('exercise', '')
+    staff_id = _clean_int_param(request, 'staff')
+    exercise_id = _clean_int_param(request, 'exercise')
     if not exercise_id and 'exercise' not in request.GET:
         # Par défaut, sélectionner l'exercice en cours
         current_ex = ExerciseService.get_or_create_current_exercise()
         exercise_id = str(current_ex.id)
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
     page_number = request.GET.get('page', 1)
 
     # Nombre d'éléments par page (10, 25, 50, 100)
@@ -3065,7 +3212,7 @@ def inventory(request):
     exercises = Exercise.objects.filter(delete_at__isnull=True).order_by('-start_date')
 
     context = {
-        'page_title': 'Inventaire',
+        'page_title': _('Inventaire'),
         'page_obj': page_obj,
         'inventories': page_obj.object_list,
         'staff_members': staff_list,
@@ -3100,15 +3247,18 @@ def add_inventory(request):
 
             messages.success(
                 request,
-                f'Inventaire pour "{inventory_record.product.name}" enregistré avec succès '
-                f'({inventory_record.valid_product_count} valides, {inventory_record.invalid_product_count} invalides).'
+                _('Inventaire pour "%(product)s" enregistré avec succès (%(valid)s valides, %(invalid)s invalides).') % {
+                    'product': inventory_record.product.name,
+                    'valid': inventory_record.valid_product_count,
+                    'invalid': inventory_record.invalid_product_count,
+                }
             )
             return redirect('inventory')
     else:
         form = InventoryForm()
 
     context = {
-        'page_title': 'Nouvel enregistrement d\'inventaire',
+        'page_title': _('Nouvel enregistrement d\'inventaire'),
         'form': form,
     }
     return render(request, 'core/inventory_add.html', context)
@@ -3151,7 +3301,7 @@ def close_inventory_summary(request):
         products_list.append(p)
 
     context = {
-        'page_title': 'Clôturer l\'inventaire',
+        'page_title': _('Clôturer l\'inventaire'),
         'exercise': current_exercise,
         'total_valid': total_valid,
         'total_invalid': total_invalid,
@@ -3178,7 +3328,7 @@ def close_inventory_confirm(request):
     )
 
     if not inventories_qs.exists():
-        messages.error(request, 'Aucun inventaire à clôturer pour l\'exercice courant.')
+        messages.error(request, _('Aucun inventaire à clôturer pour l\'exercice courant.'))
         return redirect('inventory')
 
     with transaction.atomic():
@@ -3216,13 +3366,13 @@ def close_inventory_confirm(request):
         # Marquer tous les inventaires comme clôturés
         inventories_qs.update(is_close=True)
 
-        # Fermer l'exercice courant
-        current_exercise.end_date = timezone.now()
-        current_exercise.save(update_fields=['end_date'])
+        # NB : la clôture d'inventaire ne ferme PAS l'exercice comptable.
+        # La clôture d'exercice (résultat, à-nouveaux) se fait depuis
+        # Comptabilité > Clôture d'exercice.
 
     messages.success(
         request,
-        f'Inventaire clôturé avec succès. Stock mis à jour pour {updated_count} produit(s). L\'exercice a été fermé.'
+        _('Inventaire clôturé avec succès. Stock mis à jour pour %(count)s produit(s).') % {'count': updated_count}
     )
     return redirect('inventory')
 
@@ -3235,7 +3385,7 @@ SNAPSHOT_PER_PAGE_CHOICES = [10, 25, 50, 100]
 def inventory_history(request):
     """Vue de l'historique des inventaires clôturés (InventorySnapshot)"""
     search = request.GET.get('search', '').strip()
-    exercise_id = request.GET.get('exercise', '')
+    exercise_id = _clean_int_param(request, 'exercise')
     if not exercise_id and 'exercise' not in request.GET:
         # Par défaut, sélectionner le dernier exercice (le plus récent)
         last_exercise = Exercise.objects.filter(
@@ -3279,7 +3429,7 @@ def inventory_history(request):
     exercises = Exercise.objects.filter(delete_at__isnull=True).order_by('-start_date')
 
     context = {
-        'page_title': 'Historique des inventaires',
+        'page_title': _('Historique des inventaires'),
         'page_obj': page_obj,
         'snapshots': page_obj.object_list,
         'exercises': exercises,
@@ -3324,7 +3474,7 @@ def contacts(request):
     page_obj = paginator.get_page(page_number)
 
     context = {
-        'page_title': 'Utilisateurs',
+        'page_title': _('Utilisateurs'),
         'current_tab': tab,
         'current_search': search,
         'page_obj': page_obj,
@@ -3352,7 +3502,7 @@ def suppliers_list(request):
     page_obj = paginator.get_page(page_number)
 
     context = {
-        'page_title': 'Fournisseurs',
+        'page_title': _('Fournisseurs'),
         'current_search': search,
         'page_obj': page_obj,
         'suppliers': page_obj.object_list,
@@ -3369,16 +3519,16 @@ def add_client(request):
         form = ClientForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Client "{form.cleaned_data["firstname"]}" créé avec succès.')
+            messages.success(request, _('Client "%(name)s" créé avec succès.') % {'name': form.cleaned_data['firstname']})
             return redirect('contacts')
     else:
         form = ClientForm()
 
     context = {
-        'page_title': 'Nouveau client',
+        'page_title': _('Nouveau client'),
         'form': form,
-        'form_title': 'Nouveau client',
-        'form_subtitle': 'Créer un nouveau client',
+        'form_title': _('Nouveau client'),
+        'form_subtitle': _('Créer un nouveau client'),
         'back_url': 'contacts',
         'back_tab': 'clients',
     }
@@ -3395,16 +3545,16 @@ def edit_client(request, pk):
         form = ClientForm(request.POST, instance=client)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Client "{client.get_full_name()}" modifié avec succès.')
+            messages.success(request, _('Client "%(name)s" modifié avec succès.') % {'name': client.get_full_name()})
             return redirect('contacts')
     else:
         form = ClientForm(instance=client)
 
     context = {
-        'page_title': f'Modifier {client.get_full_name()}',
+        'page_title': _('Modifier %(name)s') % {'name': client.get_full_name()},
         'form': form,
-        'form_title': 'Modifier le client',
-        'form_subtitle': f'Modifier les informations de {client.get_full_name()}',
+        'form_title': _('Modifier le client'),
+        'form_subtitle': _('Modifier les informations de %(name)s') % {'name': client.get_full_name()},
         'back_url': 'contacts',
         'back_tab': 'clients',
     }
@@ -3419,16 +3569,16 @@ def add_supplier(request):
         form = SupplierForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Fournisseur "{form.cleaned_data["name"]}" créé avec succès.')
+            messages.success(request, _('Fournisseur "%(name)s" créé avec succès.') % {'name': form.cleaned_data['name']})
             return redirect('suppliers')
     else:
         form = SupplierForm()
 
     context = {
-        'page_title': 'Nouveau fournisseur',
+        'page_title': _('Nouveau fournisseur'),
         'form': form,
-        'form_title': 'Nouveau fournisseur',
-        'form_subtitle': 'Créer un nouveau fournisseur',
+        'form_title': _('Nouveau fournisseur'),
+        'form_subtitle': _('Créer un nouveau fournisseur'),
         'back_url': 'suppliers',
     }
     return render(request, 'core/supplier_form.html', context)
@@ -3444,16 +3594,16 @@ def edit_supplier(request, pk):
         form = SupplierForm(request.POST, instance=supplier)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Fournisseur "{supplier.name}" modifié avec succès.')
+            messages.success(request, _('Fournisseur "%(name)s" modifié avec succès.') % {'name': supplier.name})
             return redirect('suppliers')
     else:
         form = SupplierForm(instance=supplier)
 
     context = {
-        'page_title': f'Modifier {supplier.name}',
+        'page_title': _('Modifier %(name)s') % {'name': supplier.name},
         'form': form,
-        'form_title': 'Modifier le fournisseur',
-        'form_subtitle': f'Modifier les informations de {supplier.name}',
+        'form_title': _('Modifier le fournisseur'),
+        'form_subtitle': _('Modifier les informations de %(name)s') % {'name': supplier.name},
         'back_url': 'suppliers',
     }
     return render(request, 'core/supplier_form.html', context)
@@ -3464,9 +3614,9 @@ def edit_supplier(request, pk):
 def supplies(request):
     """Vue de la page des approvisionnements avec pagination et filtres"""
     search = request.GET.get('search', '').strip()
-    supplier_id = request.GET.get('supplier', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    supplier_id = _clean_int_param(request, 'supplier')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
     page_number = request.GET.get('page', 1)
 
     queryset = Supply.objects.filter(
@@ -3492,7 +3642,7 @@ def supplies(request):
     suppliers_for_filter = Supplier.objects.filter(delete_at__isnull=True).order_by('name')
 
     context = {
-        'page_title': 'Approvisionnement',
+        'page_title': _('Approvisionnement'),
         'page_obj': page_obj,
         'supplies': page_obj.object_list,
         'suppliers': suppliers_for_filter,
@@ -3509,6 +3659,7 @@ def supplies(request):
 
 @login_required
 @module_required('supplies')
+@transaction.atomic
 def add_supply(request):
     """Vue pour ajouter un nouvel approvisionnement"""
     if request.method == 'POST':
@@ -3538,8 +3689,9 @@ def add_supply(request):
             if selected_expense_type:
                 from core.models.settings_models import SystemSettings
                 settings = SystemSettings.get_settings()
-                settings.default_supply_expense_type = selected_expense_type
-                settings.save()
+                if settings.default_supply_expense_type_id != selected_expense_type.pk:
+                    settings.default_supply_expense_type = selected_expense_type
+                    settings.save(update_fields=['default_supply_expense_type'])
             
             supply.save()
 
@@ -3555,7 +3707,7 @@ def add_supply(request):
                     tax_rate=supply.tax_rate,  # Passer le taux de TVA depuis l'approvisionnement
                 )
             except Exception:
-                pass  # Ne pas bloquer l'approvisionnement si la comptabilité échoue
+                logger.exception("Écriture comptable impossible pour l'approvisionnement #%s", supply.pk)
 
             # Créer CreditSupply + PaymentSchedule si achat à crédit
             if is_credit_purchase:
@@ -3577,22 +3729,28 @@ def add_supply(request):
                         status='PENDING',
                     )
 
-            # Mettre à jour le stock du produit
-            product = supply.product
+            # Mettre à jour le stock du produit (sous verrou : une vente
+            # concurrente ne doit pas écraser la mise à jour)
+            product = Product.objects.select_for_update().get(pk=supply.product_id)
             product.stock = (product.stock or 0) + supply.quantity
             # Mettre à jour le dernier prix d'achat
             product.last_purchase_price = supply.purchase_cost
-            # Mettre à jour le prix de vente si renseigné
+            update_fields = ['stock', 'last_purchase_price']
+            # Le prix de vente public n'est modifiable que par un utilisateur
+            # ayant le module « produits »
             selling_price = form.cleaned_data.get('selling_price')
-            if selling_price:
+            if selling_price and request.user.has_module_access('products'):
                 product.actual_price = selling_price
-            product.save()
+                update_fields.append('actual_price')
+            product.save(update_fields=update_fields)
 
             # Retourner JSON si c'est une requête AJAX
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': True,
-                    'message': f'Approvisionnement de {supply.quantity} x "{product.name}" enregistré avec succès.',
+                    'message': _('Approvisionnement de %(quantity)s x "%(product)s" enregistré avec succès.') % {
+                        'quantity': supply.quantity, 'product': product.name,
+                    },
                     'product_name': product.name,
                     'quantity': supply.quantity,
                     'unit_price': float(supply.purchase_cost),
@@ -3603,7 +3761,9 @@ def add_supply(request):
                     'payment_method': payment_method,
                 })
 
-            messages.success(request, f'Approvisionnement de {supply.quantity} x "{product.name}" enregistré avec succès.')
+            messages.success(request, _('Approvisionnement de %(quantity)s x "%(product)s" enregistré avec succès.') % {
+                'quantity': supply.quantity, 'product': product.name,
+            })
             return redirect('supplies')
         else:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -3622,14 +3782,14 @@ def add_supply(request):
 
             form = SupplyForm(request.POST)  # Re-render form with errors
             return render(request, 'core/supplies_add.html', {
-                'page_title': 'Nouvel approvisionnement',
+                'page_title': _('Nouvel approvisionnement'),
                 'form': form,
             })
     else:
         form = SupplyForm()
 
     context = {
-        'page_title': 'Nouvel approvisionnement',
+        'page_title': _('Nouvel approvisionnement'),
         'form': form,
     }
     return render(request, 'core/supplies_add.html', context)
@@ -3641,13 +3801,13 @@ def expenses(request):
     """Vue de la page des dépenses et recettes quotidiennes avec pagination et filtres"""
     # Paramètres communs
     search = request.GET.get('search', '').strip()
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
     page_number = request.GET.get('page', 1)
     active_tab = request.GET.get('tab', 'expenses')
     
     # === DéPENSES ===
-    expense_type_id = request.GET.get('expense_type', '')
+    expense_type_id = _clean_int_param(request, 'expense_type')
     
     expenses_queryset = DailyExpense.objects.filter(
         delete_at__isnull=True,
@@ -3703,7 +3863,7 @@ def expenses(request):
     recipe_types = RecipeType.objects.filter(delete_at__isnull=True).order_by('name')
 
     context = {
-        'page_title': 'Dépenses/Recettes',
+        'page_title': _('Dépenses/Recettes'),
         'active_tab': active_tab,
         # Dépenses
         'expenses': expenses_page.object_list,
@@ -3753,7 +3913,7 @@ def add_expense(request):
             except Exception:
                 pass  # Ne pas bloquer la dépense si la comptabilité échoue
 
-            messages.success(request, f'Dépense de {expense.amount:,.0f} FCFA enregistrée avec succès.')
+            messages.success(request, _('Dépense de %(amount)s FCFA enregistrée avec succès.') % {'amount': f'{expense.amount:,.0f}'})
             return redirect('expenses')
     else:
         # Pré-remplir les champs si des paramètres GET sont présents
@@ -3780,7 +3940,7 @@ def add_expense(request):
         form = ExpenseForm(initial=initial_data)
 
     context = {
-        'page_title': 'Nouvelle dépense',
+        'page_title': _('Nouvelle dépense'),
         'form': form,
     }
     return render(request, 'core/expenses_add.html', context)
@@ -3811,23 +3971,24 @@ def add_expense_ajax(request):
                     payment_method=payment_method,
                 )
             except Exception:
-                pass  # Ne pas bloquer la dépense si la comptabilité échoue
+                logger.exception("Écriture comptable impossible pour la dépense #%s", expense.pk)
 
             return JsonResponse({
                 'success': True,
-                'message': f'Dépense de {expense.amount:,.0f}FCFA enregistrée avec succès.',
+                'message': _('Dépense de %(amount)sFCFA enregistrée avec succès.') % {'amount': f'{expense.amount:,.0f}'},
                 'expense_id': expense.id,
             })
         else:
             return JsonResponse({
                 'success': False,
-                'error': 'Formulaire invalide',
+                'error': _('Formulaire invalide'),
                 'errors': form.errors,
             }, status=400)
-    except Exception as e:
+    except Exception:
+        logger.exception("Erreur lors de l'ajout d'une dépense (AJAX)")
         return JsonResponse({
             'success': False,
-            'error': str(e),
+            'error': _("Une erreur interne est survenue. Réessayez ou contactez l'administrateur."),
         }, status=500)
 
 
@@ -3861,13 +4022,13 @@ def add_recipe(request):
             except Exception:
                 pass  # Ne pas bloquer la recette si la comptabilité échoue
 
-            messages.success(request, f'Recette de {recipe.amount:,.0f} FCFA enregistrée avec succès.')
+            messages.success(request, _('Recette de %(amount)s FCFA enregistrée avec succès.') % {'amount': f'{recipe.amount:,.0f}'})
             return redirect('expenses')
     else:
         form = RecipeForm()
 
     context = {
-        'page_title': 'Nouvelle recette',
+        'page_title': _('Nouvelle recette'),
         'form': form,
     }
     return render(request, 'core/recipes_add.html', context)
@@ -3878,7 +4039,7 @@ def add_recipe(request):
 def reports(request):
     """Vue de la page des rapports"""
     context = {
-        'page_title': 'Rapports'
+        'page_title': _('Rapports')
     }
     return render(request, 'core/reports.html', context)
 
@@ -3892,7 +4053,7 @@ def get_daily_summary(request):
     current_daily = DailyService.get_or_create_active_daily()
 
     if not current_daily:
-        return JsonResponse({'success': False, 'message': 'Aucune journée active trouvée.'}, status=404)
+        return JsonResponse({'success': False, 'message': _('Aucune journée active trouvée.')}, status=404)
 
     # Calculer les totaux
     total_sales = Sale.objects.filter(
@@ -3930,78 +4091,99 @@ def get_daily_summary(request):
     })
 
 
+def _parse_money(value, field_label):
+    """Convertit une valeur JSON en Decimal >= 0 (max 10 chiffres), ou lève ValueError."""
+    from decimal import Decimal, InvalidOperation
+    if value is None or value == '':
+        return Decimal('0')
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        raise ValueError(_("%(field)s : montant invalide.") % {'field': field_label})
+    if not amount.is_finite():
+        raise ValueError(_("%(field)s : montant invalide.") % {'field': field_label})
+    if amount < 0:
+        raise ValueError(_("%(field)s : le montant ne peut pas être négatif.") % {'field': field_label})
+    if amount >= Decimal('100000000'):
+        raise ValueError(_("%(field)s : montant trop élevé.") % {'field': field_label})
+    return amount.quantize(Decimal('0.01'))
+
+
 @login_required
-@module_required('dashboard')
+@module_required('sales')
 @require_POST
 def close_daily(request):
     """Vue pour clôturer la journée et créer un DailyInventory"""
     import json
     from core.models.inventory_models import DailyInventory
-
-    current_daily = DailyService.get_or_create_active_daily()
-
-    if not current_daily:
-        return JsonResponse({'success': False, 'message': 'Aucune journée active trouvée.'}, status=404)
-
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'message': 'Données invalides.'}, status=400)
-
-    cash_in_hand = data.get('cash_in_hand', 0)
-    cash_float = data.get('cash_float', 0)
-    notes = data.get('notes', '')
-
-    try:
-        cash_in_hand = float(cash_in_hand)
-        cash_float = float(cash_float)
-    except (ValueError, TypeError):
-        return JsonResponse({'success': False, 'message': 'Les montants doivent être des nombres valides.'}, status=400)
-
-    # Calculer les totaux
-    total_sales = Sale.objects.filter(
-        daily=current_daily, delete_at__isnull=True
-    ).aggregate(total=Sum('total'))['total'] or 0
-
-    total_expenses = DailyExpense.objects.filter(
-        daily=current_daily, delete_at__isnull=True
-    ).aggregate(total=Sum('amount'))['total'] or 0
-
     from core.models.accounting_models import DailyRecipe
-    total_recipes = DailyRecipe.objects.filter(
-        daily=current_daily, delete_at__isnull=True
-    ).aggregate(total=Sum('amount'))['total'] or 0
-
-    # Créer le DailyInventory
-    daily_inventory = DailyInventory.objects.create(
-        daily=current_daily,
-        staff=request.user,
-        exercise=current_daily.exercise,
-        total_sales=total_sales,
-        total_expenses=total_expenses,
-        total_recipes=total_recipes,
-        cash_in_hand=cash_in_hand,
-        cash_float=cash_float,
-        notes=notes,
-    )
-
-    # Fermer la journée
-    DailyService.close_current_daily()
-    
-    # Traiter la TVA différée si le mode est DEFERRED
     from core.models.settings_models import SystemSettings
+
+    try:
+        data = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': _('Données invalides.')}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'success': False, 'message': _('Données invalides.')}, status=400)
+
+    try:
+        cash_in_hand = _parse_money(data.get('cash_in_hand', 0), _('Espèces en caisse'))
+        cash_float = _parse_money(data.get('cash_float', 0), _('Fond de caisse'))
+    except ValueError as exc:
+        return JsonResponse({'success': False, 'message': str(exc)}, status=400)
+    notes = str(data.get('notes') or '')[:2000]
+
     settings = SystemSettings.get_settings()
     tva_mode = getattr(settings, 'tva_accounting_mode', 'IMMEDIATE')
     enable_tva = getattr(settings, 'enable_tva_accounting', True)
-    
-    tva_entries_created = 0
-    if enable_tva and tva_mode == 'DEFERRED':
-        from core.services.accounting_service import AccountingService
-        tva_entries_created = AccountingService.record_deferred_tva_for_daily(current_daily)
+
+    with transaction.atomic():
+        # Ne JAMAIS créer une journée ici : on ferme celle qui est ouverte.
+        current_daily = Daily.objects.select_for_update().filter(
+            end_date__isnull=True, delete_at__isnull=True,
+        ).order_by('-start_date').first()
+        if not current_daily:
+            return JsonResponse(
+                {'success': False, 'message': _('Aucune journée ouverte à clôturer.')},
+                status=409,
+            )
+
+        # Calculer les totaux
+        total_sales = Sale.objects.filter(
+            daily=current_daily, delete_at__isnull=True
+        ).aggregate(total=Sum('total'))['total'] or 0
+        total_expenses = DailyExpense.objects.filter(
+            daily=current_daily, delete_at__isnull=True
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        total_recipes = DailyRecipe.objects.filter(
+            daily=current_daily, delete_at__isnull=True
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        # TVA différée AVANT la fermeture, dans la même transaction : une vente
+        # en erreur reste rattachée à une journée encore reprise par la commande
+        # de rattrapage plutôt que perdue.
+        tva_entries_created = 0
+        if enable_tva and tva_mode == 'DEFERRED':
+            tva_entries_created = AccountingService.record_deferred_tva_for_daily(current_daily)
+
+        daily_inventory = DailyInventory.objects.create(
+            daily=current_daily,
+            staff=request.user,
+            exercise=current_daily.exercise,
+            total_sales=total_sales,
+            total_expenses=total_expenses,
+            total_recipes=total_recipes,
+            cash_in_hand=cash_in_hand,
+            cash_float=cash_float,
+            notes=notes,
+        )
+
+        current_daily.end_date = timezone.now()
+        current_daily.save(update_fields=['end_date'])
 
     return JsonResponse({
         'success': True,
-        'message': 'La journée a été clôturée avec succès.',
+        'message': _('La journée a été clôturée avec succès.'),
         'daily_inventory_id': daily_inventory.id,
         'tva_entries_created': tva_entries_created,
     })
@@ -4012,7 +4194,7 @@ def close_daily(request):
 def settings(request):
     """Vue de la page des paramètres"""
     context = {
-        'page_title': 'Paramètres'
+        'page_title': _('Paramètres')
     }
     return render(request, 'core/settings.html', context)
 
@@ -4044,15 +4226,15 @@ def data_migration(request):
                 )
                 messages.success(
                     request,
-                    f"Migration terminée avec succès ! {total} éléments créés."
+                    _("Migration terminée avec succès ! %(total)s éléments créés.") % {'total': total}
                 )
             except Exception as e:
-                messages.error(request, f"Erreur lors de la migration : {str(e)}")
+                messages.error(request, _("Erreur lors de la migration : %(error)s") % {'error': str(e)})
     else:
         form = DataMigrationForm()
 
     context = {
-        'page_title': 'Migration de données',
+        'page_title': _('Migration de données'),
         'form': form,
         'migration_stats': migration_stats,
     }
@@ -4072,8 +4254,8 @@ def accounting_journal(request):
 
     # Filtres
     journal_filter = request.GET.get('journal', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
     search = request.GET.get('search', '')
 
     entries = JournalEntry.objects.filter(
@@ -4103,7 +4285,7 @@ def accounting_journal(request):
     )
 
     context = {
-        'page_title': 'Journal comptable',
+        'page_title': _('Journal comptable'),
         'page_obj': page_obj,
         'entries': page_obj.object_list,
         'journal_choices': JournalEntry.JOURNAL_CHOICES,
@@ -4129,8 +4311,8 @@ def accounting_general_ledger(request):
     ).order_by('code')
 
     account_code = request.GET.get('account', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    date_from = _clean_date_param(request, 'date_from')
+    date_to = _clean_date_param(request, 'date_to')
 
     selected_account = None
     ledger_lines = []
@@ -4168,7 +4350,7 @@ def accounting_general_ledger(request):
             balance = ledger_lines[-1]['running_balance'] if ledger_lines else 0
 
     context = {
-        'page_title': 'Grand Livre',
+        'page_title': _('Grand Livre'),
         'accounts': accounts,
         'selected_account': selected_account,
         'ledger_lines': ledger_lines,
@@ -4193,7 +4375,7 @@ def accounting_trial_balance(request):
     total_credit = sum(item['total_credit'] for item in trial_balance)
 
     context = {
-        'page_title': 'Balance générale',
+        'page_title': _('Balance générale'),
         'trial_balance': trial_balance,
         'exercise': exercise,
         'total_debit': total_debit,
@@ -4218,21 +4400,21 @@ def accounting_chart_of_accounts(request):
     for account in accounts:
         class_num = account.code[0] if account.code else '?'
         class_names = {
-            '1': 'Capitaux',
-            '2': 'Immobilisations',
-            '3': 'Stocks',
-            '4': 'Tiers',
-            '5': 'Trésorerie',
-            '6': 'Charges',
-            '7': 'Produits',
+            '1': pgettext('classe comptable', 'Capitaux'),
+            '2': pgettext('classe comptable', 'Immobilisations'),
+            '3': pgettext('classe comptable', 'Stocks'),
+            '4': pgettext('classe comptable', 'Tiers'),
+            '5': pgettext('classe comptable', 'Trésorerie'),
+            '6': pgettext('classe comptable', 'Charges'),
+            '7': pgettext('classe comptable', 'Produits'),
         }
-        class_label = class_names.get(class_num, 'Autres')
+        class_label = class_names.get(class_num, _('Autres'))
         if class_num not in classes:
             classes[class_num] = {'label': class_label, 'accounts': []}
         classes[class_num]['accounts'].append(account)
 
     context = {
-        'page_title': 'Plan comptable',
+        'page_title': _('Plan comptable'),
         'classes': dict(sorted(classes.items())),
         'total_accounts': accounts.count(),
     }
@@ -4247,6 +4429,8 @@ def export_chart_of_accounts(request):
     from django.http import HttpResponse
     
     format_type = request.GET.get('format', 'csv')
+    if format_type not in ('csv', 'txt'):
+        return HttpResponse(_('Format inconnu'), status=400)
     
     # Définir le delimiter selon le format
     delimiter = ';' if format_type == 'csv' else '\t'
@@ -4255,16 +4439,17 @@ def export_chart_of_accounts(request):
         is_active=True, delete_at__isnull=True
     ).order_by('code')
     
-    response = HttpResponse(content_type=f'text/{format_type}; charset=utf-8')
+    content_type = 'text/csv' if format_type == 'csv' else 'text/plain'
+    response = HttpResponse(content_type=f'{content_type}; charset=utf-8')
     response.write('\ufeff')  # BOM UTF-8 pour Excel
-    writer = csv.writer(response, delimiter=delimiter)
+    writer = _SafeCsvWriter(csv.writer(response, delimiter=delimiter))
     
     # En-tête
     filename = f"plan_comptable.{format_type}"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     # En-têtes CSV
-    writer.writerow(['Code', 'Libellé', 'Type', 'Compte Parent', 'Description', 'Actif'])
+    writer.writerow([_('Code'), _('Libellé'), _('Type'), _('Compte Parent'), _('Description'), _('Actif')])
     
     # Données
     for account in accounts:
@@ -4281,107 +4466,136 @@ def export_chart_of_accounts(request):
     return response
 
 
+CHART_IMPORT_MAX_BYTES = 1 * 1024 * 1024   # 1 Mo
+CHART_IMPORT_MAX_ROWS = 2000
+# Comptes utilisés en dur par le moteur comptable : leur type et leur
+# activation ne sont pas modifiables par import.
+SYSTEM_ACCOUNT_CODES = frozenset({
+    '12', '131', '139', '31', '401', '411', '4431', '4451', '521', '571', '585',
+    '601', '65', '701', '75',
+})
+
+
 @login_required
 @module_required('accounting')
+@require_POST
 def import_chart_of_accounts(request):
-    """Import du plan comptable depuis CSV ou TXT."""
-    from django.contrib import messages
-    from django.shortcuts import redirect
-    import csv
+    """Import du plan comptable depuis CSV ou TXT (superusers uniquement)."""
     import io
-    
-    if request.method != 'POST':
-        messages.error(request, "Méthode non autorisée.")
+
+    if not request.user.is_superuser:
+        messages.error(request, _("L'import du plan comptable est réservé aux administrateurs."))
         return redirect('accounting_chart')
     
     file = request.FILES.get('file')
     if not file:
-        messages.error(request, "Aucun fichier sélectionné.")
+        messages.error(request, _("Aucun fichier sélectionné."))
         return redirect('accounting_chart')
     
-    # Vérifier l'extension
+    # Vérifier l'extension et la taille
     filename = file.name.lower()
     if not (filename.endswith('.csv') or filename.endswith('.txt')):
-        messages.error(request, "Le fichier doit être au format CSV ou TXT.")
+        messages.error(request, _("Le fichier doit être au format CSV ou TXT."))
+        return redirect('accounting_chart')
+    if file.size > CHART_IMPORT_MAX_BYTES:
+        messages.error(request, _("Fichier trop volumineux (1 Mo maximum)."))
         return redirect('accounting_chart')
     
     delimiter = ';' if filename.endswith('.csv') else '\t'
-    
+    valid_types = ('ACTIF', 'PASSIF', 'CHARGE', 'PRODUIT')
+
     try:
-        # Lire le fichier
-        decoded = file.read().decode('utf-8-sig')
-        reader = csv.reader(io.StringIO(decoded), delimiter=delimiter)
-        
-        # Sauter l'en-tête
-        header = next(reader, None)
-        
-        accounts_created = 0
-        accounts_updated = 0
-        errors = []
-        
-        for row_num, row in enumerate(reader, start=2):
-            if not row or len(row) < 3:
-                continue
-            
-            try:
-                code = row[0].strip()
-                name = row[1].strip()
-                account_type = row[2].strip().upper()
-                
-                # Valider le type de compte
-                valid_types = ['ACTIF', 'PASSIF', 'CHARGE', 'PRODUIT']
-                if account_type not in valid_types:
-                    errors.append(f"Ligne {row_num}: Type de compte invalide '{account_type}'")
+        decoded = file.read(CHART_IMPORT_MAX_BYTES + 1).decode('utf-8-sig')
+    except UnicodeDecodeError:
+        messages.error(request, _("Le fichier doit être encodé en UTF-8."))
+        return redirect('accounting_chart')
+
+    reader = csv.reader(io.StringIO(decoded), delimiter=delimiter)
+    next(reader, None)  # en-tête
+
+    accounts_created = 0
+    accounts_updated = 0
+    errors = []
+
+    try:
+        # Tout ou rien : un import à moitié appliqué laisse un plan incohérent
+        with transaction.atomic():
+            for row_num, row in enumerate(reader, start=2):
+                if row_num - 1 > CHART_IMPORT_MAX_ROWS:
+                    raise ValueError(_("Trop de lignes (maximum %(max)s).") % {'max': CHART_IMPORT_MAX_ROWS})
+                if not row or len(row) < 3:
                     continue
-                
-                # Vérifier si le compte existe déjà
+
+                code = row[0].strip()[:20]
+                name = row[1].strip()[:255]
+                account_type = row[2].strip().upper()
+                if not code or not name:
+                    errors.append(_("Ligne %(row)s: code ou libellé manquant") % {'row': row_num})
+                    continue
+                if account_type not in valid_types:
+                    errors.append(_("Ligne %(row)s: Type de compte invalide '%(type)s'") % {'row': row_num, 'type': account_type})
+                    continue
+
                 parent_code = row[3].strip() if len(row) > 3 else ''
                 description = row[4].strip() if len(row) > 4 else ''
                 is_active = row[5].strip().lower() != 'non' if len(row) > 5 else True
-                
-                # Chercher le parent
+
                 parent = None
                 if parent_code:
-                    try:
-                        parent = Account.objects.get(code=parent_code, delete_at__isnull=True)
-                    except Account.DoesNotExist:
-                        errors.append(f"Ligne {row_num}: Compte parent '{parent_code}' introuvable")
+                    parent = Account.objects.filter(code=parent_code, delete_at__isnull=True).first()
+                    if parent is None:
+                        errors.append(_("Ligne %(row)s: Compte parent '%(code)s' introuvable") % {'row': row_num, 'code': parent_code})
                         continue
-                
-                # Créer ou mettre à jour
-                account, created = Account.objects.update_or_create(
-                    code=code,
-                    defaults={
-                        'name': name,
-                        'account_type': account_type,
-                        'parent': parent,
-                        'description': description,
-                        'is_active': is_active,
-                    }
-                )
-                
+                    if parent.code == code:
+                        errors.append(_("Ligne %(row)s: un compte ne peut pas être son propre parent") % {'row': row_num})
+                        continue
+
+                defaults = {
+                    'name': name,
+                    'account_type': account_type,
+                    'parent': parent,
+                    'description': description,
+                    'is_active': is_active,
+                }
+                existing = Account.objects.filter(code=code).first()
+                if existing is not None and code in SYSTEM_ACCOUNT_CODES:
+                    # Compte système : libellé/description/parent modifiables,
+                    # jamais son type ni sa désactivation.
+                    defaults['account_type'] = existing.account_type
+                    defaults['is_active'] = True
+                    if not is_active or account_type != existing.account_type:
+                        errors.append(
+                            _("Ligne %(row)s: le compte système %(code)s ne peut être ni désactivé ni changé de type (ignoré).") % {
+                                'row': row_num, 'code': code,
+                            }
+                        )
+                if existing is not None and existing.delete_at is not None:
+                    # Réactivation explicite d'un compte supprimé
+                    defaults['delete_at'] = None
+
+                account, created = Account.objects.update_or_create(code=code, defaults=defaults)
                 if created:
                     accounts_created += 1
                 else:
                     accounts_updated += 1
-                    
-            except Exception as e:
-                errors.append(f"Ligne {row_num}: {str(e)}")
-        
-        # Message de succès/erreur
-        if accounts_created > 0:
-            messages.success(request, f"{accounts_created} compte(s) créé(s).")
-        if accounts_updated > 0:
-            messages.success(request, f"{accounts_updated} compte(s) mis à jour.")
-        if errors:
-            for error in errors[:10]:  # Limiter à 10 erreurs affichées
-                messages.warning(request, error)
-            if len(errors) > 10:
-                messages.warning(request, f"... et {len(errors) - 10} erreur(s) supplémentaire(s).")
-        
-    except Exception as e:
-        messages.error(request, f"Erreur lors de l'importation: {str(e)}")
-    
+    except ValueError as exc:
+        messages.error(request, _("Import annulé : %(error)s") % {'error': exc})
+        return redirect('accounting_chart')
+    except Exception:
+        logger.exception("Erreur lors de l'import du plan comptable")
+        messages.error(request, _("Import annulé : erreur interne. Aucune modification n'a été enregistrée."))
+        return redirect('accounting_chart')
+
+    if accounts_created > 0:
+        messages.success(request, _("%(count)s compte(s) créé(s).") % {'count': accounts_created})
+    if accounts_updated > 0:
+        messages.success(request, _("%(count)s compte(s) mis à jour.") % {'count': accounts_updated})
+    if errors:
+        for error in errors[:10]:  # Limiter à 10 erreurs affichées
+            messages.warning(request, error)
+        if len(errors) > 10:
+            messages.warning(request, _("... et %(count)s erreur(s) supplémentaire(s).") % {'count': len(errors) - 10})
+
     return redirect('accounting_chart')
 
 
@@ -4398,11 +4612,21 @@ def accounting_add_entry(request):
         is_active=True, delete_at__isnull=True
     ).order_by('code')
     
+    MAX_LINES = 50
+    MAX_AMOUNT = Decimal('9999999999999.99')  # max_digits=15
+
     if request.method == 'POST':
+        from decimal import InvalidOperation
         form = JournalEntryForm(request.POST)
-        
-        # Récupérer les lignes
-        line_count = int(request.POST.get('line_count', 2))
+
+        # Récupérer les lignes (nombre borné, montants >= 0, comptes actifs)
+        try:
+            line_count = int(request.POST.get('line_count', 2))
+        except (TypeError, ValueError):
+            line_count = 0
+        line_count = max(0, min(line_count, MAX_LINES))
+        active_account_ids = set(accounts.values_list('id', flat=True))
+
         lines_data = []
         errors = []
         
@@ -4411,87 +4635,103 @@ def accounting_add_entry(request):
         
         for i in range(line_count):
             account_id = request.POST.get(f'account_{i}')
-            debit = request.POST.get(f'debit_{i}', '0').replace(',', '.')
-            credit = request.POST.get(f'credit_{i}', '0').replace(',', '.')
-            line_desc = request.POST.get(f'line_desc_{i}', '')
+            debit = (request.POST.get(f'debit_{i}') or '0').replace(',', '.').strip()
+            credit = (request.POST.get(f'credit_{i}') or '0').replace(',', '.').strip()
+            line_desc = (request.POST.get(f'line_desc_{i}') or '')[:255]
             
             if not account_id:
                 continue
-                
+
             try:
-                debit_val = Decimal(debit) if debit else Decimal('0')
-                credit_val = Decimal(credit) if credit else Decimal('0')
+                account_id = int(account_id)
+                debit_val = Decimal(debit or '0')
+                credit_val = Decimal(credit or '0')
+            except (ValueError, TypeError, InvalidOperation):
+                errors.append(_("Ligne %(line)s: compte ou montant invalide.") % {'line': i + 1})
+                continue
+
+            if account_id not in active_account_ids:
+                errors.append(_("Ligne %(line)s: compte inconnu ou inactif.") % {'line': i + 1})
+                continue
+            if not debit_val.is_finite() or not credit_val.is_finite():
+                errors.append(_("Ligne %(line)s: montant invalide.") % {'line': i + 1})
+                continue
+            if debit_val < 0 or credit_val < 0:
+                errors.append(_("Ligne %(line)s: les montants ne peuvent pas être négatifs.") % {'line': i + 1})
+                continue
+            if debit_val > MAX_AMOUNT or credit_val > MAX_AMOUNT:
+                errors.append(_("Ligne %(line)s: montant trop élevé.") % {'line': i + 1})
+                continue
+
+            # Au moins un montant doit être positif
+            if debit_val == 0 and credit_val == 0:
+                continue
                 
-                # Au moins un montant doit être positif
-                if debit_val == 0 and credit_val == 0:
-                    continue
-                    
-                # Les deux ne peuvent pas être positifs
-                if debit_val > 0 and credit_val > 0:
-                    errors.append(f"Ligne {i+1}: Un compte ne peut pas avoir à la fois un débit et un crédit.")
-                    continue
-                    
-                total_debit += debit_val
-                total_credit += credit_val
+            # Les deux ne peuvent pas être positifs
+            if debit_val > 0 and credit_val > 0:
+                errors.append(_("Ligne %(line)s: Un compte ne peut pas avoir à la fois un débit et un crédit.") % {'line': i + 1})
+                continue
                 
-                lines_data.append({
-                    'account_id': int(account_id),
-                    'debit': debit_val,
-                    'credit': credit_val,
-                    'description': line_desc
-                })
-                
-            except Exception as e:
-                errors.append(f"Ligne {i+1}: {str(e)}")
+            total_debit += debit_val
+            total_credit += credit_val
+            
+            lines_data.append({
+                'account_id': account_id,
+                'debit': debit_val,
+                'credit': credit_val,
+                'description': line_desc
+            })
         
         # Validation
         if not form.is_valid():
             errors.extend([f"{k}: {v[0]}" for k, v in form.errors.items()])
         
         if not lines_data:
-            errors.append("Veuillez saisir au moins une ligne avec un montant.")
+            errors.append(_("Veuillez saisir au moins une ligne avec un montant."))
         
         if total_debit != total_credit:
-            errors.append(f"L'écriture n'est pas équilibrée. Total débit: {total_debit}, Total crédit: {total_credit}")
+            errors.append(_("L'écriture n'est pas équilibrée. Total débit: %(debit)s, Total crédit: %(credit)s") % {
+                'debit': total_debit, 'credit': total_credit,
+            })
         
         if errors:
             for error in errors:
                 messages.error(request, error)
         else:
-            # Créer l'écriture
+            # Créer l'écriture : en-tête + lignes dans une seule transaction
             try:
-                exercise = ExerciseService.get_or_create_current_exercise()
-                ref = AccountingService._generate_reference('OD')  # OD = Opérations Diverses
-                
-                entry = JournalEntry.objects.create(
-                    reference=ref,
-                    date=form.cleaned_data['date'],
-                    description=form.cleaned_data['description'],
-                    journal='OD',  # Journal des Opérations Diverses
-                    exercise=exercise,
-                    is_validated=True,
-                )
-                
-                # Créer les lignes
-                for line_data in lines_data:
-                    JournalEntryLine.objects.create(
-                        entry=entry,
-                        account_id=line_data['account_id'],
-                        debit=line_data['debit'],
-                        credit=line_data['credit'],
-                        description=line_data['description'],
+                with transaction.atomic():
+                    exercise = ExerciseService.get_or_create_current_exercise()
+                    entry = AccountingService._create_entry(
+                        'OD',  # OD = Opérations Diverses
+                        date=form.cleaned_data['date'],
+                        description=form.cleaned_data['description'],
+                        journal='OD',
+                        exercise=exercise,
+                        is_validated=True,
                     )
+                    JournalEntryLine.objects.bulk_create([
+                        JournalEntryLine(
+                            entry=entry,
+                            account_id=line_data['account_id'],
+                            debit=line_data['debit'],
+                            credit=line_data['credit'],
+                            description=line_data['description'],
+                        )
+                        for line_data in lines_data
+                    ])
                 
-                messages.success(request, f"Écriture {ref} créée avec succès!")
+                messages.success(request, _("Écriture %(reference)s créée avec succès!") % {'reference': entry.reference})
                 return redirect('accounting_journal')
                 
-            except Exception as e:
-                messages.error(request, f"Erreur lors de la création: {str(e)}")
+            except Exception:
+                logger.exception("Erreur lors de la création d'une écriture manuelle")
+                messages.error(request, _("Erreur interne lors de la création de l'écriture. Rien n'a été enregistré."))
     else:
         form = JournalEntryForm()
     
     context = {
-        'page_title': 'Nouvelle écriture comptable',
+        'page_title': _('Nouvelle écriture comptable'),
         'form': form,
         'accounts': accounts,
         'journal_choices': JournalEntry.JOURNAL_CHOICES,
@@ -4533,7 +4773,7 @@ def credit_sales_list(request):
     page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {
-        'page_title': 'Ventes à crédit',
+        'page_title': _('Ventes à crédit'),
         'page_obj': page_obj,
         'credit_sales': page_obj.object_list,
         'current_search': search,
@@ -4556,46 +4796,64 @@ def record_credit_payment(request, credit_sale_id):
     )
 
     if credit_sale.is_fully_paid:
-        messages.warning(request, 'Cette vente à crédit est déjà entièrement payée.')
+        messages.warning(request, _('Cette vente à crédit est déjà entièrement payée.'))
         return redirect('credit_sales')
 
     if request.method == 'POST':
         form = PaymentForm(request.POST, credit_sale=credit_sale)
         if form.is_valid():
-            payment = form.save(commit=False)
-            payment.credit_sale = credit_sale
-            payment.staff = request.user
-            daily = DailyService.get_or_create_active_daily()
-            payment.daily = daily
-            payment.save()
-
-            # Mettre à jour le CreditSale
-            credit_sale.amount_paid += payment.amount
-            credit_sale.amount_remaining -= payment.amount
-            if credit_sale.amount_remaining <= 0:
-                credit_sale.amount_remaining = 0
-                credit_sale.is_fully_paid = True
-                credit_sale.sale.is_paid = True
-                credit_sale.sale.save(update_fields=['is_paid'])
-            credit_sale.save(update_fields=['amount_paid', 'amount_remaining', 'is_fully_paid'])
-
-            # Écriture comptable
             try:
-                exercise = daily.exercise if daily else ExerciseService.get_or_create_current_exercise()
-                AccountingService.record_credit_payment(
-                    payment=payment,
-                    daily=daily,
-                    exercise=exercise,
-                )
-            except Exception:
-                pass
+                with transaction.atomic():
+                    # Re-lire sous verrou : deux paiements simultanés ne
+                    # peuvent pas dépasser le reste dû.
+                    credit_sale = CreditSale.objects.select_for_update().select_related('sale').get(
+                        pk=credit_sale.pk, delete_at__isnull=True,
+                    )
+                    amount = form.cleaned_data['amount']
+                    if credit_sale.is_fully_paid or amount > credit_sale.amount_remaining:
+                        raise ValueError(
+                            _("Le montant dépasse le solde restant (%(amount)s FCFA).") % {
+                                'amount': f'{credit_sale.amount_remaining:,.0f}',
+                            }
+                        )
 
-            messages.success(
-                request,
-                f'Paiement de {payment.amount:,.0f} FCFA enregistré. '
-                f'Solde restant : {credit_sale.amount_remaining:,.0f} FCFA.'
-            )
-            return redirect('credit_sales')
+                    payment = form.save(commit=False)
+                    payment.credit_sale = credit_sale
+                    payment.staff = request.user
+                    daily = DailyService.get_or_create_active_daily()
+                    payment.daily = daily
+                    payment.save()
+
+                    credit_sale.amount_paid += payment.amount
+                    credit_sale.amount_remaining -= payment.amount
+                    if credit_sale.amount_remaining <= 0:
+                        credit_sale.amount_remaining = 0
+                        credit_sale.is_fully_paid = True
+                        credit_sale.sale.is_paid = True
+                        credit_sale.sale.save(update_fields=['is_paid'])
+                    credit_sale.save(update_fields=['amount_paid', 'amount_remaining', 'is_fully_paid'])
+
+                    # Écriture comptable (dans la même transaction : un
+                    # encaissement sans écriture n'est plus possible)
+                    AccountingService.record_credit_payment(
+                        payment=payment,
+                        daily=daily,
+                        exercise=daily.exercise,
+                    )
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            except Exception:
+                logger.exception("Erreur lors de l'enregistrement d'un paiement client")
+                messages.error(request, _("Erreur interne : le paiement n'a pas été enregistré."))
+            else:
+                messages.success(
+                    request,
+                    _('Paiement de %(amount)s FCFA enregistré. Solde restant : %(remaining)s FCFA.') % {
+                        'amount': f'{payment.amount:,.0f}',
+                        'remaining': f'{credit_sale.amount_remaining:,.0f}',
+                    }
+                )
+                return redirect('credit_sales')
     else:
         form = PaymentForm(credit_sale=credit_sale)
 
@@ -4603,7 +4861,7 @@ def record_credit_payment(request, credit_sale_id):
     payments = credit_sale.payments.filter(delete_at__isnull=True).order_by('-payment_date')
 
     context = {
-        'page_title': f'Paiement – Vente #{credit_sale.sale_id}',
+        'page_title': _('Paiement – Vente #%(id)s') % {'id': credit_sale.sale_id},
         'form': form,
         'credit_sale': credit_sale,
         'payments': payments,
@@ -4616,7 +4874,7 @@ def record_credit_payment(request, credit_sale_id):
 def supplier_payments_list(request):
     """Vue listant les paiements fournisseurs."""
     search = request.GET.get('search', '')
-    supplier_id = request.GET.get('supplier', '')
+    supplier_id = _clean_int_param(request, 'supplier')
 
     queryset = SupplierPayment.objects.select_related(
         'supplier', 'supply', 'staff', 'daily',
@@ -4638,7 +4896,7 @@ def supplier_payments_list(request):
     suppliers = Supplier.objects.filter(delete_at__isnull=True).order_by('name')
 
     context = {
-        'page_title': 'Paiements fournisseurs',
+        'page_title': _('Paiements fournisseurs'),
         'page_obj': page_obj,
         'supplier_payments': page_obj.object_list,
         'suppliers': suppliers,
@@ -4676,14 +4934,16 @@ def add_supplier_payment(request):
 
             messages.success(
                 request,
-                f'Paiement de {payment.amount:,.0f} FCFA à {payment.supplier.name} enregistré.'
+                _('Paiement de %(amount)s FCFA à %(supplier)s enregistré.') % {
+                    'amount': f'{payment.amount:,.0f}', 'supplier': payment.supplier.name,
+                }
             )
             return redirect('supplier_payments')
     else:
         form = SupplierPaymentForm()
 
     context = {
-        'page_title': 'Nouveau paiement fournisseur',
+        'page_title': _('Nouveau paiement fournisseur'),
         'form': form,
     }
     return render(request, 'core/accounting/add_supplier_payment.html', context)
@@ -4698,70 +4958,101 @@ def record_supply_payment(request, supply_id):
     supply = get_object_or_404(Supply, id=supply_id, delete_at__isnull=True)
     
     if not supply.is_credit:
-        messages.warning(request, 'Cet approvisionnement n\'est pas un achat à crédit.')
+        messages.warning(request, _('Cet approvisionnement n\'est pas un achat à crédit.'))
         return redirect('supplies')
-    
-    # Récupérer ou créer le CreditSupply
-    try:
-        credit_supply = supply.credit_info
-    except CreditSupply.DoesNotExist:
-        credit_supply = CreditSupply.objects.create(
-            supply=supply,
-            amount_paid=0,
-            amount_remaining=supply.total_price,
-            is_fully_paid=False,
-        )
-    
-    if credit_supply.is_fully_paid:
-        messages.warning(request, 'Cet approvisionnement est déjà payé.')
+
+    def _get_or_create_credit_supply(locked=False):
+        qs = CreditSupply.objects.select_for_update() if locked else CreditSupply.objects
+        credit = qs.filter(supply=supply, delete_at__isnull=True).first()
+        if credit is None and locked:
+            # Créé uniquement dans le flux POST (jamais sur un simple GET) en
+            # tenant compte des paiements déjà enregistrés sur cet achat.
+            already_paid = SupplierPayment.objects.filter(
+                supply=supply, delete_at__isnull=True,
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            credit = CreditSupply.objects.create(
+                supply=supply,
+                amount_paid=already_paid,
+                amount_remaining=max((supply.total_price or 0) - already_paid, 0),
+                is_fully_paid=(supply.total_price or 0) - already_paid <= 0,
+            )
+        return credit
+
+    credit_supply = _get_or_create_credit_supply()
+    if credit_supply is not None and credit_supply.is_fully_paid:
+        messages.warning(request, _('Cet approvisionnement est déjà payé.'))
         return redirect('supplies')
+    amount_remaining = (
+        credit_supply.amount_remaining if credit_supply is not None else (supply.total_price or 0)
+    )
 
     if request.method == 'POST':
-        form = SupplierPaymentForm(request.POST)
+        # Le fournisseur est imposé : celui de l'approvisionnement
+        post_data = request.POST.copy()
+        post_data['supplier'] = supply.supplier_id
+        form = SupplierPaymentForm(post_data)
         if form.is_valid():
-            payment = form.save(commit=False)
-            payment.staff = request.user
-            daily = DailyService.get_or_create_active_daily()
-            payment.daily = daily
-            payment.save()
-
-            # Mettre à jour le CreditSupply
-            credit_supply.amount_paid += payment.amount
-            credit_supply.amount_remaining -= payment.amount
-            
-            # Vérifier si le paiement est complet
-            if credit_supply.amount_remaining <= 0:
-                credit_supply.amount_remaining = 0
-                credit_supply.is_fully_paid = True
-                supply.is_paid = True
-                supply.save(update_fields=['is_paid'])
-            
-            credit_supply.save(update_fields=['amount_paid', 'amount_remaining', 'is_fully_paid'])
-
-            # Écriture comptable
             try:
-                exercise = daily.exercise if daily else ExerciseService.get_or_create_current_exercise()
-                AccountingService.record_supplier_payment(
-                    supplier_payment=payment,
-                    daily=daily,
-                    exercise=exercise,
-                )
-            except Exception:
-                pass
+                with transaction.atomic():
+                    credit_supply = _get_or_create_credit_supply(locked=True)
+                    amount = form.cleaned_data['amount']
+                    if credit_supply.is_fully_paid or amount > credit_supply.amount_remaining:
+                        raise ValueError(
+                            _("Le montant dépasse le reste dû (%(amount)s FCFA).") % {
+                                'amount': f'{credit_supply.amount_remaining:,.0f}',
+                            }
+                        )
 
-            messages.success(
-                request,
-                f'Paiement de {payment.amount:,.0f} FCFA pour {supply.product.name} enregistré. '
-                f'Restant: {credit_supply.amount_remaining:,.0f} FCFA'
-            )
-            return redirect('supplies')
+                    payment = form.save(commit=False)
+                    payment.supplier = supply.supplier
+                    payment.supply = supply
+                    payment.staff = request.user
+                    daily = DailyService.get_or_create_active_daily()
+                    payment.daily = daily
+                    payment.save()
+
+                    credit_supply.amount_paid += payment.amount
+                    credit_supply.amount_remaining -= payment.amount
+                    if credit_supply.amount_remaining <= 0:
+                        credit_supply.amount_remaining = 0
+                        credit_supply.is_fully_paid = True
+                        supply.is_paid = True
+                        supply.save(update_fields=['is_paid'])
+                    credit_supply.save(update_fields=['amount_paid', 'amount_remaining', 'is_fully_paid'])
+
+                    AccountingService.record_supplier_payment(
+                        supplier_payment=payment,
+                        daily=daily,
+                        exercise=daily.exercise,
+                    )
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            except Exception:
+                logger.exception("Erreur lors de l'enregistrement d'un paiement fournisseur")
+                messages.error(request, _("Erreur interne : le paiement n'a pas été enregistré."))
+            else:
+                messages.success(
+                    request,
+                    _('Paiement de %(amount)s FCFA pour %(product)s enregistré. Restant: %(remaining)s FCFA') % {
+                        'amount': f'{payment.amount:,.0f}',
+                        'product': supply.product.name,
+                        'remaining': f'{credit_supply.amount_remaining:,.0f}',
+                    }
+                )
+                return redirect('supplies')
     else:
         # Pré-remplir le formulaire avec le montant restant
         initial_data = {
-            'amount': credit_supply.amount_remaining,
+            'amount': amount_remaining,
             'supplier': supply.supplier,
         }
         form = SupplierPaymentForm(initial=initial_data)
+    form.fields['supplier'].disabled = True
+    if credit_supply is None:
+        # Vue en lecture : objet non persisté pour l'affichage
+        credit_supply = CreditSupply(
+            supply=supply, amount_paid=0, amount_remaining=amount_remaining, is_fully_paid=False,
+        )
 
     # Historique des paiements pour ce fournisseur
     payments = SupplierPayment.objects.filter(
@@ -4769,7 +5060,7 @@ def record_supply_payment(request, supply_id):
     ).order_by('-payment_date')[:5]
 
     context = {
-        'page_title': f'Paiement – {supply.product.name}',
+        'page_title': _('Paiement – %(product)s') % {'product': supply.product.name},
         'form': form,
         'supply': supply,
         'credit_supply': credit_supply,
@@ -4802,7 +5093,7 @@ def invoices_list(request):
     page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {
-        'page_title': 'Factures',
+        'page_title': _('Factures'),
         'page_obj': page_obj,
         'invoices': page_obj.object_list,
         'current_search': search,
@@ -4814,24 +5105,37 @@ def invoices_list(request):
 
 @login_required
 @module_required('treasury')
+@require_POST
 def generate_invoice(request, sale_id):
-    """Génère une facture pour une vente."""
-    sale = get_object_or_404(Sale, id=sale_id, delete_at__isnull=True)
+    """Génère une facture pour une vente (POST : action qui crée une donnée)."""
+    with transaction.atomic():
+        sale = get_object_or_404(
+            Sale.objects.select_for_update(), id=sale_id, delete_at__isnull=True,
+        )
+        existing = Invoice.objects.filter(sale=sale).first()
+        if existing is not None:
+            if existing.delete_at is None:
+                messages.info(request, _('Facture %(number)s existe déjà pour cette vente.') % {'number': existing.invoice_number})
+                return redirect('invoices')
+            # Une facture annulée (soft-delete) occupe déjà la relation 1-1 :
+            # on la réactive avec un nouveau numéro plutôt que de planter.
+            existing.delete_at = None
+            existing.invoice_number = Invoice.generate_invoice_number()
+            existing.invoice_date = timezone.now().date()
+            existing.status = 'PAID' if sale.is_paid else 'SENT'
+            existing.save()
+            invoice = existing
+        else:
+            credit_info = getattr(sale, 'credit_info', None)
+            invoice = Invoice.objects.create(
+                sale=sale,
+                invoice_number=Invoice.generate_invoice_number(),
+                invoice_date=timezone.now().date(),
+                due_date=credit_info.due_date if credit_info else None,
+                status='PAID' if sale.is_paid else 'SENT',
+            )
 
-    # Vérifier qu'il n'y a pas déjà une facture
-    if hasattr(sale, 'invoice') and sale.invoice and sale.invoice.delete_at is None:
-        messages.info(request, f'Facture {sale.invoice.invoice_number} existe déjà pour cette vente.')
-        return redirect('invoices')
-
-    invoice = Invoice.objects.create(
-        sale=sale,
-        invoice_number=Invoice.generate_invoice_number(),
-        invoice_date=timezone.now().date(),
-        due_date=getattr(sale, 'credit_info', None) and sale.credit_info.due_date,
-        status='PAID' if sale.is_paid else 'SENT',
-    )
-
-    messages.success(request, f'Facture {invoice.invoice_number} générée avec succès.')
+    messages.success(request, _('Facture %(number)s générée avec succès.') % {'number': invoice.invoice_number})
     return redirect('invoices')
 
 
@@ -4885,7 +5189,7 @@ def treasury_dashboard(request):
     ).select_related('supplier').order_by('-payment_date', '-create_at')[:10]
 
     context = {
-        'page_title': 'Trésorerie',
+        'page_title': _('Trésorerie'),
         'treasury_accounts': treasury_accounts,
         'total_treasury': total_treasury,
         'clients_balance': clients_balance,
@@ -4910,7 +5214,7 @@ def income_statement(request):
     data = AccountingService.get_income_statement(exercise)
 
     context = {
-        'page_title': 'Compte de résultat',
+        'page_title': _('Compte de résultat'),
         'exercise': exercise,
         **data,
     }
@@ -4925,7 +5229,7 @@ def balance_sheet(request):
     data = AccountingService.get_balance_sheet(exercise)
 
     context = {
-        'page_title': 'Bilan comptable',
+        'page_title': _('Bilan comptable'),
         'exercise': exercise,
         **data,
     }
@@ -4940,9 +5244,9 @@ def aged_balance(request):
     exercise = ExerciseService.get_or_create_current_exercise()
     data = AccountingService.get_aged_balance(balance_type, exercise)
 
-    print(data)
+
     context = {
-        'page_title': f"Balance âgée — {data['title']}",
+        'page_title': _("Balance âgée — %(title)s") % {'title': data['title']},
         'exercise': exercise,
         'current_type': balance_type,
         **data,
@@ -4958,7 +5262,7 @@ def product_margins(request):
     data = AccountingService.get_product_margins(exercise)
 
     context = {
-        'page_title': 'Marge par produit',
+        'page_title': _('Marge par produit'),
         'exercise': exercise,
         **data,
     }
@@ -4976,54 +5280,54 @@ def export_report_csv(request, report_type):
 
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response.write('\ufeff')  # BOM UTF-8 pour Excel
-    writer = csv.writer(response, delimiter=';')
+    writer = _SafeCsvWriter(csv.writer(response, delimiter=';'))
 
     if report_type == 'income_statement':
         response['Content-Disposition'] = 'attachment; filename="compte_de_resultat.csv"'
         data = AccountingService.get_income_statement(exercise)
-        writer.writerow(['Compte de résultat', f'Exercice {exercise}'])
+        writer.writerow([_('Compte de résultat'), _('Exercice %(exercise)s') % {'exercise': exercise}])
         writer.writerow([])
-        writer.writerow(['PRODUITS'])
-        writer.writerow(['Code', 'Intitulé', 'Montant'])
+        writer.writerow([_('PRODUITS')])
+        writer.writerow([_('Code'), _('Intitulé'), _('Montant')])
         for item in data['produits']:
             writer.writerow([item['account'].code, item['account'].name, str(item['balance'])])
-        writer.writerow(['', 'TOTAL PRODUITS', str(data['total_produits'])])
+        writer.writerow(['', _('TOTAL PRODUITS'), str(data['total_produits'])])
         writer.writerow([])
-        writer.writerow(['CHARGES'])
-        writer.writerow(['Code', 'Intitulé', 'Montant'])
+        writer.writerow([_('CHARGES')])
+        writer.writerow([_('Code'), _('Intitulé'), _('Montant')])
         for item in data['charges']:
             writer.writerow([item['account'].code, item['account'].name, str(item['balance'])])
-        writer.writerow(['', 'TOTAL CHARGES', str(data['total_charges'])])
+        writer.writerow(['', _('TOTAL CHARGES'), str(data['total_charges'])])
         writer.writerow([])
-        writer.writerow(['', 'RÉSULTAT NET', str(data['resultat_net'])])
+        writer.writerow(['', _('RÉSULTAT NET'), str(data['resultat_net'])])
 
     elif report_type == 'balance_sheet':
         response['Content-Disposition'] = 'attachment; filename="bilan_comptable.csv"'
         data = AccountingService.get_balance_sheet(exercise)
-        writer.writerow(['Bilan comptable', f'Exercice {exercise}'])
+        writer.writerow([_('Bilan comptable'), _('Exercice %(exercise)s') % {'exercise': exercise}])
         writer.writerow([])
-        writer.writerow(['ACTIF'])
-        writer.writerow(['Code', 'Intitulé', 'Montant'])
+        writer.writerow([_('ACTIF')])
+        writer.writerow([_('Code'), _('Intitulé'), _('Montant')])
         for section in [data['actif_immobilise'], data['actif_circulant'], data['tresorerie_actif']]:
             for item in section:
                 writer.writerow([item['account'].code, item['account'].name, str(item['balance'])])
-        writer.writerow(['', 'TOTAL ACTIF', str(data['total_actif'])])
+        writer.writerow(['', _('TOTAL ACTIF'), str(data['total_actif'])])
         writer.writerow([])
-        writer.writerow(['PASSIF'])
-        writer.writerow(['Code', 'Intitulé', 'Montant'])
+        writer.writerow([_('PASSIF')])
+        writer.writerow([_('Code'), _('Intitulé'), _('Montant')])
         for section in [data['capitaux'], data['dettes'], data['tresorerie_passif']]:
             for item in section:
                 writer.writerow([item['account'].code, item['account'].name, str(item['balance'])])
         if data['resultat_net'] > 0:
-            writer.writerow(['', 'Résultat de l\'exercice', str(data['resultat_net'])])
-        writer.writerow(['', 'TOTAL PASSIF', str(data['total_passif'])])
+            writer.writerow(['', _('Résultat de l\'exercice'), str(data['resultat_net'])])
+        writer.writerow(['', _('TOTAL PASSIF'), str(data['total_passif'])])
 
     elif report_type == 'product_margins':
         response['Content-Disposition'] = 'attachment; filename="marges_produits.csv"'
         data = AccountingService.get_product_margins(exercise)
-        writer.writerow(['Marge par produit', f'Exercice {exercise}'])
+        writer.writerow([_('Marge par produit'), _('Exercice %(exercise)s') % {'exercise': exercise}])
         writer.writerow([])
-        writer.writerow(['Produit', 'Qté vendue', 'CA (FCFA)', 'Prix achat', 'Coût total', 'Marge', 'Marge %'])
+        writer.writerow([_('Produit'), _('Qté vendue'), _('CA (FCFA)'), _('Prix achat'), _('Coût total'), _('Marge'), _('Marge %')])
         for item in data['items']:
             writer.writerow([
                 item['product'].name, item['qty_sold'],
@@ -5032,17 +5336,19 @@ def export_report_csv(request, report_type):
                 f"{item['margin_pct']:.1f}%",
             ])
         writer.writerow([])
-        writer.writerow(['TOTAUX', '', str(data['total_ca']), '',
+        writer.writerow([_('TOTAUX'), '', str(data['total_ca']), '',
                          str(data['total_cost']), str(data['total_margin']),
                          f"{data['total_margin_pct']:.1f}%"])
 
     elif report_type == 'aged_balance':
         balance_type = request.GET.get('type', 'client')
+        if balance_type not in ('client', 'supplier'):
+            return HttpResponse(_('Type de balance inconnu'), status=400)
         response['Content-Disposition'] = f'attachment; filename="balance_agee_{balance_type}.csv"'
         data = AccountingService.get_aged_balance(balance_type, exercise)
-        writer.writerow([data['title'], f'Exercice {exercise}'])
+        writer.writerow([data['title'], _('Exercice %(exercise)s') % {'exercise': exercise}])
         writer.writerow([])
-        writer.writerow(['Référence', 'Tiers', 'Date', 'Échéance', 'Jours', 'Tranche', 'Montant'])
+        writer.writerow([_('Référence'), _('Tiers'), _('Date'), _('Échéance'), _('Jours'), _('Tranche'), _('Montant')])
         for item in data['items']:
             writer.writerow([
                 item['reference'], item['tiers'],
@@ -5051,10 +5357,10 @@ def export_report_csv(request, report_type):
                 item['age_days'], item['tranche'], str(item['amount']),
             ])
         writer.writerow([])
-        writer.writerow(['', '', '', '', '', 'TOTAL', str(data['grand_total'])])
+        writer.writerow(['', '', '', '', '', _('TOTAL'), str(data['grand_total'])])
 
     else:
-        return HttpResponse('Type de rapport inconnu', status=400)
+        return HttpResponse(_('Type de rapport inconnu'), status=400)
 
     return response
 
@@ -5071,7 +5377,7 @@ def vat_declaration(request):
     data = AccountingService.get_vat_declaration(exercise)
 
     context = {
-        'page_title': 'Déclaration de TVA',
+        'page_title': _('Déclaration de TVA'),
         'exercise': exercise,
         **data,
     }
@@ -5083,8 +5389,8 @@ def vat_declaration(request):
 def bank_reconciliation(request):
     """Rapprochement bancaire."""
     account_code = request.GET.get('account', '521')
-    date_start = request.GET.get('date_start')
-    date_end = request.GET.get('date_end')
+    date_start = _clean_date_param(request, 'date_start', default=None)
+    date_end = _clean_date_param(request, 'date_end', default=None)
 
     # Convertir les dates
     from datetime import datetime as dt
@@ -5095,7 +5401,7 @@ def bank_reconciliation(request):
         data = AccountingService.get_bank_reconciliation(account_code, d_start, d_end)
     except Account.DoesNotExist:
         from django.http import Http404
-        raise Http404("Compte bancaire introuvable")
+        raise Http404(_("Compte bancaire introuvable"))
 
     # Comptes bancaires disponibles pour le sélecteur
     bank_accounts = Account.objects.filter(
@@ -5103,7 +5409,7 @@ def bank_reconciliation(request):
     )
 
     context = {
-        'page_title': 'Rapprochement bancaire',
+        'page_title': _('Rapprochement bancaire'),
         'bank_accounts': bank_accounts,
         'current_account': account_code,
         'date_start': date_start or '',
@@ -5120,13 +5426,13 @@ def reconcile_entry(request):
     from django.http import JsonResponse
 
     if request.method != 'POST':
-        return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+        return JsonResponse({'error': _('Méthode non autorisée')}, status=405)
 
     statement_id = request.POST.get('statement_id')
     entry_line_id = request.POST.get('entry_line_id')
 
     if not statement_id or not entry_line_id:
-        return JsonResponse({'error': 'Paramètres manquants'}, status=400)
+        return JsonResponse({'error': _('Paramètres manquants')}, status=400)
 
     try:
         stmt = AccountingService.reconcile_statement(
@@ -5134,10 +5440,13 @@ def reconcile_entry(request):
         )
         return JsonResponse({
             'success': True,
-            'message': f'Ligne rapprochée avec succès',
+            'message': _('Ligne rapprochée avec succès'),
         })
-    except Exception as e:
+    except ValueError as e:
         return JsonResponse({'error': str(e)}, status=400)
+    except Exception:
+        logger.exception("Erreur de rapprochement bancaire")
+        return JsonResponse({'error': _('Rapprochement impossible.')}, status=400)
 
 
 @login_required
@@ -5147,17 +5456,20 @@ def unreconcile_entry(request):
     from django.http import JsonResponse
 
     if request.method != 'POST':
-        return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+        return JsonResponse({'error': _('Méthode non autorisée')}, status=405)
 
     statement_id = request.POST.get('statement_id')
     if not statement_id:
-        return JsonResponse({'error': 'Paramètre manquant'}, status=400)
+        return JsonResponse({'error': _('Paramètre manquant')}, status=400)
 
     try:
         AccountingService.unreconcile_statement(int(statement_id))
-        return JsonResponse({'success': True, 'message': 'Rapprochement annulé'})
-    except Exception as e:
+        return JsonResponse({'success': True, 'message': _('Rapprochement annulé')})
+    except ValueError as e:
         return JsonResponse({'error': str(e)}, status=400)
+    except Exception:
+        logger.exception("Erreur d'annulation de rapprochement bancaire")
+        return JsonResponse({'error': _("Annulation du rapprochement impossible.")}, status=400)
 
 
 @login_required
@@ -5175,7 +5487,7 @@ def exercise_closing_view(request):
     income_data = AccountingService.get_income_statement(exercise)
 
     context = {
-        'page_title': "Clôture d'exercice",
+        'page_title': _("Clôture d'exercice"),
         'exercise': exercise,
         'closings': closings,
         'resultat_net': income_data['resultat_net'],
@@ -5194,19 +5506,34 @@ def close_exercise_action(request):
     if request.method != 'POST':
         return redirect('exercise_closing')
 
-    exercise = ExerciseService.get_or_create_current_exercise()
+    # Ne jamais créer un exercice vide pour le clôturer aussitôt
+    exercise = ExerciseService.get_current_exercise()
+    if exercise is None:
+        messages.error(request, _("Aucun exercice ouvert à clôturer."))
+        return redirect('exercise_closing')
+
+    # L'utilisateur confirme l'exercice affiché : refuse si un autre est ouvert
+    confirmed_id = request.POST.get('exercise_id')
+    if confirmed_id and str(exercise.pk) != str(confirmed_id):
+        messages.error(request, _("L'exercice affiché n'est plus l'exercice ouvert. Rechargez la page."))
+        return redirect('exercise_closing')
 
     try:
-        closing = AccountingService.close_exercise(exercise, user=request.user)
-        new_exercise = AccountingService.open_new_exercise(closing, user=request.user)
+        # Clôture + réouverture dans UNE transaction : pas d'exercice clos
+        # sans successeur, pas d'à-nouveaux dupliqués.
+        with transaction.atomic():
+            closing = AccountingService.close_exercise(exercise, user=request.user)
+            AccountingService.open_new_exercise(closing, user=request.user)
         messages.success(
             request,
-            f"Exercice clôturé avec succès. Résultat : {closing.result_amount} FCFA. "
-            f"Nouvel exercice créé."
+            _("Exercice clôturé avec succès. Résultat : %(result)s FCFA. Nouvel exercice créé.") % {
+                'result': closing.result_amount,
+            }
         )
     except ValueError as e:
         messages.error(request, str(e))
-    except Exception as e:
-        messages.error(request, f"Erreur lors de la clôture : {str(e)}")
+    except Exception:
+        logger.exception("Erreur lors de la clôture de l'exercice #%s", exercise.pk)
+        messages.error(request, _("Erreur interne lors de la clôture. Aucune modification n'a été enregistrée."))
 
     return redirect('exercise_closing')

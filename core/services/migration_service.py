@@ -6,6 +6,7 @@ Parse les données SQL VALUES et les importe dans le nouveau système Django.
 import re
 from django.db import transaction
 from django.db.models.fields.files import ImageFieldFile
+from django.utils.translation import gettext as _
 from core.models.product_models import (
     Product, ProductImage, Category, Gamme, Rayon, GrammageType
 )
@@ -197,7 +198,8 @@ def migrate_data(
                 try:
                     if len(row) < 14:
                         stats['errors'].append(
-                            f"Produit ignoré (colonnes insuffisantes) : {row[:3]}"
+                            _("Produit ignoré (colonnes insuffisantes) : %(row)s")
+                            % {'row': row[:3]}
                         )
                         continue
 
@@ -230,7 +232,8 @@ def migrate_data(
                         existing = Product.objects.get(code=code)
                         product_map[old_id] = existing.id
                         stats['errors'].append(
-                            f"Produit '{name}' (code={code}) existe déjà, ignoré."
+                            _("Produit '%(name)s' (code=%(code)s) existe déjà, ignoré.")
+                            % {'name': name, 'code': code}
                         )
                         continue
 
@@ -256,7 +259,8 @@ def migrate_data(
 
                 except Exception as e:
                     stats['errors'].append(
-                        f"Erreur produit (row={row[:3]}): {str(e)}"
+                        _("Erreur produit (row=%(row)s): %(error)s")
+                        % {'row': row[:3], 'error': str(e)}
                     )
 
         # 6. Importer les images
@@ -268,7 +272,8 @@ def migrate_data(
                 try:
                     if len(row) < 4:
                         stats['errors'].append(
-                            f"Image ignorée (colonnes insuffisantes) : {row}"
+                            _("Image ignorée (colonnes insuffisantes) : %(row)s")
+                            % {'row': row}
                         )
                         continue
 
@@ -279,7 +284,8 @@ def migrate_data(
                     new_product_id = product_map.get(old_product_id)
                     if new_product_id is None:
                         stats['errors'].append(
-                            f"Image ignorée (produit ancien ID={old_product_id} non trouvé) : {image_path}"
+                            _("Image ignorée (produit ancien ID=%(old_id)s non trouvé) : %(path)s")
+                            % {'old_id': old_product_id, 'path': image_path}
                         )
                         continue
 
@@ -312,7 +318,8 @@ def migrate_data(
 
                 except Exception as e:
                     stats['errors'].append(
-                        f"Erreur image (row={row[:3]}): {str(e)}"
+                        _("Erreur image (row=%(row)s): %(error)s")
+                        % {'row': row[:3], 'error': str(e)}
                     )
 
     return stats

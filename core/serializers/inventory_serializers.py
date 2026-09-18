@@ -3,6 +3,7 @@ Serializers for inventory-related endpoints.
 Correspond à l'ancien endpoint Flask: POST /create_inventory
 """
 
+from django.utils.translation import gettext
 from rest_framework import serializers
 from core.models import Inventory, Product
 
@@ -25,7 +26,7 @@ class InventorySerializer(serializers.ModelSerializer):
     def get_staff_name(self, obj):
         if obj.staff:
             return obj.staff.get_full_name()
-        return "N/A"
+        return gettext("N/A")
 
 
 class InventoryCreateSerializer(serializers.Serializer):
@@ -42,6 +43,6 @@ class InventoryCreateSerializer(serializers.Serializer):
 
     def validate_product_id(self, value):
         if not Product.objects.filter(id=value, delete_at__isnull=True).exists():
-            raise serializers.ValidationError("Produit introuvable.")
+            raise serializers.ValidationError(gettext("Produit introuvable."))
         return value
 

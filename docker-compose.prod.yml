@@ -1,30 +1,38 @@
 services:
 
+  # Pas de network_mode: host ici : MySQL n'est publié que sur la boucle locale
+  # de l'hôte (127.0.0.1:3306), ce qui suffit au service web (lui en mode host).
   mysql:
     image: mysql:8.0
     container_name: blanco-mysql
     restart: unless-stopped
-    network_mode: host
+    # Seules les variables MYSQL_* sont transmises (pas de env_file : inutile de
+    # donner SECRET_KEY & co. au conteneur MySQL). Les valeurs viennent de .env.
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    env_file:
-      - .env
+    ports:
+      - "127.0.0.1:3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysql", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}", "-e", "SELECT 1"]
+      # $$ : non interpolé par compose ; le mot de passe est lu dans l'environnement
+      # du conteneur (MYSQL_PWD) et n'apparaît pas en argument de ligne de commande.
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 60s
 
   web:
+    # Recommandé en production : figer une version immuable plutôt que :latest,
+    # ex. ramirokaffo/blanco:1.2.3 ou ramirokaffo/blanco@sha256:<digest>
     image: ramirokaffo/blanco:latest
     container_name: blanco_web
     restart: unless-stopped
+    # network_mode: host est requis : détection de l'IP LAN / QR code pour l'app mobile.
     network_mode: host
     env_file:
       - .env

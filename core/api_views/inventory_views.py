@@ -5,9 +5,9 @@ Correspond à l'ancien endpoint Flask: POST /create_inventory
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.api_permissions import HasModule
 from core.serializers.inventory_serializers import (
     InventoryCreateSerializer, InventorySerializer,
 )
@@ -15,7 +15,7 @@ from core.services.inventory_service import InventoryService
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([HasModule('inventory')])
 def create_inventory(request):
     """
     Créer un inventaire pour un produit.
@@ -36,4 +36,3 @@ def create_inventory(request):
         'status': 0,
         'errors': serializer.errors,
     }, status=status.HTTP_400_BAD_REQUEST)
-

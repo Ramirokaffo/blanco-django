@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block title %}{{ page_title }} - {{ system_settings.company_name }}{% endblock %}
@@ -67,12 +68,12 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Nouvelle écriture comptable</h1>
-            <p class="text-secondary">Journal des Opérations Diverses (OD)</p>
+            <h1>{% trans "Nouvelle écriture comptable" %}</h1>
+            <p class="text-secondary">{% trans "Journal des Opérations Diverses (OD)" %}</p>
         </div>
         <div>
             <a href="{% url 'accounting_journal' %}" class="btn btn-secondary btn-sm">
-                Retour au journal
+                {% trans "Retour au journal" %}
             </a>
         </div>
     </div>
@@ -97,27 +98,27 @@
             <!-- Informations de l'écriture -->
             <div class="form-row" style="display: flex; gap: 20px; margin-bottom: 20px;">
                 <div class="form-group" style="flex: 1;">
-                    <label for="id_date">Date</label>
+                    <label for="id_date">{% trans "Date" %}</label>
                     <input type="date" class="form-control" id="id_date" name="date" 
                            value="{{ form.date.value|date:'Y-m-d'|default:form.initial.date }}" required>
                 </div>
                 <div class="form-group" style="flex: 3;">
-                    <label for="id_description">Libellé de l'écriture</label>
+                    <label for="id_description">{% trans "Libellé de l'écriture" %}</label>
                     <input type="text" class="form-control" id="id_description" name="description" 
-                           placeholder="Description de l'opération" required>
+                           placeholder="{% trans "Description de l'opération" %}" required>
                 </div>
             </div>
             
             <!-- Lignes d'écriture -->
-            <h4 style="margin-bottom: 15px;">Lignes d'écriture</h4>
+            <h4 style="margin-bottom: 15px;">{% trans "Lignes d'écriture" %}</h4>
             
             <table class="entry-lines-table" id="linesTable">
                 <thead>
                     <tr>
-                        <th>Compte</th>
-                        <th>Débit</th>
-                        <th>Crédit</th>
-                        <th>Libellé</th>
+                        <th>{% trans "Compte" %}</th>
+                        <th>{% trans "Débit" %}</th>
+                        <th>{% trans "Crédit" %}</th>
+                        <th>{% trans "Libellé" %}</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -126,7 +127,7 @@
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td>TOTAL</td>
+                        <td>{% trans "TOTAL" %}</td>
                         <td id="totalDebit">0.00</td>
                         <td id="totalCredit">0.00</td>
                         <td></td>
@@ -136,19 +137,19 @@
             </table>
             
             <div id="balanceIndicator" class="balance-indicator balance-error">
-                L'écriture n'est pas équilibrée
+                {% trans "L'écriture n'est pas équilibrée" %}
             </div>
             
             <button type="button" class="btn btn-secondary btn-sm add-line-btn" onclick="addLine()">
-                + Ajouter une ligne
+                {% trans "+ Ajouter une ligne" %}
             </button>
             
             <input type="hidden" name="line_count" id="lineCount" value="2">
             
             <div style="margin-top: 30px; text-align: right;">
-                <a href="{% url 'accounting_journal' %}" class="btn btn-secondary">Annuler</a>
+                <a href="{% url 'accounting_journal' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
                 <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
-                    Enregistrer l'écriture
+                    {% trans "Enregistrer l'écriture" %}
                 </button>
             </div>
         </form>
@@ -160,8 +161,8 @@
 {% block extra_js %}
 <script>
 const accounts = [
-    {% for account in accounts %}
-    { id: {{ account.id }}, code: "{{ account.code }}", name: "{{ account.name|escapejs }}" },
+    {% for account in accounts %}{% trans account.name as account_label %}
+    { id: {{ account.id }}, code: "{{ account.code|escapejs }}", name: "{{ account_label|escapejs }}" },
     {% endfor %}
 ];
 
@@ -173,10 +174,10 @@ function addLine(accountId = '', debit = '', credit = '', lineDesc = '') {
     row.id = `line-${lineIndex}`;
     
     // Options du select de compte
-    let options = '<option value="">-- Sélectionner un compte --</option>';
+    let options = `<option value="">${gettext('-- Sélectionner un compte --')}</option>`;
     accounts.forEach(acc => {
         const selected = acc.id == accountId ? 'selected' : '';
-        options += `<option value="${acc.id}" ${selected}>${acc.code} - ${acc.name}</option>`;
+        options += `<option value="${acc.id}" ${selected}>${escapeHtml(acc.code)} - ${escapeHtml(acc.name)}</option>`;
     });
     
     row.innerHTML = `
@@ -187,21 +188,21 @@ function addLine(accountId = '', debit = '', credit = '', lineDesc = '') {
         </td>
         <td class="amount-cell">
             <input type="number" class="form-control debit-input" name="debit_${lineIndex}" 
-                   value="${debit}" step="0.01" min="0" placeholder="0.00" 
+                   value="${escapeHtml(debit)}" step="0.01" min="0" placeholder="0.00" 
                    oninput="clearCredit(this); updateBalance()">
         </td>
         <td class="amount-cell">
             <input type="number" class="form-control credit-input" name="credit_${lineIndex}" 
-                   value="${credit}" step="0.01" min="0" placeholder="0.00" 
+                   value="${escapeHtml(credit)}" step="0.01" min="0" placeholder="0.00" 
                    oninput="clearDebit(this); updateBalance()">
         </td>
         <td>
             <input type="text" class="form-control" name="line_desc_${lineIndex}" 
-                   value="${lineDesc}" placeholder="Libellé (optionnel)">
+                   value="${escapeHtml(lineDesc)}" placeholder="${gettext('Libellé (optionnel)')}">
         </td>
         <td>
             <button type="button" class="btn btn-danger btn-sm" onclick="removeLine(${lineIndex})" 
-                    title="Supprimer">
+                    title="${gettext('Supprimer')}">
                 ×
             </button>
         </td>
@@ -258,11 +259,11 @@ function updateBalance() {
     const diff = Math.abs(totalDebit - totalCredit);
     if (diff < 0.01 && totalDebit > 0 && totalCredit > 0) {
         indicator.className = 'balance-indicator balance-ok';
-        indicator.textContent = 'Écriture équilibrée ✓';
+        indicator.textContent = gettext('Écriture équilibrée ✓');
         submitBtn.disabled = false;
     } else {
         indicator.className = 'balance-indicator balance-error';
-        indicator.textContent = `Écriture non équilibrée (différence: ${diff.toFixed(2)})`;
+        indicator.textContent = interpolate(gettext('Écriture non équilibrée (différence: %(diff)s)'), {diff: diff.toFixed(2)}, true);
         submitBtn.disabled = true;
     }
 }

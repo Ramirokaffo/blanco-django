@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block title %}{{ product.name }} - {{ system_settings.company_name }}{% endblock %}
@@ -10,10 +11,10 @@
 {% block content %}
 <div class="product-detail-header">
     <div class="page-header">
-        <h1>Détail du produit</h1>
-        <p class="text-secondary">Consultez les informations complètes de <strong>{{ product.name }}</strong>.</p>
+        <h1>{% trans "Détail du produit" %}</h1>
+        <p class="text-secondary">{% blocktrans with name=product.name %}Consultez les informations complètes de <strong>{{ name }}</strong>.{% endblocktrans %}</p>
     </div>
-    <a href="{% url 'products' %}" class="btn btn-secondary btn-sm back-link-inline">← Retour aux produits</a>
+    <a href="{% url 'products' %}" class="btn btn-secondary btn-sm back-link-inline">← {% trans "Retour aux produits" %}</a>
 </div>
 
 <div class="product-detail-layout">
@@ -31,7 +32,7 @@
             <div class="product-gallery">
                 {% for image in product_images %}
                     {% if image.image %}
-                    <div class="product-gallery-item"><img src="{{ image.image.url }}" alt="{{ product.name }} - image {{ forloop.counter }}"></div>
+                    <div class="product-gallery-item"><img src="{{ image.image.url }}" alt="{% blocktrans with name=product.name index=forloop.counter %}{{ name }} - image {{ index }}{% endblocktrans %}"></div>
                     {% endif %}
                 {% endfor %}
             </div>
@@ -42,41 +43,45 @@
             <span class="product-code-badge">{{ product.code }}</span>
             <div>
                 <h2>{{ product.name }}</h2>
-                <p class="product-subtitle">{{ product.brand|default:"Produit sans marque renseignée" }}</p>
+                {% trans "Produit sans marque renseignée" as no_brand_label %}
+                <p class="product-subtitle">{{ product.brand|default:no_brand_label }}</p>
             </div>
 
+            {% trans "Non définie" as undefined_f_label %}
+            {% trans "Non défini" as undefined_m_label %}
             <div class="product-tags">
-                <span class="product-tag">Catégorie : {{ product.category.name|default:"Non définie" }}</span>
-                <span class="product-tag">Rayon : {{ product.rayon.name|default:"Non défini" }}</span>
-                <span class="product-tag">Gamme : {{ product.gamme.name|default:"Non définie" }}</span>
+                <span class="product-tag">{% blocktrans with category=product.category.name|default:undefined_f_label %}Catégorie : {{ category }}{% endblocktrans %}</span>
+                <span class="product-tag">{% blocktrans with rayon=product.rayon.name|default:undefined_m_label %}Rayon : {{ rayon }}{% endblocktrans %}</span>
+                <span class="product-tag">{% blocktrans with gamme=product.gamme.name|default:undefined_f_label %}Gamme : {{ gamme }}{% endblocktrans %}</span>
             </div>
 
-            <p class="product-description">{{ product.description|default:"Aucune description disponible pour ce produit." }}</p>
+            {% trans "Aucune description disponible pour ce produit." as no_description_label %}
+            <p class="product-description">{{ product.description|default:no_description_label }}</p>
 
             <div class="price-grid">
                 <div class="stat-card">
-                    <span class="stat-label">Prix actuel</span>
+                    <span class="stat-label">{% trans "Prix actuel" %}</span>
                     <span class="stat-value">{% if product.actual_price %}{{ product.actual_price|floatformat:0 }} FCFA{% else %}-{% endif %}</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">Prix max</span>
+                    <span class="stat-label">{% trans "Prix max" %}</span>
                     <span class="stat-value">{% if product.max_salable_price %}{{ product.max_salable_price|floatformat:0 }} FCFA{% else %}-{% endif %}</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-label">Dernier achat</span>
+                    <span class="stat-label">{% trans "Dernier achat" %}</span>
                     <span class="stat-value">{% if product.last_purchase_price %}{{ product.last_purchase_price|floatformat:0 }} FCFA{% else %}-{% endif %}</span>
                 </div>
             </div>
 
             <div class="card">
-                <h3 class="product-section-title">Caractéristiques</h3>
+                <h3 class="product-section-title">{% trans "Caractéristiques" %}</h3>
                 <div class="product-meta-grid">
-                    <div class="detail-item"><span class="detail-label">Couleur</span><span class="detail-value">{{ product.color|default:"-" }}</span></div>
-                    <div class="detail-item"><span class="detail-label">Grammage</span><span class="detail-value">{% if product.grammage %}{{ product.grammage|floatformat:-2 }} {{ product.grammage_type.name|default:"" }}{% else %}-{% endif %}</span></div>
-                    <div class="detail-item"><span class="detail-label">TVA</span><span class="detail-value">{{ product.has_vat|yesno:"Applicable,Non applicable" }}</span></div>
-                    <div class="detail-item"><span class="detail-label">Prix réductible</span><span class="detail-value">{{ product.is_price_reducible|yesno:"Oui,Non" }}</span></div>
-                    <div class="detail-item"><span class="detail-label">Seuil d'alerte</span><span class="detail-value">{{ product.stock_limit|default:"-" }}</span></div>
-                    <div class="detail-item"><span class="detail-label">Alerte expiration</span><span class="detail-value">{% if product.exp_alert_period %}{{ product.exp_alert_period }} jours{% else %}-{% endif %}</span></div>
+                    <div class="detail-item"><span class="detail-label">{% trans "Couleur" %}</span><span class="detail-value">{{ product.color|default:"-" }}</span></div>
+                    <div class="detail-item"><span class="detail-label">{% trans "Grammage" %}</span><span class="detail-value">{% if product.grammage %}{{ product.grammage|floatformat:-2 }} {{ product.grammage_type.name|default:"" }}{% else %}-{% endif %}</span></div>
+                    <div class="detail-item"><span class="detail-label">{% trans "TVA" %}</span><span class="detail-value">{% if product.has_vat %}{% trans "Applicable" %}{% else %}{% trans "Non applicable" %}{% endif %}</span></div>
+                    <div class="detail-item"><span class="detail-label">{% trans "Prix réductible" %}</span><span class="detail-value">{% if product.is_price_reducible %}{% trans "Oui" %}{% else %}{% trans "Non" %}{% endif %}</span></div>
+                    <div class="detail-item"><span class="detail-label">{% trans "Seuil d'alerte" %}</span><span class="detail-value">{{ product.stock_limit|default:"-" }}</span></div>
+                    <div class="detail-item"><span class="detail-label">{% trans "Alerte expiration" %}</span><span class="detail-value">{% if product.exp_alert_period %}{% blocktrans count counter=product.exp_alert_period|default:0 %}{{ counter }} jour{% plural %}{{ counter }} jours{% endblocktrans %}{% else %}-{% endif %}</span></div>
                 </div>
             </div>
         </div>
@@ -84,26 +89,26 @@
 
     <div class="product-side-panel">
         <div class="product-status-card {% if product.stock == 0 %}status-danger{% elif product.is_low_stock %}status-warning{% endif %}">
-            <span class="status-label">État du stock</span>
+            <span class="status-label">{% trans "État du stock" %}</span>
             <span class="status-value">{{ product.stock }}</span>
             <span class="status-help">
                 {% if product.stock == 0 %}
-                    Produit en rupture de stock.
+                    {% trans "Produit en rupture de stock." %}
                 {% elif product.is_low_stock %}
-                    Stock bas : attention au seuil d'alerte.
+                    {% trans "Stock bas : attention au seuil d'alerte." %}
                 {% else %}
-                    Stock disponible pour la vente.
+                    {% trans "Stock disponible pour la vente." %}
                 {% endif %}
             </span>
         </div>
 
         <div class="card">
-            <h3 class="product-section-title">Résumé rapide</h3>
+            <h3 class="product-section-title">{% trans "Résumé rapide" %}</h3>
             <div class="product-side-grid">
-                <div class="detail-item"><span class="detail-label">Code</span><span class="detail-value">{{ product.code }}</span></div>
-                <div class="detail-item"><span class="detail-label">Marque</span><span class="detail-value">{{ product.brand|default:"-" }}</span></div>
-                <div class="detail-item"><span class="detail-label">Catégorie</span><span class="detail-value">{{ product.category.name|default:"-" }}</span></div>
-                <div class="detail-item"><span class="detail-label">Rayon</span><span class="detail-value">{{ product.rayon.name|default:"-" }}</span></div>
+                <div class="detail-item"><span class="detail-label">{% trans "Code" %}</span><span class="detail-value">{{ product.code }}</span></div>
+                <div class="detail-item"><span class="detail-label">{% trans "Marque" %}</span><span class="detail-value">{{ product.brand|default:"-" }}</span></div>
+                <div class="detail-item"><span class="detail-label">{% trans "Catégorie" %}</span><span class="detail-value">{{ product.category.name|default:"-" }}</span></div>
+                <div class="detail-item"><span class="detail-label">{% trans "Rayon" %}</span><span class="detail-value">{{ product.rayon.name|default:"-" }}</span></div>
             </div>
         </div>
     </div>

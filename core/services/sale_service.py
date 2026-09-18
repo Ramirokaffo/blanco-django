@@ -2,11 +2,13 @@
 Service pour la gestion des ventes.
 """
 
+import logging
 from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from core.models import (
     Sale, SaleProduct, SaleReturn, SaleReturnLine, CreditSale, Product, Client, Refund,
@@ -17,11 +19,24 @@ from core.services.daily_service import DailyService
 from core.services.accounting_service import AccountingService
 
 
+logger = logging.getLogger(__name__)
+
+
 class SaleService:
 
     @staticmethod
     def _append_note(existing_note, new_note):
         return f"{existing_note}\n{new_note}".strip() if existing_note else new_note
+
+    @staticmethod
+    def _ensure_exercise_open(sale):
+        """Une vente d'un exercice clôturé ne peut plus être annulée ni retournée."""
+        exercise = getattr(getattr(sale, 'daily', None), 'exercise', None)
+        if exercise is not None and exercise.end_date is not None:
+            raise ValueError(_(
+                "Impossible de modifier une vente d'un exercice clôturé. "
+                "Passez une écriture de régularisation dans l'exercice en cours."
+            ))
 
     @staticmethod
     def _adjust_credit_schedules(credit_sale, reduction_amount, reason=''):
@@ -46,9 +61,11 @@ class SaleService:
             if schedule.amount_paid > schedule.amount_due:
                 schedule.amount_paid = schedule.amount_due
 
-            note = f"Retour partiel vente #{credit_sale.sale_id} : -{reduction:,.0f} FCFA"
+            note = _("Retour partiel vente #%(id)s : -%(amount)s FCFA") % {
+                'id': credit_sale.sale_id, 'amount': format(reduction, ',.0f'),
+            }
             if reason:
-                note = f"{note} — Motif: {reason}"
+                note = _("%(note)s — Motif: %(reason)s") % {'note': note, 'reason': reason}
             schedule.notes = SaleService._append_note(schedule.notes, note)
             schedule.update_status()
             schedule.save(update_fields=['amount_due', 'amount_paid', 'status', 'notes'])
@@ -101,16 +118,54 @@ class SaleService:
         due_date = validated_data.get('due_date')
         payment_method = validated_data.pop('payment_method', 'CASH')
 
-        client = Client.objects.get(id=client_id) if client_id else None
+        if not items_data:
+            raise ValueError(_("Au moins un article est requis."))
+
+        client = None
+        if client_id:
+            client = Client.objects.filter(id=client_id, delete_at__isnull=True).first()
+            if client is None:
+                raise ValueError(_("Client introuvable."))
+        if is_credit and not due_date:
+            raise ValueError(_("Date d'échéance obligatoire pour une vente à crédit."))
+
         daily = DailyService.get_or_create_active_daily()
         if not daily:
-            raise ValueError("Aucune session Daily ouverte.")
+            raise ValueError(_("Aucune session Daily ouverte."))
 
-        # Calculer le total
-        total = sum(
-            item['unit_price'] * item['quantity']
-            for item in items_data
-        )
+        # Verrouiller les produits et valider les invariants métier ICI (et pas
+        # seulement dans le serializer) : prix strictement positif, plafond,
+        # prix non réductible respecté, stock suffisant sous verrou.
+        locked_items = []
+        for item_data in items_data:
+            quantity = int(item_data['quantity'])
+            unit_price = Decimal(str(item_data['unit_price']))
+            product = Product.objects.select_for_update().filter(
+                id=item_data['product_id'], delete_at__isnull=True,
+            ).first()
+            if product is None:
+                raise ValueError(_("Produit introuvable."))
+            if quantity <= 0:
+                raise ValueError(_("Quantité invalide pour %(product)s.") % {'product': product.name})
+            if unit_price <= 0:
+                raise ValueError(_("Prix unitaire invalide pour %(product)s.") % {'product': product.name})
+            if product.max_salable_price and unit_price > product.max_salable_price:
+                raise ValueError(
+                    _("Prix trop élevé pour %(product)s. Maximum : %(max)s")
+                    % {'product': product.name, 'max': product.max_salable_price}
+                )
+            if (product.actual_price and unit_price < product.actual_price
+                    and not product.is_price_reducible):
+                raise ValueError(_("Le prix de %(product)s ne peut pas être réduit.") % {'product': product.name})
+            if (product.stock or 0) < quantity:
+                raise ValueError(
+                    _("Stock insuffisant pour %(product)s. Disponible : %(stock)s")
+                    % {'product': product.name, 'stock': product.stock}
+                )
+            locked_items.append((product, quantity, unit_price))
+
+        # Calculer le total à partir des valeurs validées
+        total = sum(unit_price * quantity for _product, quantity, unit_price in locked_items)
 
         # Créer la vente
         sale = Sale.objects.create(
@@ -125,17 +180,16 @@ class SaleService:
 
         # Créer les articles et mettre à jour le stock
         has_vat = False
-        for item_data in items_data:
-            product = Product.objects.select_for_update().get(id=item_data['product_id'])
+        for product, quantity, unit_price in locked_items:
             if product.has_vat:
                 has_vat = True
             SaleProduct.objects.create(
                 sale=sale,
                 product=product,
-                quantity=item_data['quantity'],
-                unit_price=item_data['unit_price'],
+                quantity=quantity,
+                unit_price=unit_price,
             )
-            product.stock -= item_data['quantity']
+            product.stock -= quantity
             product.save(update_fields=['stock'])
 
         # Mettre à jour le champ has_vat sur la vente
@@ -169,23 +223,47 @@ class SaleService:
                     status='PENDING',
                 )
 
-        # Enregistrer l'écriture comptable
-        try:
-            AccountingService.record_sale(
-                sale=sale,
-                daily=daily,
-                exercise=daily.exercise,
-                payment_method=payment_method,
-                apply_tax=apply_tax_now,
-            )
-            # Marquer les écritures TVA comme créées si on est en mode immédiat
-            if apply_tax_now:
-                sale.tva_accounting_created = True
-                sale.save(update_fields=['tva_accounting_created'])
-        except Exception:
-            pass  # Ne pas bloquer la vente si la comptabilité échoue
+        # Enregistrer l'écriture comptable. Une erreur ne bloque pas la vente
+        # (continuité de service en caisse) mais n'est plus silencieuse : elle
+        # est journalisée et la vente est marquée « à rejouer »
+        # (``manage.py replay_accounting``).
+        SaleService.record_sale_accounting(
+            sale, daily, payment_method=payment_method, apply_tax=apply_tax_now,
+        )
 
         return sale
+
+    @staticmethod
+    def record_sale_accounting(sale, daily, payment_method='CASH', apply_tax=False):
+        """
+        Passe l'écriture comptable d'une vente dans un savepoint dédié.
+        Retourne True si l'écriture a été créée, False sinon (vente marquée
+        ``accounting_pending``).
+        """
+        try:
+            with transaction.atomic():
+                AccountingService.record_sale(
+                    sale=sale,
+                    daily=daily,
+                    exercise=daily.exercise,
+                    payment_method=payment_method,
+                    apply_tax=apply_tax,
+                )
+                if apply_tax and not sale.tva_accounting_created:
+                    sale.tva_accounting_created = True
+                    sale.save(update_fields=['tva_accounting_created'])
+        except Exception:
+            logger.exception(
+                "Écriture comptable impossible pour la vente #%s (marquée à rejouer)",
+                sale.pk,
+            )
+            Sale.objects.filter(pk=sale.pk).update(accounting_pending=True)
+            sale.accounting_pending = True
+            return False
+        if sale.accounting_pending:
+            Sale.objects.filter(pk=sale.pk).update(accounting_pending=False)
+            sale.accounting_pending = False
+        return True
 
     @staticmethod
     @transaction.atomic
@@ -197,11 +275,12 @@ class SaleService:
         ).prefetch_related('sale_products__product', 'credit_info__payments').get(id=sale.id)
 
         if sale.delete_at is not None:
-            raise ValueError("Cette vente est déjà annulée.")
+            raise ValueError(_("Cette vente est déjà annulée."))
+        SaleService._ensure_exercise_open(sale)
 
         sale_lines = list(sale.sale_products.filter(delete_at__isnull=True).select_related('product'))
         if not sale_lines:
-            raise ValueError("Impossible d'annuler une vente sans lignes de produits actives.")
+            raise ValueError(_("Impossible d'annuler une vente sans lignes de produits actives."))
 
         credit_sale = getattr(sale, 'credit_info', None) if sale.is_credit else None
         amount_paid = Decimal('0')
@@ -234,9 +313,11 @@ class SaleService:
 
         invoice = getattr(sale, 'invoice', None)
         if invoice and invoice.delete_at is None and invoice.status != 'CANCELLED':
-            note = f"Annulée le {timezone.localtime(cancel_at).strftime('%d/%m/%Y %H:%M')}"
+            note = _("Annulée le %(date)s") % {
+                'date': timezone.localtime(cancel_at).strftime('%d/%m/%Y %H:%M'),
+            }
             if reason:
-                note = f"{note} — Motif: {reason}"
+                note = _("%(note)s — Motif: %(reason)s") % {'note': note, 'reason': reason}
             invoice.status = 'CANCELLED'
             invoice.notes = f"{invoice.notes}\n{note}".strip() if invoice.notes else note
             invoice.save(update_fields=['status', 'notes'])
@@ -263,16 +344,17 @@ class SaleService:
         ).prefetch_related('sale_products__product').get(id=sale.id)
 
         if sale.delete_at is not None:
-            raise ValueError("Cette vente est déjà annulée.")
+            raise ValueError(_("Cette vente est déjà annulée."))
+        SaleService._ensure_exercise_open(sale)
         if not returned_items:
-            raise ValueError("Veuillez sélectionner au moins une quantité à retourner.")
+            raise ValueError(_("Veuillez sélectionner au moins une quantité à retourner."))
 
         sale_products = {
             sp.id: sp
             for sp in sale.sale_products.filter(delete_at__isnull=True).select_related('product')
         }
         if not sale_products:
-            raise ValueError("Impossible d'enregistrer un retour sur une vente sans lignes actives.")
+            raise ValueError(_("Impossible d'enregistrer un retour sur une vente sans lignes actives."))
 
         validated_items = []
         return_total = Decimal('0')
@@ -284,11 +366,14 @@ class SaleService:
             sale_product = sale_products.get(sale_product_id)
 
             if sale_product is None:
-                raise ValueError("Une ligne de vente demandée est introuvable ou inactive.")
+                raise ValueError(_("Une ligne de vente demandée est introuvable ou inactive."))
             if quantity <= 0:
                 continue
             if quantity > sale_product.quantity:
-                raise ValueError(f"La quantité retournée dépasse le disponible pour {sale_product.product.name}.")
+                raise ValueError(
+                    _("La quantité retournée dépasse le disponible pour %(product)s.")
+                    % {'product': sale_product.product.name}
+                )
 
             line_total = Decimal(str(sale_product.unit_price)) * quantity
             validated_items.append({
@@ -299,7 +384,7 @@ class SaleService:
             return_total += line_total
 
         if not validated_items:
-            raise ValueError("Veuillez sélectionner au moins une quantité à retourner.")
+            raise ValueError(_("Veuillez sélectionner au moins une quantité à retourner."))
 
         for sale_product in sale_products.values():
             requested_qty = next(
@@ -311,12 +396,12 @@ class SaleService:
                 break
 
         if not remaining_quantity_exists:
-            raise ValueError("Ce retour couvre toute la vente. Utilisez l'annulation totale pour ce cas.")
+            raise ValueError(_("Ce retour couvre toute la vente. Utilisez l'annulation totale pour ce cas."))
 
         previous_total = Decimal(str(sale.total or 0))
         new_total = previous_total - return_total
         if new_total <= 0:
-            raise ValueError("Ce retour couvre toute la vente. Utilisez l'annulation totale pour ce cas.")
+            raise ValueError(_("Ce retour couvre toute la vente. Utilisez l'annulation totale pour ce cas."))
 
         sale_return = SaleReturn.objects.create(
             sale=sale,
@@ -351,7 +436,7 @@ class SaleService:
         credit_sale = getattr(sale, 'credit_info', None) if sale.is_credit else None
         if sale.is_credit:
             if credit_sale is None or credit_sale.delete_at is not None:
-                raise ValueError("La vente à crédit ne possède pas d'information de crédit active.")
+                raise ValueError(_("La vente à crédit ne possède pas d'information de crédit active."))
 
             current_paid = Decimal(str(credit_sale.amount_paid or 0))
             refund_amount = max(current_paid - new_total, Decimal('0'))
@@ -380,23 +465,25 @@ class SaleService:
         )
 
         if refund_amount > 0:
-            refund_reason = reason or 'Retour partiel'
+            refund_reason = reason or _('Retour partiel')
             Refund.objects.create(
                 sale=sale,
                 value=refund_amount,
-                reason=f"Retour partiel — {refund_reason}",
+                reason=_("Retour partiel — %(reason)s") % {'reason': refund_reason},
             )
 
         invoice = getattr(sale, 'invoice', None)
         if invoice and invoice.delete_at is None:
-            note = (
-                f"Retour partiel le {timezone.localtime(return_at).strftime('%d/%m/%Y %H:%M')} "
-                f"— Montant retourné: {return_total:,.0f} FCFA"
-            )
+            note = _("Retour partiel le %(date)s — Montant retourné: %(amount)s FCFA") % {
+                'date': timezone.localtime(return_at).strftime('%d/%m/%Y %H:%M'),
+                'amount': format(return_total, ',.0f'),
+            }
             if refund_amount > 0:
-                note = f"{note} — Remboursement: {refund_amount:,.0f} FCFA"
+                note = _("%(note)s — Remboursement: %(amount)s FCFA") % {
+                    'note': note, 'amount': format(refund_amount, ',.0f'),
+                }
             if reason:
-                note = f"{note} — Motif: {reason}"
+                note = _("%(note)s — Motif: %(reason)s") % {'note': note, 'reason': reason}
             invoice.notes = SaleService._append_note(invoice.notes, note)
             invoice.save(update_fields=['notes'])
 

@@ -1,19 +1,20 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Clients - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Clients" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>Gestion des clients</h1>
-    <p class="text-secondary">Gérez votre base de clients</p>
+    <h1>{% trans "Gestion des clients" %}</h1>
+    <p class="text-secondary">{% trans "Gérez votre base de clients" %}</p>
 </div>
 
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des clients</h3>
+        <h3 class="card-title">{% trans "Liste des clients" %}</h3>
     </div>
     <div class="card-body">
-        <p>Contenu à venir...</p>
+        <p>{% trans "Contenu à venir..." %}</p>
     </div>
 </div>
 {% endblock %}

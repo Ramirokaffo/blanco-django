@@ -19,7 +19,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const saleNotification = document.getElementById('saleNotification');
 
     // Fonction pour afficher une notification
-    function showNotification(message, type = 'info') {
+    // Le message est inséré en texte brut (textContent). Passer allowHtml = true uniquement
+    // pour un message construit avec du balisage dont les parties dynamiques sont déjà échappées.
+    function showNotification(message, type = 'info', allowHtml = false) {
         if (!saleNotification) return;
 
         // Supprimer les anciennes classes de type
@@ -31,7 +33,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Mettre à jour le message
         const messageElement = saleNotification.querySelector('.notification-message');
         if (messageElement) {
-            messageElement.innerHTML = message;
+            if (allowHtml) {
+                messageElement.innerHTML = message;
+            } else {
+                messageElement.textContent = message;
+            }
         }
 
         // Afficher la notification
@@ -132,10 +138,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Ajout au panier par délégation d'événement : les données produit sont lues
+    // depuis les attributs data-* (jamais interpolées dans un onclick inline)
+    if (searchResults) {
+        searchResults.addEventListener('click', function(e) {
+            const resultItem = e.target.closest('.search-result-item[data-id]');
+            if (!resultItem || !searchResults.contains(resultItem)) return;
+
+            addToCart(
+                Number(resultItem.dataset.id),
+                resultItem.dataset.name,
+                Number(resultItem.dataset.price),
+                Number(resultItem.dataset.stock),
+                resultItem.dataset.reducible === 'true'
+            );
+        });
+    }
     
     // Fonction de recherche de produits
     function searchProducts(query) {
-        searchResults.innerHTML = '<div class="search-result-item" style="padding: 20px; text-align: center; color: var(--text-secondary);">Recherche en cours...</div>';
+        searchResults.innerHTML = '<div class="search-result-item" style="padding: 20px; text-align: center; color: var(--text-secondary);">' + gettext('Recherche en cours...') + '</div>';
         searchResults.classList.add('active');
 
         // Appel API réel
@@ -151,23 +174,28 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Erreur:', error);
-                searchResults.innerHTML = '<div class="search-result-item" style="padding: 20px; text-align: center; color: var(--danger-color);">Erreur lors de la recherche</div>';
+                searchResults.innerHTML = '<div class="search-result-item" style="padding: 20px; text-align: center; color: var(--danger-color);">' + gettext('Erreur lors de la recherche') + '</div>';
             });
     }
     
     // Afficher les résultats de recherche
     function displaySearchResults(products) {
         if (products.length === 0) {
-            searchResults.innerHTML = '<div class="search-result-item" style="padding: 20px; text-align: center; color: var(--text-secondary);">Aucun produit trouvé</div>';
+            searchResults.innerHTML = '<div class="search-result-item" style="padding: 20px; text-align: center; color: var(--text-secondary);">' + gettext('Aucun produit trouvé') + '</div>';
             return;
         }
         
         searchResults.innerHTML = products.map(product => `
-            <div class="search-result-item" onclick="addToCart(${product.id}, '${product.name}', ${product.actual_price}, ${product.stock}, ${product.is_price_reducible})">
-                <div class="product-name">${product.name}</div>
+            <div class="search-result-item"
+                 data-id="${escapeHtml(product.id)}"
+                 data-name="${escapeHtml(product.name)}"
+                 data-price="${escapeHtml(product.actual_price)}"
+                 data-stock="${escapeHtml(product.stock)}"
+                 data-reducible="${product.is_price_reducible ? 'true' : 'false'}">
+                <div class="product-name">${escapeHtml(product.name)}</div>
                 <div class="product-info">
-                    <span>Code: ${product.code}</span>
-                    <span>Stock: ${product.stock}</span>
+                    <span>${gettext('Code:')} ${escapeHtml(product.code)}</span>
+                    <span>${gettext('Stock:')} ${escapeHtml(product.stock)}</span>
                     <span class="product-price">${formatCurrency(product.actual_price)}</span>
                 </div>
             </div>
@@ -183,9 +211,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (existingItem.quantity < stock) {
                 existingItem.quantity++;
                 updateCart();
-                showNotification(`Quantité de "${productName}" mise à jour`, 'success');
+                showNotification(interpolate(gettext('Quantité de "%(name)s" mise à jour'), {name: productName}, true), 'success');
             } else {
-                showNotification(`Stock insuffisant pour "${productName}". Stock disponible: ${stock}`, 'warning');
+                showNotification(interpolate(gettext('Stock insuffisant pour "%(name)s". Stock disponible: %(stock)s'), {name: productName, stock: stock}, true), 'warning');
             }
         } else {
             cart.push({
@@ -197,7 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 isPriceReducible: isPriceReducible
             });
             updateCart();
-            showNotification(`"${productName}" ajouté au panier`, 'success');
+            showNotification(interpolate(gettext('"%(name)s" ajouté au panier'), {name: productName}, true), 'success');
         }
 
         // Réinitialiser la recherche
@@ -209,12 +237,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Mettre à jour l'affichage du panier
     function updateCart() {
         if (cart.length === 0) {
-            cartItems.innerHTML = '<tr class="empty-cart"><td colspan="5" class="text-center">Le panier est vide</td></tr>';
+            cartItems.innerHTML = '<tr class="empty-cart"><td colspan="5" class="text-center">' + gettext('Le panier est vide') + '</td></tr>';
             completeSaleBtn.disabled = true;
         } else {
             cartItems.innerHTML = cart.map((item, index) => `
                 <tr class="cart-item-enter">
-                    <td>${item.name}</td>
+                    <td>${escapeHtml(item.name)}</td>
                     <td>
                         <input type="number"
                                min="0"
@@ -226,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </td>
                     <td>
                         <div class="quantity-control">
-                            <button class="quantity-btn" onclick="decrementQuantity(${index})" title="Diminuer">
+                            <button class="quantity-btn" onclick="decrementQuantity(${index})" title="${gettext('Diminuer')}">
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                     <path d="M2 6h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
@@ -237,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                    value="${item.quantity}"
                                    onchange="updateQuantity(${index}, this.value)"
                                    class="cart-quantity-input">
-                            <button class="quantity-btn" onclick="incrementQuantity(${index})" title="Augmenter">
+                            <button class="quantity-btn" onclick="incrementQuantity(${index})" title="${gettext('Augmenter')}">
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                     <path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
@@ -247,13 +275,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="font-weight-bold">${formatCurrency(calculateSubtotal(item))}</td>
                     <td>
                         <div class="cart-item-actions">
-                            <button class="btn-icon" onclick="viewProductDetails(${item.id})" title="Voir détails">
+                            <button class="btn-icon" onclick="viewProductDetails(${item.id})" title="${gettext('Voir détails')}">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                     <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.5"/>
                                     <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
                                 </svg>
                             </button>
-                            <button class="btn-icon btn-icon-danger" onclick="removeFromCart(${index})" title="Retirer">
+                            <button class="btn-icon btn-icon-danger" onclick="removeFromCart(${index})" title="${gettext('Retirer')}">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                     <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 </svg>
@@ -280,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cart[index].price = price;
             updateCart();
         } else {
-            showNotification('Prix invalide. Le prix doit être supérieur ou égal à 0.', 'error');
+            showNotification(gettext('Prix invalide. Le prix doit être supérieur ou égal à 0.'), 'error');
             updateCart();
         }
     };
@@ -292,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cart[index].quantity = quantity;
             updateCart();
         } else {
-            showNotification(`Quantité invalide. Stock disponible: ${cart[index].stock}`, 'error');
+            showNotification(interpolate(gettext('Quantité invalide. Stock disponible: %(stock)s'), {stock: cart[index].stock}, true), 'error');
             updateCart();
         }
     };
@@ -303,7 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cart[index].quantity++;
             updateCart();
         } else {
-            showNotification(`Stock maximum atteint pour "${cart[index].name}". Stock disponible: ${cart[index].stock}`, 'warning');
+            showNotification(interpolate(gettext('Stock maximum atteint pour "%(name)s". Stock disponible: %(stock)s'), {name: cart[index].name, stock: cart[index].stock}, true), 'warning');
         }
     };
 
@@ -313,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cart[index].quantity--;
             updateCart();
         } else {
-            showNotification('La quantité minimale est 1. Utilisez le bouton de suppression pour retirer l\'article.', 'warning');
+            showNotification(gettext('La quantité minimale est 1. Utilisez le bouton de suppression pour retirer l\'article.'), 'warning');
         }
     };
     
@@ -333,7 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
         modalContent.innerHTML = `
             <div class="loading-spinner">
                 <div class="spinner"></div>
-                <p>Chargement des détails...</p>
+                <p>${gettext('Chargement des détails...')}</p>
             </div>
         `;
 
@@ -352,12 +380,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     imagesHtml = `
                         <div class="product-images">
                             ${product.images.map(img => `
-                                <img src="${img.url}" alt="${product.name}" class="product-image ${img.is_main ? 'main-image' : ''}">
+                                <img src="${escapeHtml(img.url)}" alt="${escapeHtml(product.name)}" class="product-image ${img.is_main ? 'main-image' : ''}">
                             `).join('')}
                         </div>
                     `;
                 } else {
-                    imagesHtml = '<div class="no-image">Aucune image disponible</div>';
+                    imagesHtml = '<div class="no-image">' + gettext('Aucune image disponible') + '</div>';
                 }
 
                 modalContent.innerHTML = `
@@ -366,71 +394,71 @@ document.addEventListener('DOMContentLoaded', function() {
                             ${imagesHtml}
                         </div>
                         <div class="product-info-section">
-                            <h2>${product.name}</h2>
+                            <h2>${escapeHtml(product.name)}</h2>
                             <div class="product-detail-row">
-                                <span class="detail-label">Code:</span>
-                                <span class="detail-value">${product.code}</span>
+                                <span class="detail-label">${gettext('Code:')}</span>
+                                <span class="detail-value">${escapeHtml(product.code)}</span>
                             </div>
                             ${product.brand ? `
                                 <div class="product-detail-row">
-                                    <span class="detail-label">Marque:</span>
-                                    <span class="detail-value">${product.brand}</span>
+                                    <span class="detail-label">${gettext('Marque:')}</span>
+                                    <span class="detail-value">${escapeHtml(product.brand)}</span>
                                 </div>
                             ` : ''}
                             ${product.color ? `
                                 <div class="product-detail-row">
-                                    <span class="detail-label">Couleur:</span>
-                                    <span class="detail-value">${product.color}</span>
+                                    <span class="detail-label">${gettext('Couleur:')}</span>
+                                    <span class="detail-value">${escapeHtml(product.color)}</span>
                                 </div>
                             ` : ''}
                             <div class="product-detail-row">
-                                <span class="detail-label">Stock disponible:</span>
-                                <span class="detail-value ${product.stock <= (product.stock_limit || 5) ? 'text-danger' : 'text-success'}">${product.stock}</span>
+                                <span class="detail-label">${gettext('Stock disponible:')}</span>
+                                <span class="detail-value ${product.stock <= (product.stock_limit || 5) ? 'text-danger' : 'text-success'}">${escapeHtml(product.stock)}</span>
                             </div>
                             ${product.actual_price ? `
                                 <div class="product-detail-row">
-                                    <span class="detail-label">Prix actuel:</span>
+                                    <span class="detail-label">${gettext('Prix actuel:')}</span>
                                     <span class="detail-value font-weight-bold">${formatCurrency(product.actual_price)}</span>
                                 </div>
                             ` : ''}
                             ${product.max_salable_price ? `
                                 <div class="product-detail-row">
-                                    <span class="detail-label">Prix maximum:</span>
+                                    <span class="detail-label">${gettext('Prix maximum:')}</span>
                                     <span class="detail-value">${formatCurrency(product.max_salable_price)}</span>
                                 </div>
                             ` : ''}
                             <div class="product-detail-row">
-                                <span class="detail-label">Prix modifiable:</span>
-                                <span class="detail-value">${product.is_price_reducible ? '✓ Oui' : '✗ Non'}</span>
+                                <span class="detail-label">${gettext('Prix modifiable:')}</span>
+                                <span class="detail-value">${product.is_price_reducible ? gettext('✓ Oui') : gettext('✗ Non')}</span>
                             </div>
                             ${product.category ? `
                                 <div class="product-detail-row">
-                                    <span class="detail-label">Catégorie:</span>
-                                    <span class="detail-value">${product.category.name}</span>
+                                    <span class="detail-label">${gettext('Catégorie:')}</span>
+                                    <span class="detail-value">${escapeHtml(product.category.name)}</span>
                                 </div>
                             ` : ''}
                             ${product.gamme ? `
                                 <div class="product-detail-row">
-                                    <span class="detail-label">Gamme:</span>
-                                    <span class="detail-value">${product.gamme.name}</span>
+                                    <span class="detail-label">${gettext('Gamme:')}</span>
+                                    <span class="detail-value">${escapeHtml(product.gamme.name)}</span>
                                 </div>
                             ` : ''}
                             ${product.rayon ? `
                                 <div class="product-detail-row">
-                                    <span class="detail-label">Rayon:</span>
-                                    <span class="detail-value">${product.rayon.name}</span>
+                                    <span class="detail-label">${gettext('Rayon:')}</span>
+                                    <span class="detail-value">${escapeHtml(product.rayon.name)}</span>
                                 </div>
                             ` : ''}
                             ${product.grammage && product.grammage_type ? `
                                 <div class="product-detail-row">
-                                    <span class="detail-label">Grammage:</span>
-                                    <span class="detail-value">${product.grammage} ${product.grammage_type.name}</span>
+                                    <span class="detail-label">${gettext('Grammage:')}</span>
+                                    <span class="detail-value">${escapeHtml(product.grammage)} ${escapeHtml(product.grammage_type.name)}</span>
                                 </div>
                             ` : ''}
                             ${product.description ? `
                                 <div class="product-detail-row full-width">
-                                    <span class="detail-label">Description:</span>
-                                    <p class="detail-value">${product.description}</p>
+                                    <span class="detail-label">${gettext('Description:')}</span>
+                                    <p class="detail-value">${escapeHtml(product.description)}</p>
                                 </div>
                             ` : ''}
                         </div>
@@ -441,8 +469,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Erreur:', error);
                 modalContent.innerHTML = `
                     <div class="error-message">
-                        <p>Erreur lors du chargement des détails du produit.</p>
-                        <button class="btn btn-primary" onclick="closeProductModal()">Fermer</button>
+                        <p>${gettext('Erreur lors du chargement des détails du produit.')}</p>
+                        <button class="btn btn-primary" onclick="closeProductModal()">${gettext('Fermer')}</button>
                     </div>
                 `;
             });
@@ -457,7 +485,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Vider le panier
     if (clearCartBtn) {
         clearCartBtn.addEventListener('click', function() {
-            if (confirm('Voulez-vous vraiment vider le panier ?')) {
+            if (confirm(gettext('Voulez-vous vraiment vider le panier ?'))) {
                 clearCart();
             }
         });
@@ -485,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
             closeSaleNotification();
 
             if (cart.length === 0) {
-                showNotification('Le panier est vide. Veuillez ajouter des produits avant de valider la vente.', 'warning');
+                showNotification(gettext('Le panier est vide. Veuillez ajouter des produits avant de valider la vente.'), 'warning');
                 return;
             }
 
@@ -495,7 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Validation pour vente à crédit
             if (saleType === 'credit' && !dueDate) {
-                showNotification('Veuillez sélectionner une date d\'échéance pour la vente à crédit.', 'error');
+                showNotification(gettext('Veuillez sélectionner une date d\'échéance pour la vente à crédit.'), 'error');
                 return;
             }
 
@@ -516,7 +544,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const totalAmount = parseFloat(document.getElementById('grandTotal').textContent.replace(/[^\d]/g, ''));
 
             // Afficher un message de confirmation
-            showNotification(`Validation de la vente en cours... Montant total: ${formatCurrency(totalAmount)}`, 'info');
+            showNotification(interpolate(gettext('Validation de la vente en cours... Montant total: %(total)s'), {total: formatCurrency(totalAmount)}, true), 'info');
 
             // Désactiver le bouton et afficher un loader
             completeSaleBtn.disabled = true;
@@ -539,7 +567,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
-                showNotification('✓ Vente enregistrée avec succès!', 'success');
+                showNotification(gettext('✓ Vente enregistrée avec succès!'), 'success');
 
                 // Attendre 2 secondes avant de recharger pour que l'utilisateur voie le message
                 setTimeout(() => {
@@ -550,15 +578,15 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Erreur:', error);
-                let errorMessage = '<strong>Erreur lors de l\'enregistrement de la vente</strong><br><br>';
+                let errorMessage = '<strong>' + gettext('Erreur lors de l\'enregistrement de la vente') + '</strong><br><br>';
 
                 // Afficher les erreurs de validation de manière structurée
                 if (error.items && Array.isArray(error.items)) {
-                    errorMessage += '<strong>Erreurs sur les articles:</strong><ul style="margin: 8px 0; padding-left: 20px;">';
+                    errorMessage += '<strong>' + gettext('Erreurs sur les articles:') + '</strong><ul style="margin: 8px 0; padding-left: 20px;">';
                     error.items.forEach((itemError, index) => {
                         if (itemError) {
                             Object.keys(itemError).forEach(key => {
-                                errorMessage += `<li>Article ${index + 1} - ${key}: ${itemError[key]}</li>`;
+                                errorMessage += `<li>${interpolate(gettext('Article %(n)s'), {n: index + 1}, true)} - ${escapeHtml(key)}: ${escapeHtml(itemError[key])}</li>`;
                             });
                         }
                     });
@@ -569,21 +597,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (key !== 'items') {
                             const value = error[key];
                             if (Array.isArray(value)) {
-                                errorMessage += `<strong>${key}:</strong> ${value.join(', ')}<br>`;
+                                errorMessage += `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(value.join(', '))}<br>`;
                             } else if (typeof value === 'string') {
-                                errorMessage += `<strong>${key}:</strong> ${value}<br>`;
+                                errorMessage += `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(value)}<br>`;
                             } else {
-                                errorMessage += `<strong>${key}:</strong> ${JSON.stringify(value)}<br>`;
+                                errorMessage += `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(value))}<br>`;
                             }
                         }
                     });
                 } else if (typeof error === 'string') {
-                    errorMessage += error;
+                    errorMessage += escapeHtml(error);
                 } else {
-                    errorMessage += 'Une erreur inattendue s\'est produite.';
+                    errorMessage += gettext('Une erreur inattendue s\'est produite.');
                 }
 
-                showNotification(errorMessage, 'error');
+                showNotification(errorMessage, 'error', true);
             })
             .finally(() => {
                 // Réactiver le bouton
@@ -634,7 +662,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour rechercher les ventes côté backend
     function searchSalesBackend(query) {
         // Afficher un indicateur de chargement
-        salesTableBody.innerHTML = '<tr><td colspan="8" class="text-center">Recherche en cours...</td></tr>';
+        salesTableBody.innerHTML = '<tr><td colspan="8" class="text-center">' + gettext('Recherche en cours...') + '</td></tr>';
 
         // Construire l'URL avec le paramètre de recherche
         const url = query ? `/api/sales/search/?q=${encodeURIComponent(query)}` : '/api/sales/search/';
@@ -648,37 +676,37 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(sales => {
                 if (sales.length === 0) {
-                    salesTableBody.innerHTML = '<tr><td colspan="8" class="text-center">Aucune vente trouvée</td></tr>';
+                    salesTableBody.innerHTML = '<tr><td colspan="8" class="text-center">' + gettext('Aucune vente trouvée') + '</td></tr>';
                     return;
                 }
 
                 // Afficher les résultats
                 salesTableBody.innerHTML = sales.map(sale => `
                     <tr>
-                        <td>#${sale.id}</td>
+                        <td>#${escapeHtml(sale.id)}</td>
                         <td>${formatDateTime(sale.create_at)}</td>
-                        <td>${sale.client_name || '<span class="text-secondary">Client de passage</span>'}</td>
-                        <td>${sale.staff_name || 'N/A'}</td>
+                        <td>${sale.client_name ? escapeHtml(sale.client_name) : '<span class="text-secondary">' + gettext('Client de passage') + '</span>'}</td>
+                        <td>${escapeHtml(sale.staff_name || 'N/A')}</td>
                         <td class="font-weight-bold">${formatCurrency(sale.total)}</td>
                         <td>
                             ${sale.is_credit
-                                ? '<span class="badge badge-warning">Crédit</span>'
-                                : '<span class="badge badge-success">Comptant</span>'}
+                                ? '<span class="badge badge-warning">' + gettext('Crédit') + '</span>'
+                                : '<span class="badge badge-success">' + gettext('Comptant') + '</span>'}
                         </td>
                         <td>
                             ${sale.is_paid
-                                ? '<span class="badge badge-success">Payé</span>'
-                                : '<span class="badge badge-danger">Non payé</span>'}
+                                ? '<span class="badge badge-success">' + gettext('Payé') + '</span>'
+                                : '<span class="badge badge-danger">' + gettext('Non payé') + '</span>'}
                         </td>
                         <td>
                             <div class="action-buttons">
-                                <button class="btn-icon" onclick="viewSale(${sale.id})" title="Voir détails">
+                                <button class="btn-icon" onclick="viewSale(${Number(sale.id)})" title="${gettext('Voir détails')}">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                         <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.5"/>
                                         <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
                                     </svg>
                                 </button>
-                                <button class="btn-icon" onclick="printSale(${sale.id})" title="Imprimer">
+                                <button class="btn-icon" onclick="printSale(${Number(sale.id)})" title="${gettext('Imprimer')}">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                         <path d="M4 5V2h8v3M4 11H2V7h12v4h-2" stroke="currentColor" stroke-width="1.5"/>
                                         <rect x="4" y="9" width="8" height="5" stroke="currentColor" stroke-width="1.5"/>
@@ -691,7 +719,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Erreur:', error);
-                salesTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Erreur lors de la recherche des ventes</td></tr>';
+                salesTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">' + gettext('Erreur lors de la recherche des ventes') + '</td></tr>';
             });
     }
 
@@ -729,7 +757,7 @@ function viewSale(saleId) {
     const modal = document.getElementById('saleDetailsModal');
     const modalContent = document.getElementById('saleDetailsContent');
 
-    modalContent.innerHTML = '<p style="text-align: center; padding: 40px;">Chargement des détails...</p>';
+    modalContent.innerHTML = '<p style="text-align: center; padding: 40px;">' + gettext('Chargement des détails...') + '</p>';
     modal.classList.add('active');
 
     // Charger les détails via API
@@ -743,9 +771,9 @@ function viewSale(saleId) {
         .then(data => {
             const itemsHtml = data.items.map(item => `
                 <tr>
-                    <td>${item.product_name}</td>
-                    <td>${item.product_code}</td>
-                    <td>${item.quantity}</td>
+                    <td>${escapeHtml(item.product_name)}</td>
+                    <td>${escapeHtml(item.product_code)}</td>
+                    <td>${escapeHtml(item.quantity)}</td>
                     <td>${formatCurrency(item.unit_price)}</td>
                     <td class="font-weight-bold">${formatCurrency(item.subtotal)}</td>
                 </tr>
@@ -754,47 +782,47 @@ function viewSale(saleId) {
             modalContent.innerHTML = `
                 <div style="padding: 20px;">
                     <div style="margin-bottom: 20px;">
-                        <h4 style="margin-bottom: 15px;">Vente #${data.id}</h4>
+                        <h4 style="margin-bottom: 15px;">${interpolate(gettext('Vente #%(id)s'), {id: escapeHtml(data.id)}, true)}</h4>
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
                             <div>
-                                <strong>Client:</strong> ${data.client_name}
+                                <strong>${gettext('Client:')}</strong> ${escapeHtml(data.client_name)}
                             </div>
                             <div>
-                                <strong>Vendeur:</strong> ${data.staff_name}
+                                <strong>${gettext('Vendeur:')}</strong> ${escapeHtml(data.staff_name)}
                             </div>
                             <div>
-                                <strong>Date:</strong> ${new Date(data.create_at).toLocaleString('fr-FR')}
+                                <strong>${gettext('Date:')}</strong> ${new Date(data.create_at).toLocaleString(document.documentElement.lang || 'fr')}
                             </div>
                             <div>
-                                <strong>Type:</strong>
+                                <strong>${gettext('Type:')}</strong>
                                 <span class="badge ${data.is_credit ? 'badge-warning' : 'badge-success'}">
-                                    ${data.is_credit ? 'Crédit' : 'Comptant'}
+                                    ${data.is_credit ? gettext('Crédit') : gettext('Comptant')}
                                 </span>
                             </div>
                             ${data.is_credit && data.credit_info ? `
                                 <div>
-                                    <strong>Date d'échéance:</strong> ${new Date(data.credit_info.due_date).toLocaleDateString('fr-FR')}
+                                    <strong>${gettext('Date d\'échéance:')}</strong> ${new Date(data.credit_info.due_date).toLocaleDateString(document.documentElement.lang || 'fr')}
                                 </div>
                             ` : ''}
                             <div>
-                                <strong>Statut:</strong>
+                                <strong>${gettext('Statut:')}</strong>
                                 <span class="badge ${data.is_paid ? 'badge-success' : 'badge-danger'}">
-                                    ${data.is_paid ? 'Payé' : 'Non payé'}
+                                    ${data.is_paid ? gettext('Payé') : gettext('Non payé')}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <h5 style="margin-bottom: 15px;">Articles</h5>
+                    <h5 style="margin-bottom: 15px;">${gettext('Articles')}</h5>
                     <div style="overflow-x: auto;">
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Produit</th>
-                                    <th>Code</th>
-                                    <th>Quantité</th>
-                                    <th>Prix unitaire</th>
-                                    <th>Sous-total</th>
+                                    <th>${gettext('Produit')}</th>
+                                    <th>${gettext('Code')}</th>
+                                    <th>${gettext('Quantité')}</th>
+                                    <th>${gettext('Prix unitaire')}</th>
+                                    <th>${gettext('Sous-total')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -804,7 +832,7 @@ function viewSale(saleId) {
                     </div>
 
                     <div style="text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid var(--border-color);">
-                        <h4 style="color: var(--primary-color);">Total: ${formatCurrency(data.total)}</h4>
+                        <h4 style="color: var(--primary-color);">${gettext('Total:')} ${formatCurrency(data.total)}</h4>
                     </div>
                 </div>
             `;
@@ -813,7 +841,7 @@ function viewSale(saleId) {
             console.error('Erreur:', error);
             modalContent.innerHTML = `
                 <p style="text-align: center; padding: 40px; color: var(--danger-color);">
-                    Erreur lors du chargement des détails
+                    ${gettext('Erreur lors du chargement des détails')}
                 </p>
             `;
         });
@@ -821,7 +849,7 @@ function viewSale(saleId) {
 
 // Fonction utilitaire pour formater la monnaie (déplacée ici pour être accessible globalement)
 function formatCurrency(amount) {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat(document.documentElement.lang || 'fr', {
         style: 'decimal',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
@@ -849,7 +877,7 @@ function printSale(saleId) {
         })
         .catch(error => {
             console.error('Erreur lors du chargement de la facture:', error);
-            alert('Impossible de charger les détails de la vente pour l\'impression.');
+            alert(gettext('Impossible de charger les détails de la vente pour l\'impression.'));
         });
 }
 
@@ -857,22 +885,23 @@ function printSale(saleId) {
 function openInvoicePrintWindow(sale) {
     const printWindow = window.open('', '_blank', 'width=400,height=700');
     if (!printWindow) {
-        alert('Le navigateur a bloqué l\'ouverture de la fenêtre. Veuillez autoriser les popups.');
+        alert(gettext('Le navigateur a bloqué l\'ouverture de la fenêtre. Veuillez autoriser les popups.'));
         return;
     }
 
-    // Récupérer les paramètres système
+    // Récupérer les paramètres système, échappés dès maintenant car toutes les
+    // constantes ci-dessous ne servent qu'à construire le HTML du ticket
     const settings = window.SYSTEM_SETTINGS || {};
-    const companyName = settings.companyName || 'BLANCO';
-    const companyLogo = settings.companyLogo || '';
-    const companyAddress = settings.companyAddress || '';
-    const companyPhone = settings.companyPhone || '';
-    const companyEmail = settings.companyEmail || '';
-    const currencySymbol = settings.currencySymbol || 'FCFA';
-    const receiptFooter = settings.receiptFooter || 'Merci pour votre achat !';
+    const companyName = escapeHtml(settings.companyName || 'BLANCO');
+    const companyLogo = escapeHtml(settings.companyLogo || '');
+    const companyAddress = escapeHtml(settings.companyAddress || '');
+    const companyPhone = escapeHtml(settings.companyPhone || '');
+    const companyEmail = escapeHtml(settings.companyEmail || '');
+    const currencySymbol = escapeHtml(settings.currencySymbol || 'FCFA');
+    const receiptFooter = escapeHtml(settings.receiptFooter || gettext('Merci pour votre achat !'));
 
     const invoiceDate = sale.create_at
-        ? new Date(sale.create_at).toLocaleDateString('fr-FR', {
+        ? new Date(sale.create_at).toLocaleDateString(document.documentElement.lang || 'fr', {
             day: '2-digit', month: '2-digit', year: 'numeric',
             hour: '2-digit', minute: '2-digit'
         })
@@ -881,8 +910,8 @@ function openInvoicePrintWindow(sale) {
     // Construire les lignes des articles pour ticket thermique
     const itemsLines = sale.items.map((item, index) => `
         <div class="item-line">
-            <span class="item-name">${index + 1}. ${item.product_name}</span>
-            <span class="item-detail">${item.quantity} x ${formatCurrencyPlain(item.unit_price)} = ${formatCurrencyPlain(item.subtotal)} ${currencySymbol}</span>
+            <span class="item-name">${index + 1}. ${escapeHtml(item.product_name)}</span>
+            <span class="item-detail">${escapeHtml(item.quantity)} x ${formatCurrencyPlain(item.unit_price)} = ${formatCurrencyPlain(item.subtotal)} ${currencySymbol}</span>
         </div>
     `).join('');
 
@@ -890,23 +919,23 @@ function openInvoicePrintWindow(sale) {
     let creditHtml = '';
     if (sale.is_credit && sale.credit_info) {
         const dueDate = sale.credit_info.due_date
-            ? new Date(sale.credit_info.due_date).toLocaleDateString('fr-FR')
+            ? new Date(sale.credit_info.due_date).toLocaleDateString(document.documentElement.lang || 'fr')
             : 'N/A';
         creditHtml = `
             <div class="separator">=</div>
-            <div class="section-title">** CREDIT **</div>
-            <div class="info-line"><span>Payé</span><span>${formatCurrencyPlain(sale.credit_info.amount_paid)} ${currencySymbol}</span></div>
-            <div class="info-line"><span>Reste</span><span>${formatCurrencyPlain(sale.credit_info.amount_remaining)} ${currencySymbol}</span></div>
-            <div class="info-line"><span>Échéance</span><span>${dueDate}</span></div>
+            <div class="section-title">${gettext('** CREDIT **')}</div>
+            <div class="info-line"><span>${gettext('Payé')}</span><span>${formatCurrencyPlain(sale.credit_info.amount_paid)} ${currencySymbol}</span></div>
+            <div class="info-line"><span>${gettext('Reste')}</span><span>${formatCurrencyPlain(sale.credit_info.amount_remaining)} ${currencySymbol}</span></div>
+            <div class="info-line"><span>${gettext('Échéance')}</span><span>${dueDate}</span></div>
         `;
     }
 
     const invoiceHtml = `
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="${document.documentElement.lang || 'fr'}">
 <head>
     <meta charset="UTF-8">
-    <title>Ticket #${sale.id} - ${companyName}</title>
+    <title>${interpolate(gettext('Ticket #%(id)s'), {id: escapeHtml(sale.id)}, true)} - ${companyName}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1025,35 +1054,35 @@ function openInvoicePrintWindow(sale) {
         ${companyLogo ? `<img src="${companyLogo}" alt="${companyName}">` : ''}
         <div class="company-name">${companyName}</div>
         ${companyAddress ? `<div class="company-info">${companyAddress}</div>` : ''}
-        ${companyPhone ? `<div class="company-info">Tél: ${companyPhone}</div>` : ''}
+        ${companyPhone ? `<div class="company-info">${gettext('Tél:')} ${companyPhone}</div>` : ''}
         ${companyEmail ? `<div class="company-info">${companyEmail}</div>` : ''}
     </div>
 
     <div class="separator double"></div>
 
     <!-- FACTURE -->
-    <div class="section-title">FACTURE N° ${sale.id}</div>
-    <div class="info-line"><span>Date</span><span>${invoiceDate}</span></div>
-    <div class="info-line"><span>Type</span><span>${sale.is_credit ? 'Crédit' : 'Comptant'}</span></div>
-    <div class="info-line"><span>Statut</span><span>${sale.is_paid ? 'Payé' : 'Non payé'}</span></div>
+    <div class="section-title">${interpolate(gettext('FACTURE N° %(id)s'), {id: escapeHtml(sale.id)}, true)}</div>
+    <div class="info-line"><span>${gettext('Date')}</span><span>${invoiceDate}</span></div>
+    <div class="info-line"><span>${gettext('Type')}</span><span>${sale.is_credit ? gettext('Crédit') : gettext('Comptant')}</span></div>
+    <div class="info-line"><span>${gettext('Statut')}</span><span>${sale.is_paid ? gettext('Payé') : gettext('Non payé')}</span></div>
 
     <div class="separator"></div>
 
     <!-- CLIENT & VENDEUR -->
-    <div class="info-line"><span>Client</span><span class="bold">${sale.client_name || 'Passage'}</span></div>
-    <div class="info-line"><span>Vendeur</span><span class="bold">${sale.staff_name || 'N/A'}</span></div>
+    <div class="info-line"><span>${gettext('Client')}</span><span class="bold">${escapeHtml(sale.client_name || gettext('Passage'))}</span></div>
+    <div class="info-line"><span>${gettext('Vendeur')}</span><span class="bold">${escapeHtml(sale.staff_name || 'N/A')}</span></div>
 
     <div class="separator double"></div>
 
     <!-- ARTICLES -->
-    <div class="section-title">ARTICLES</div>
+    <div class="section-title">${gettext('ARTICLES')}</div>
     ${itemsLines}
 
     <div class="separator double"></div>
 
     <!-- TOTAL -->
     <div class="total-line">
-        <span>TOTAL</span>
+        <span>${gettext('TOTAL')}</span>
         <span>${formatCurrencyPlain(sale.total)} ${currencySymbol}</span>
     </div>
 
@@ -1064,17 +1093,17 @@ function openInvoicePrintWindow(sale) {
     <!-- PIED DE PAGE -->
     <div class="footer">
         <p class="bold">${receiptFooter}</p>
-        <p>${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+        <p>${new Date().toLocaleDateString(document.documentElement.lang || 'fr', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
     </div>
 
 </div>
 
     <div class="no-print" style="text-align:center; margin-top:15px;">
         <button onclick="window.print()" style="padding:8px 20px; font-size:13px; background:#333; color:white; border:none; border-radius:4px; cursor:pointer;">
-            🖨️ Imprimer
+            🖨️ ${gettext('Imprimer')}
         </button>
         <button onclick="window.close()" style="padding:8px 20px; font-size:13px; background:#999; color:white; border:none; border-radius:4px; cursor:pointer; margin-left:8px;">
-            Fermer
+            ${gettext('Fermer')}
         </button>
     </div>
 </body>
@@ -1091,7 +1120,7 @@ function openInvoicePrintWindow(sale) {
 
 // Formater un montant sans le suffixe FCFA (pour la facture)
 function formatCurrencyPlain(amount) {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat(document.documentElement.lang || 'fr', {
         style: 'decimal',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0

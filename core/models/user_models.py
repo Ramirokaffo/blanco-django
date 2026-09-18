@@ -3,6 +3,7 @@ User-related models: CustomUser (Staff), Client, Supplier.
 """
 
 from django.db import models
+from django.utils.translation import gettext, gettext_lazy as _
 from django.contrib.auth.models import AbstractUser
 from .base_models import BaseUser
 
@@ -13,27 +14,48 @@ class CustomUser(AbstractUser):
     Replaces the old Staff model for authentication.
     """
     # Champs additionnels pour le personnel
-    firstname = models.CharField(max_length=255, null=True, blank=True, verbose_name="Prénom")
-    lastname = models.CharField(max_length=255, null=True, blank=True, verbose_name="Nom")
-    phone_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="Téléphone")
-    role = models.CharField(max_length=50, null=True, blank=True, verbose_name="Rôle")
-    gender = models.CharField(max_length=10, null=True, blank=True, verbose_name="Genre")
-    profil = models.CharField(max_length=255, null=True, blank=True, verbose_name="Profil")
-    delete_at = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
+    firstname = models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Prénom"))
+    lastname = models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Nom"))
+    phone_number = models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Téléphone"))
+    role = models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Rôle"))
+    gender = models.CharField(max_length=10, null=True, blank=True, verbose_name=_("Genre"))
+    profil = models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Profil"))
+    delete_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Date de suppression"))
 
     # ──── Modules autorisés ──────────────────────────────────────────
     allowed_modules = models.ManyToManyField(
         'core.AppModule',
         blank=True,
         related_name='users',
-        verbose_name="Modules autorisés",
-        help_text="Modules auxquels cet utilisateur a accès"
+        verbose_name=_("Modules autorisés"),
+        help_text=_("Modules auxquels cet utilisateur a accès")
     )
 
     class Meta:
         db_table = 'staff'  # Utiliser la table staff existante
-        verbose_name = 'Utilisateur'
-        verbose_name_plural = 'Utilisateurs'
+        verbose_name = _('Utilisateur')
+        verbose_name_plural = _('Utilisateurs')
+
+    def save(self, *args, **kwargs):
+        # Un compte soft-supprimé est toujours désactivé : Django et DRF ne
+        # testent que ``is_active`` à l'authentification.
+        if self.delete_at is not None and self.is_active:
+            self.is_active = False
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None and 'is_active' not in update_fields:
+                kwargs['update_fields'] = list(update_fields) + ['is_active']
+        super().save(*args, **kwargs)
+        if not self.is_active or self.delete_at is not None:
+            self.revoke_api_tokens()
+
+    def revoke_api_tokens(self):
+        """Supprime les tokens DRF de l'utilisateur (déconnexion de l'app mobile)."""
+        from rest_framework.authtoken.models import Token
+        Token.objects.filter(user_id=self.pk).delete()
+
+    def is_usable(self):
+        """Compte actif et non soft-supprimé."""
+        return self.is_active and self.delete_at is None
 
     def get_full_name(self):
         """Return the full name of the user."""
@@ -43,6 +65,8 @@ class CustomUser(AbstractUser):
 
     def has_module_access(self, module_code):
         """Vérifie si l'utilisateur a accès à un module donné."""
+        if not self.is_usable():
+            return False
         if self.is_superuser:
             return True
         return self.allowed_modules.filter(code=module_code, is_active=True).exists()
@@ -71,33 +95,33 @@ class Client(BaseUser):
     class Meta:
         db_table = 'client'
         # managed = False
-        verbose_name = 'Client'
-        verbose_name_plural = 'Clients'
+        verbose_name = _('Client')
+        verbose_name_plural = _('Clients')
     
     def __str__(self):
-        return self.get_full_name() or f"Client #{self.id}"
+        return self.get_full_name() or gettext("Client #%(id)s") % {'id': self.id}
 
 
 class Supplier(models.Model):
     """
     Supplier model representing a company/business that supplies products.
     """
-    name = models.CharField(max_length=255, verbose_name="Nom de l'entreprise", default="Fournisseur")
-    address = models.TextField(null=True, blank=True, verbose_name="Adresse")
-    niu = models.CharField(max_length=100, null=True, blank=True, verbose_name="NIU")
-    contact_phone = models.CharField(max_length=50, null=True, blank=True, verbose_name="Téléphone")
-    contact_email = models.EmailField(max_length=255, null=True, blank=True, verbose_name="Email")
-    website = models.URLField(max_length=255, null=True, blank=True, verbose_name="Site web")
-    description = models.TextField(null=True, blank=True, verbose_name="Description")
+    name = models.CharField(max_length=255, verbose_name=_("Nom de l'entreprise"), default="Fournisseur")
+    address = models.TextField(null=True, blank=True, verbose_name=_("Adresse"))
+    niu = models.CharField(max_length=100, null=True, blank=True, verbose_name=_("NIU"))
+    contact_phone = models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Téléphone"))
+    contact_email = models.EmailField(max_length=255, null=True, blank=True, verbose_name=_("Email"))
+    website = models.URLField(max_length=255, null=True, blank=True, verbose_name=_("Site web"))
+    description = models.TextField(null=True, blank=True, verbose_name=_("Description"))
     create_at = models.DateTimeField(auto_now_add=True)
     delete_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'supplier'
-        verbose_name = 'Fournisseur'
-        verbose_name_plural = 'Fournisseurs'
+        verbose_name = _('Fournisseur')
+        verbose_name_plural = _('Fournisseurs')
         ordering = ['name']
 
     def __str__(self):
-        return self.name or f"Fournisseur #{self.id}"
+        return self.name or gettext("Fournisseur #%(id)s") % {'id': self.id}
 

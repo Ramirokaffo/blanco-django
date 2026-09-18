@@ -3,7 +3,10 @@
 ## Endpoint
 
 ```
-PATCH /api/products/by-code/<product_code>/update/
+PATCH /api/products/<product_id>/update/
+
+> Permission : module `products` (ou superuser). Le champ `stock` n'est **pas** modifiable par
+> cet endpoint : le stock ne bouge que par approvisionnement ou inventaire.
 ```
 
 ## Description
@@ -33,7 +36,7 @@ Tous les champs sont **optionnels** (partial update). Seuls les champs fournis s
 | `description` | string | Description du produit |
 | `brand` | string | Marque du produit |
 | `color` | string | Couleur du produit |
-| `stock` | integer | Quantité en stock |
+| ~~`stock`~~ | integer | **Ignoré** — le stock n'est pas modifiable ici (approvisionnement / inventaire) |
 | `stock_limit` | integer | Seuil d'alerte de stock |
 | `max_salable_price` | decimal | Prix de vente maximum |
 | `actual_price` | decimal | Prix actuel |
@@ -124,7 +127,7 @@ Tous les champs sont **optionnels** (partial update). Seuls les champs fournis s
 
 ```bash
 curl -X PATCH \
-  http://localhost:8000/api/products/by-code/PROD001/update/ \
+  http://localhost:8000/api/products/12/update/ \
   -H "Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b" \
   -H "Content-Type: application/json" \
   -d '{
@@ -138,7 +141,7 @@ curl -X PATCH \
 
 ```bash
 curl -X PATCH \
-  http://localhost:8000/api/products/by-code/PROD001/update/ \
+  http://localhost:8000/api/products/12/update/ \
   -H "Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b" \
   -F "name=Nouveau nom" \
   -F "actual_price=1500.00" \
@@ -152,7 +155,7 @@ curl -X PATCH \
 const token = "9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b";
 const productCode = "PROD001";
 
-fetch(`http://localhost:8000/api/products/by-code/${productCode}/update/`, {
+fetch(`http://localhost:8000/api/products/${productId}/update/`, {
   method: 'PATCH',
   headers: {
     'Authorization': `Token ${token}`,

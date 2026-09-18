@@ -1,7 +1,8 @@
+{% load i18n %}
 <header class="header">
     <div class="container header-container">
         <div class="header-left">
-            <button class="sidebar-toggle" id="sidebarToggle" aria-controls="appSidebar" aria-expanded="true" aria-label="Fermer la navigation latérale" title="Ouvrir / fermer la navigation">
+            <button class="sidebar-toggle" id="sidebarToggle" aria-controls="appSidebar" aria-expanded="true" aria-label="{% trans "Fermer la navigation latérale" %}" title="{% trans "Ouvrir / fermer la navigation" %}">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="4" width="6" height="16" rx="1"></rect>
                     <path d="M13 7h8"></path>
@@ -19,7 +20,7 @@
         
         <div class="header-center">
             <div class="search-bar">
-                <input type="text" placeholder="Rechercher une fonctionnalité..." class="search-input" id="globalSearchInput" autocomplete="off">
+                <input type="text" placeholder="{% trans "Rechercher une fonctionnalité..." %}" class="search-input" id="globalSearchInput" autocomplete="off">
                 <button class="search-btn">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                         <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -31,7 +32,7 @@
         
         <div class="header-right">
             <!-- Bouton QR Code serveur -->
-            <button class="qr-toggle" id="qrToggle" aria-label="Afficher le QR Code serveur" title="QR Code serveur">
+            <button class="qr-toggle" id="qrToggle" aria-label="{% trans "Afficher le QR Code serveur" %}" title="{% trans "QR Code serveur" %}">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="2" width="8" height="8" rx="1"/>
                     <rect x="14" y="2" width="8" height="8" rx="1"/>
@@ -44,7 +45,16 @@
                 </svg>
             </button>
 
-            <button class="theme-toggle" id="themeToggle" aria-label="Changer de thème">
+            <!-- Sélecteur de langue (cookie via django.views.i18n.set_language) -->
+            <form method="post" action="{% url 'set_language' %}" class="lang-switcher" aria-label="{% trans "Langue" %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                {% for lang_code, lang_name in LANGUAGES %}
+                <button type="submit" name="language" value="{{ lang_code }}" class="lang-btn{% if lang_code == LANGUAGE_CODE %} active{% endif %}" title="{{ lang_name }}"{% if lang_code == LANGUAGE_CODE %} aria-current="true"{% endif %}>{{ lang_code|upper }}</button>
+                {% endfor %}
+            </form>
+
+            <button class="theme-toggle" id="themeToggle" aria-label="{% trans "Changer de thème" %}">
                 <svg class="sun-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
                     <path d="M12 1v2m0 18v2M21 12h-2M5 12H3m15.364-7.364l-1.414 1.414M7.05 16.95l-1.414 1.414m12.728 0l-1.414-1.414M7.05 7.05L5.636 5.636" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -62,14 +72,17 @@
                     <span class="user-name">{{ user.username }}</span>
                 </button>
                 <div class="user-dropdown" id="userDropdown">
-                    <a href="{% url 'logout' %}" class="user-dropdown-item logout-link">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                            <polyline points="16 17 21 12 16 7"/>
-                            <line x1="21" y1="12" x2="9" y2="12"/>
-                        </svg>
-                        Déconnexion
-                    </a>
+                    <form method="post" action="{% url 'logout' %}" class="logout-form">
+                        {% csrf_token %}
+                        <button type="submit" class="user-dropdown-item logout-link">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                            {% trans "Déconnexion" %}
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

@@ -1,26 +1,27 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Balance âgée - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Balance âgée" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Balance âgée — {{ title }}</h1>
-            <p class="text-secondary">Exercice : {{ exercise }} — Total : {{ grand_total|floatformat:0 }} FCFA</p>
+            <h1>{% blocktrans %}Balance âgée — {{ title }}{% endblocktrans %}</h1>
+            <p class="text-secondary">{% blocktrans with total=grand_total|floatformat:0 %}Exercice : {{ exercise }} — Total : {{ total }} FCFA{% endblocktrans %}</p>
         </div>
         <div>
-            <a href="{% url 'export_report_csv' 'aged_balance' %}?type={{ current_type }}" class="btn btn-secondary btn-sm">⬇ Export CSV</a>
-            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">Rapports</a>
+            <a href="{% url 'export_report_csv' 'aged_balance' %}?type={{ current_type }}" class="btn btn-secondary btn-sm">⬇ {% trans "Export CSV" %}</a>
+            <a href="{% url 'reports' %}" class="btn btn-secondary btn-sm">{% trans "Rapports" %}</a>
         </div>
     </div>
 </div>
 
 <!-- Onglets client / fournisseur -->
 <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
-    <a href="{% url 'aged_balance' %}?type=client" class="btn {% if current_type == 'client' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Créances clients</a>
-    <a href="{% url 'aged_balance' %}?type=supplier" class="btn {% if current_type == 'supplier' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Dettes fournisseurs</a>
+    <a href="{% url 'aged_balance' %}?type=client" class="btn {% if current_type == 'client' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "Créances clients" %}</a>
+    <a href="{% url 'aged_balance' %}?type=supplier" class="btn {% if current_type == 'supplier' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "Dettes fournisseurs" %}</a>
 </div>
 
 <!-- Résumé par tranche -->
@@ -29,7 +30,7 @@
     {% for tranche in tranches_data %}
     <div class="card" style="padding: 1rem; text-align: center;">
         <div style="font-size: 0.85rem; color: var(--text-secondary, #6c757d);">
-            {{ tranche.label }} jours
+            {% blocktrans with label=tranche.label %}{{ label }} jours{% endblocktrans %}
         </div>
         <div style="font-size: 1.3rem; font-weight: 700;">
             {{ tranche.amount }}
@@ -40,20 +41,20 @@
 <!-- Tableau détaillé -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Détail</h3>
+        <h3 class="card-title">{% trans "Détail" %}</h3>
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Référence</th>
-                        <th>Tiers</th>
-                        <th>Date</th>
-                        <th>Échéance</th>
-                        <th class="text-right">Jours</th>
-                        <th>Tranche</th>
-                        <th class="text-right">Montant (FCFA)</th>
+                        <th>{% trans "Référence" %}</th>
+                        <th>{% trans "Tiers" %}</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Échéance" %}</th>
+                        <th class="text-right">{% trans "Jours" %}</th>
+                        <th>{% trans "Tranche" %}</th>
+                        <th class="text-right">{% trans "Montant (FCFA)" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -72,13 +73,13 @@
                         <td class="text-right">{{ item.amount|floatformat:0 }}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="7" class="text-center">Aucun élément à afficher</td></tr>
+                    <tr><td colspan="7" class="text-center">{% trans "Aucun élément à afficher" %}</td></tr>
                     {% endfor %}
                 </tbody>
                 {% if items %}
                 <tfoot>
                     <tr style="font-weight: bold; border-top: 2px solid var(--border-color, #dee2e6);">
-                        <td colspan="6">TOTAL</td>
+                        <td colspan="6">{% trans "TOTAL" %}</td>
                         <td class="text-right">{{ grand_total|floatformat:0 }} FCFA</td>
                     </tr>
                 </tfoot>
@@ -88,4 +89,3 @@
     </div>
 </div>
 {% endblock %}
-

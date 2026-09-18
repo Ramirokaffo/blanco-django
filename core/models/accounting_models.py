@@ -4,6 +4,7 @@ Account, JournalEntry, JournalEntryLine, Payment, SupplierPayment, Invoice.
 """
 
 from django.db import models
+from django.utils.translation import gettext, gettext_lazy as _, pgettext_lazy
 from django.conf import settings
 
 from core.models.base_models import SoftDeleteModel
@@ -19,31 +20,34 @@ class Account(SoftDeleteModel):
     Classes : 1-Capitaux, 2-Immobilisations, 3-Stocks, 4-Tiers,
               5-Trésorerie, 6-Charges, 7-Produits.
     """
+    # Contexte de traduction : « Actif »/« Produit » désignent ici des types de comptes
+    # (Assets / Revenue), pas l'état actif d'une fiche ni un article du catalogue.
     ACCOUNT_TYPE_CHOICES = [
-        ('ACTIF', 'Actif'),
-        ('PASSIF', 'Passif'),
-        ('CHARGE', 'Charge'),
-        ('PRODUIT', 'Produit'),
+        ('ACTIF', pgettext_lazy('type de compte', 'Actif')),
+        ('PASSIF', pgettext_lazy('type de compte', 'Passif')),
+        ('CHARGE', pgettext_lazy('type de compte', 'Charge')),
+        ('PRODUIT', pgettext_lazy('type de compte', 'Produit')),
     ]
 
-    code = models.CharField(max_length=20, unique=True, verbose_name="Code du compte")
-    name = models.CharField(max_length=255, verbose_name="Libellé du compte")
-    account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPE_CHOICES, verbose_name="Type de compte")
+    code = models.CharField(max_length=20, unique=True, verbose_name=_("Code du compte"))
+    name = models.CharField(max_length=255, verbose_name=_("Libellé du compte"))
+    account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPE_CHOICES, verbose_name=_("Type de compte"))
     parent = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='children', verbose_name="Compte parent"
+        related_name='children', verbose_name=_("Compte parent")
     )
-    description = models.TextField(null=True, blank=True, verbose_name="Description")
-    is_active = models.BooleanField(default=True, verbose_name="Actif")
+    description = models.TextField(null=True, blank=True, verbose_name=_("Description"))
+    is_active = models.BooleanField(default=True, verbose_name=_("Actif"))
 
     class Meta:
         db_table = 'account'
-        verbose_name = 'Compte comptable'
-        verbose_name_plural = 'Comptes comptables'
+        verbose_name = _('Compte comptable')
+        verbose_name_plural = _('Comptes comptables')
         ordering = ['code']
 
     def __str__(self):
-        return f"{self.code} - {self.name}"
+        # Les noms des comptes semés (DEFAULT_ACCOUNTS) sont marqués gettext_noop : traduits à l'affichage
+        return f"{self.code} - {gettext(self.name)}"
 
     def get_balance(self, exercise=None):
         """
@@ -53,7 +57,14 @@ class Account(SoftDeleteModel):
         """
         from django.db.models import Sum
 
-        filters = {'entry__is_validated': True, 'account': self}
+        # Ignorer les lignes et écritures soft-supprimées, sinon le solde
+        # diverge des totaux de la balance.
+        filters = {
+            'entry__is_validated': True,
+            'entry__delete_at__isnull': True,
+            'delete_at__isnull': True,
+            'account': self,
+        }
         if exercise:
             filters['entry__exercise'] = exercise
 
@@ -76,30 +87,32 @@ class JournalEntry(SoftDeleteModel):
     Chaque écriture contient au minimum 2 lignes (partie double).
     """
     JOURNAL_CHOICES = [
-        ('VE', 'Journal des Ventes'),
-        ('AC', 'Journal des Achats'),
-        ('CA', 'Journal de Caisse'),
-        ('BQ', 'Journal de Banque'),
-        ('OD', 'Journal des Opérations Diverses'),
+        ('VE', _('Journal des Ventes')),
+        ('AC', _('Journal des Achats')),
+        ('CA', _('Journal de Caisse')),
+        ('BQ', _('Journal de Banque')),
+        ('OD', _('Journal des Opérations Diverses')),
+        ('AN', _('À-nouveaux (ouverture)')),
+        ('CL', _('Clôture')),
     ]
 
-    reference = models.CharField(max_length=50, unique=True, verbose_name="Référence")
-    date = models.DateField(verbose_name="Date de l'écriture")
-    description = models.CharField(max_length=500, verbose_name="Libellé")
-    journal = models.CharField(max_length=2, choices=JOURNAL_CHOICES, default='OD', verbose_name="Journal")
-    exercise = models.ForeignKey('Exercise', on_delete=models.CASCADE, related_name='journal_entries', verbose_name="Exercice")
-    daily = models.ForeignKey('Daily', on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries', verbose_name="Journée")
-    is_validated = models.BooleanField(default=True, verbose_name="Validée")
+    reference = models.CharField(max_length=50, unique=True, verbose_name=_("Référence"))
+    date = models.DateField(verbose_name=_("Date de l'écriture"))
+    description = models.CharField(max_length=500, verbose_name=_("Libellé"))
+    journal = models.CharField(max_length=2, choices=JOURNAL_CHOICES, default='OD', verbose_name=_("Journal"))
+    exercise = models.ForeignKey('Exercise', on_delete=models.CASCADE, related_name='journal_entries', verbose_name=_("Exercice"))
+    daily = models.ForeignKey('Daily', on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries', verbose_name=_("Journée"))
+    is_validated = models.BooleanField(default=True, verbose_name=_("Validée"))
 
     # Liens optionnels vers l'opération source
-    sale = models.ForeignKey('Sale', on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries', verbose_name="Vente liée")
-    supply = models.ForeignKey('Supply', on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries', verbose_name="Approvisionnement lié")
-    expense = models.ForeignKey('DailyExpense', on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries', verbose_name="Dépense liée")
+    sale = models.ForeignKey('Sale', on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries', verbose_name=_("Vente liée"))
+    supply = models.ForeignKey('Supply', on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries', verbose_name=_("Approvisionnement lié"))
+    expense = models.ForeignKey('DailyExpense', on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries', verbose_name=_("Dépense liée"))
 
     class Meta:
         db_table = 'journal_entry'
-        verbose_name = 'Écriture comptable'
-        verbose_name_plural = 'Écritures comptables'
+        verbose_name = _('Écriture comptable')
+        verbose_name_plural = _('Écritures comptables')
         ordering = ['-date', '-create_at']
 
     def __str__(self):
@@ -108,7 +121,7 @@ class JournalEntry(SoftDeleteModel):
     def is_balanced(self):
         """Vérifie que l'écriture est équilibrée (débits = crédits)."""
         from django.db.models import Sum
-        totals = self.lines.aggregate(
+        totals = self.lines.filter(delete_at__isnull=True).aggregate(
             total_debit=Sum('debit'),
             total_credit=Sum('credit'),
         )
@@ -126,22 +139,22 @@ class JournalEntryLine(SoftDeleteModel):
     """
     Ligne d'écriture comptable (débit OU crédit sur un compte).
     """
-    entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='lines', verbose_name="Écriture")
-    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='entry_lines', verbose_name="Compte")
-    debit = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Débit")
-    credit = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Crédit")
-    description = models.CharField(max_length=255, null=True, blank=True, verbose_name="Libellé ligne")
+    entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='lines', verbose_name=_("Écriture"))
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='entry_lines', verbose_name=_("Compte"))
+    debit = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name=_("Débit"))
+    credit = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name=_("Crédit"))
+    description = models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Libellé ligne"))
 
     class Meta:
         db_table = 'journal_entry_line'
-        verbose_name = "Ligne d'écriture"
-        verbose_name_plural = "Lignes d'écriture"
+        verbose_name = _("Ligne d'écriture")
+        verbose_name_plural = _("Lignes d'écriture")
         ordering = ['id']
 
     def __str__(self):
         if self.debit > 0:
-            return f"{self.account.code} — Débit {self.debit}"
-        return f"{self.account.code} — Crédit {self.credit}"
+            return gettext("%(code)s — Débit %(debit)s") % {'code': self.account.code, 'debit': self.debit}
+        return gettext("%(code)s — Crédit %(credit)s") % {'code': self.account.code, 'credit': self.credit}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -158,12 +171,12 @@ class Exercise(SoftDeleteModel):
     class Meta:
         db_table = 'exercise'
         # managed = False
-        verbose_name = 'Exercice'
-        verbose_name_plural = 'Exercices'
+        verbose_name = _('Exercice')
+        verbose_name_plural = _('Exercices')
         ordering = ['-start_date']
     
     def __str__(self):
-        return f"Exercice {self.start_date.year if self.start_date else self.id}"
+        return gettext("Exercice %(label)s") % {'label': self.start_date.year if self.start_date else self.id}
     
     def is_active(self):
         """Check if the exercise is currently active."""
@@ -181,12 +194,12 @@ class Daily(SoftDeleteModel):
     class Meta:
         db_table = 'daily'
         # managed = False
-        verbose_name = 'Journée'
-        verbose_name_plural = 'Journées'
+        verbose_name = _('Journée')
+        verbose_name_plural = _('Journées')
         ordering = ['-start_date']
     
     def __str__(self):
-        return f"Journée {self.start_date.strftime('%Y-%m-%d') if self.start_date else self.id}"
+        return gettext("Journée %(label)s") % {'label': self.start_date.strftime('%Y-%m-%d') if self.start_date else self.id}
     
     def is_open(self):
         """Check if the daily session is still open."""
@@ -203,8 +216,8 @@ class ExpenseType(SoftDeleteModel):
     class Meta:
         db_table = 'expense_type'
         # managed = False
-        verbose_name = 'Type de dépense'
-        verbose_name_plural = 'Types de dépenses'
+        verbose_name = _('Type de dépense')
+        verbose_name_plural = _('Types de dépenses')
     
     def __str__(self):
         return self.name
@@ -220,8 +233,8 @@ class RecipeType(SoftDeleteModel):
     class Meta:
         db_table = 'recipe_type'
         # managed = False
-        verbose_name = 'Type de recette'
-        verbose_name_plural = 'Types de recettes'
+        verbose_name = _('Type de recette')
+        verbose_name_plural = _('Types de recettes')
     
     def __str__(self):
         return self.name
@@ -239,18 +252,18 @@ class DailyExpense(SoftDeleteModel):
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name='expenses')
     account = models.ForeignKey(
         'Account', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='expenses', verbose_name="Compte comptable"
+        related_name='expenses', verbose_name=_("Compte comptable")
     )
     
     class Meta:
         db_table = 'daily_expense'
         # managed = False
-        verbose_name = 'Dépense quotidienne'
-        verbose_name_plural = 'Dépenses quotidiennes'
+        verbose_name = _('Dépense quotidienne')
+        verbose_name_plural = _('Dépenses quotidiennes')
         ordering = ['-create_at']
     
     def __str__(self):
-        return f"Dépense {self.amount} - {self.expense_type}"
+        return gettext("Dépense %(amount)s - %(expense_type)s") % {'amount': self.amount, 'expense_type': self.expense_type}
 
 
 class DailyRecipe(SoftDeleteModel):
@@ -265,18 +278,18 @@ class DailyRecipe(SoftDeleteModel):
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name='recipes')
     account = models.ForeignKey(
         'Account', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='recipes', verbose_name="Compte comptable"
+        related_name='recipes', verbose_name=_("Compte comptable")
     )
     
     class Meta:
         db_table = 'daily_recipe'
         # managed = False
-        verbose_name = 'Recette quotidienne'
-        verbose_name_plural = 'Recettes quotidiennes'
+        verbose_name = _('Recette quotidienne')
+        verbose_name_plural = _('Recettes quotidiennes')
         ordering = ['-create_at']
     
     def __str__(self):
-        return f"Recette {self.amount} - {self.recipe_type}"
+        return gettext("Recette %(amount)s - %(recipe_type)s") % {'amount': self.amount, 'recipe_type': self.recipe_type}
 
 
 class ProductExpense(SoftDeleteModel):
@@ -290,11 +303,11 @@ class ProductExpense(SoftDeleteModel):
     class Meta:
         db_table = 'product_expense'
         # managed = False
-        verbose_name = 'Dépense produit'
-        verbose_name_plural = 'Dépenses produits'
+        verbose_name = _('Dépense produit')
+        verbose_name_plural = _('Dépenses produits')
 
     def __str__(self):
-        return f"Dépense {self.amount} pour {self.product.name}"
+        return gettext("Dépense %(amount)s pour %(product)s") % {'amount': self.amount, 'product': self.product.name}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -302,10 +315,10 @@ class ProductExpense(SoftDeleteModel):
 # ──────────────────────────────────────────────────────────────────────────────
 
 PAYMENT_METHOD_CHOICES = [
-    ('CASH', 'Espèces'),
-    ('MOBILE_MONEY', 'Mobile Money'),
-    ('BANK_TRANSFER', 'Virement bancaire'),
-    ('CHECK', 'Chèque'),
+    ('CASH', _('Espèces')),
+    ('MOBILE_MONEY', _('Mobile Money')),
+    ('BANK_TRANSFER', _('Virement bancaire')),
+    ('CHECK', _('Chèque')),
 ]
 
 # Mapping mode de paiement → code compte comptable de trésorerie
@@ -326,37 +339,37 @@ class Payment(SoftDeleteModel):
     """
     credit_sale = models.ForeignKey(
         'CreditSale', on_delete=models.CASCADE,
-        related_name='payments', verbose_name="Vente à crédit"
+        related_name='payments', verbose_name=_("Vente à crédit")
     )
-    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name=_("Montant"))
     payment_method = models.CharField(
         max_length=20, choices=PAYMENT_METHOD_CHOICES,
-        default='CASH', verbose_name="Mode de paiement"
+        default='CASH', verbose_name=_("Mode de paiement")
     )
-    payment_date = models.DateField(verbose_name="Date de paiement")
+    payment_date = models.DateField(verbose_name=_("Date de paiement"))
     reference = models.CharField(
         max_length=100, null=True, blank=True,
-        verbose_name="Référence (n° chèque, ID transaction...)"
+        verbose_name=_("Référence (n° chèque, ID transaction...)")
     )
-    notes = models.TextField(null=True, blank=True, verbose_name="Notes")
+    notes = models.TextField(null=True, blank=True, verbose_name=_("Notes"))
     staff = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='recorded_payments',
-        verbose_name="Enregistré par"
+        verbose_name=_("Enregistré par")
     )
     daily = models.ForeignKey(
         'Daily', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='payments', verbose_name="Journée"
+        related_name='payments', verbose_name=_("Journée")
     )
 
     class Meta:
         db_table = 'payment'
-        verbose_name = 'Paiement client'
-        verbose_name_plural = 'Paiements clients'
+        verbose_name = _('Paiement client')
+        verbose_name_plural = _('Paiements clients')
         ordering = ['-payment_date', '-create_at']
 
     def __str__(self):
-        return f"Paiement {self.amount} FCFA – Vente #{self.credit_sale.sale_id}"
+        return gettext("Paiement %(amount)s FCFA – Vente #%(sale_id)s") % {'amount': self.amount, 'sale_id': self.credit_sale.sale_id}
 
 
 class SupplierPayment(SoftDeleteModel):
@@ -367,40 +380,40 @@ class SupplierPayment(SoftDeleteModel):
     """
     supplier = models.ForeignKey(
         'Supplier', on_delete=models.CASCADE,
-        related_name='payments', verbose_name="Fournisseur"
+        related_name='payments', verbose_name=_("Fournisseur")
     )
     supply = models.ForeignKey(
         'Supply', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='payments', verbose_name="Approvisionnement lié"
+        related_name='payments', verbose_name=_("Approvisionnement lié")
     )
-    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name=_("Montant"))
     payment_method = models.CharField(
         max_length=20, choices=PAYMENT_METHOD_CHOICES,
-        default='CASH', verbose_name="Mode de paiement"
+        default='CASH', verbose_name=_("Mode de paiement")
     )
-    payment_date = models.DateField(verbose_name="Date de paiement")
+    payment_date = models.DateField(verbose_name=_("Date de paiement"))
     reference = models.CharField(
-        max_length=100, null=True, blank=True, verbose_name="Référence"
+        max_length=100, null=True, blank=True, verbose_name=_("Référence")
     )
-    notes = models.TextField(null=True, blank=True, verbose_name="Notes")
+    notes = models.TextField(null=True, blank=True, verbose_name=_("Notes"))
     staff = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='supplier_payments',
-        verbose_name="Enregistré par"
+        verbose_name=_("Enregistré par")
     )
     daily = models.ForeignKey(
         'Daily', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='supplier_payments', verbose_name="Journée"
+        related_name='supplier_payments', verbose_name=_("Journée")
     )
 
     class Meta:
         db_table = 'supplier_payment'
-        verbose_name = 'Paiement fournisseur'
-        verbose_name_plural = 'Paiements fournisseurs'
+        verbose_name = _('Paiement fournisseur')
+        verbose_name_plural = _('Paiements fournisseurs')
         ordering = ['-payment_date', '-create_at']
 
     def __str__(self):
-        return f"Paiement {self.amount} FCFA – {self.supplier.name}"
+        return gettext("Paiement %(amount)s FCFA – %(supplier)s") % {'amount': self.amount, 'supplier': self.supplier.name}
 
 
 class Invoice(SoftDeleteModel):
@@ -408,37 +421,37 @@ class Invoice(SoftDeleteModel):
     Facture de vente formelle.
     """
     INVOICE_STATUS_CHOICES = [
-        ('DRAFT', 'Brouillon'),
-        ('SENT', 'Envoyée'),
-        ('PAID', 'Payée'),
-        ('CANCELLED', 'Annulée'),
+        ('DRAFT', _('Brouillon')),
+        ('SENT', _('Envoyée')),
+        ('PAID', _('Payée')),
+        ('CANCELLED', _('Annulée')),
     ]
 
     sale = models.OneToOneField(
         'Sale', on_delete=models.CASCADE,
-        related_name='invoice', verbose_name="Vente"
+        related_name='invoice', verbose_name=_("Vente")
     )
     invoice_number = models.CharField(
-        max_length=50, unique=True, verbose_name="N° Facture"
+        max_length=50, unique=True, verbose_name=_("N° Facture")
     )
-    invoice_date = models.DateField(verbose_name="Date de facture")
+    invoice_date = models.DateField(verbose_name=_("Date de facture"))
     due_date = models.DateField(
-        null=True, blank=True, verbose_name="Date d'échéance"
+        null=True, blank=True, verbose_name=_("Date d'échéance")
     )
     status = models.CharField(
         max_length=10, choices=INVOICE_STATUS_CHOICES,
-        default='DRAFT', verbose_name="Statut"
+        default='DRAFT', verbose_name=_("Statut")
     )
-    notes = models.TextField(null=True, blank=True, verbose_name="Notes")
+    notes = models.TextField(null=True, blank=True, verbose_name=_("Notes"))
 
     class Meta:
         db_table = 'invoice'
-        verbose_name = 'Facture'
-        verbose_name_plural = 'Factures'
+        verbose_name = _('Facture')
+        verbose_name_plural = _('Factures')
         ordering = ['-invoice_date', '-create_at']
 
     def __str__(self):
-        return f"Facture {self.invoice_number}"
+        return gettext("Facture %(number)s") % {'number': self.invoice_number}
 
     @staticmethod
     def generate_invoice_number():
@@ -465,20 +478,20 @@ class TaxRate(SoftDeleteModel):
     Taux de TVA configurables.
     Au Cameroun : TVA standard = 19.25% (19% + 1.25% CAC).
     """
-    name = models.CharField(max_length=100, verbose_name="Nom du taux")
+    name = models.CharField(max_length=100, verbose_name=_("Nom du taux"))
     rate = models.DecimalField(
         max_digits=5, decimal_places=2,
-        verbose_name="Taux (%)",
-        help_text="Ex: 19.25 pour 19.25%"
+        verbose_name=_("Taux (%)"),
+        help_text=_("Ex: 19.25 pour 19.25%")
     )
-    is_default = models.BooleanField(default=False, verbose_name="Taux par défaut")
-    is_active = models.BooleanField(default=True, verbose_name="Actif")
-    description = models.TextField(null=True, blank=True, verbose_name="Description")
+    is_default = models.BooleanField(default=False, verbose_name=_("Taux par défaut"))
+    is_active = models.BooleanField(default=True, verbose_name=_("Actif"))
+    description = models.TextField(null=True, blank=True, verbose_name=_("Description"))
 
     class Meta:
         db_table = 'tax_rate'
-        verbose_name = 'Taux de TVA'
-        verbose_name_plural = 'Taux de TVA'
+        verbose_name = _('Taux de TVA')
+        verbose_name_plural = _('Taux de TVA')
         ordering = ['rate']
 
     def __str__(self):
@@ -491,46 +504,46 @@ class BankStatement(SoftDeleteModel):
     Chaque ligne représente une transaction sur le relevé bancaire.
     """
     STATEMENT_TYPE_CHOICES = [
-        ('CREDIT', 'Crédit (entrée)'),
-        ('DEBIT', 'Débit (sortie)'),
+        ('CREDIT', _('Crédit (entrée)')),
+        ('DEBIT', _('Débit (sortie)')),
     ]
 
     account = models.ForeignKey(
         Account, on_delete=models.CASCADE,
         related_name='bank_statements',
-        verbose_name="Compte bancaire",
-        help_text="Compte 521 (Banque) ou 585 (Mobile Money)"
+        verbose_name=_("Compte bancaire"),
+        help_text=_("Compte 521 (Banque) ou 585 (Mobile Money)")
     )
-    statement_date = models.DateField(verbose_name="Date de l'opération")
-    description = models.CharField(max_length=500, verbose_name="Libellé")
+    statement_date = models.DateField(verbose_name=_("Date de l'opération"))
+    description = models.CharField(max_length=500, verbose_name=_("Libellé"))
     reference = models.CharField(
         max_length=100, null=True, blank=True,
-        verbose_name="Référence bancaire"
+        verbose_name=_("Référence bancaire")
     )
-    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name=_("Montant"))
     statement_type = models.CharField(
         max_length=6, choices=STATEMENT_TYPE_CHOICES,
-        verbose_name="Type d'opération"
+        verbose_name=_("Type d'opération")
     )
-    is_reconciled = models.BooleanField(default=False, verbose_name="Rapproché")
+    is_reconciled = models.BooleanField(default=False, verbose_name=_("Rapproché"))
     reconciled_entry = models.ForeignKey(
         JournalEntryLine, on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='reconciled_statements',
-        verbose_name="Ligne d'écriture rapprochée"
+        verbose_name=_("Ligne d'écriture rapprochée")
     )
-    reconciled_at = models.DateTimeField(null=True, blank=True, verbose_name="Date de rapprochement")
+    reconciled_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Date de rapprochement"))
     reconciled_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='reconciled_statements',
-        verbose_name="Rapproché par"
+        verbose_name=_("Rapproché par")
     )
 
     class Meta:
         db_table = 'bank_statement'
-        verbose_name = 'Relevé bancaire'
-        verbose_name_plural = 'Relevés bancaires'
+        verbose_name = _('Relevé bancaire')
+        verbose_name_plural = _('Relevés bancaires')
         ordering = ['-statement_date', '-create_at']
 
     def __str__(self):
@@ -545,45 +558,45 @@ class ExerciseClosing(SoftDeleteModel):
     exercise = models.OneToOneField(
         Exercise, on_delete=models.CASCADE,
         related_name='closing',
-        verbose_name="Exercice clôturé"
+        verbose_name=_("Exercice clôturé")
     )
-    closed_at = models.DateTimeField(verbose_name="Date de clôture")
+    closed_at = models.DateTimeField(verbose_name=_("Date de clôture"))
     closed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='closed_exercises',
-        verbose_name="Clôturé par"
+        verbose_name=_("Clôturé par")
     )
     result_amount = models.DecimalField(
         max_digits=15, decimal_places=2,
-        verbose_name="Résultat de l'exercice (bénéfice/perte)"
+        verbose_name=_("Résultat de l'exercice (bénéfice/perte)")
     )
     closing_entry = models.ForeignKey(
         JournalEntry, on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='exercise_closing',
-        verbose_name="Écriture de clôture"
+        verbose_name=_("Écriture de clôture")
     )
     opening_entry = models.ForeignKey(
         JournalEntry, on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='exercise_opening',
-        verbose_name="Écriture d'ouverture (report à nouveau)"
+        verbose_name=_("Écriture d'ouverture (report à nouveau)")
     )
     new_exercise = models.ForeignKey(
         Exercise, on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='opened_from_closing',
-        verbose_name="Nouvel exercice créé"
+        verbose_name=_("Nouvel exercice créé")
     )
-    notes = models.TextField(null=True, blank=True, verbose_name="Notes")
+    notes = models.TextField(null=True, blank=True, verbose_name=_("Notes"))
 
     class Meta:
         db_table = 'exercise_closing'
-        verbose_name = "Clôture d'exercice"
-        verbose_name_plural = "Clôtures d'exercice"
+        verbose_name = _("Clôture d'exercice")
+        verbose_name_plural = _("Clôtures d'exercice")
         ordering = ['-closed_at']
 
     def __str__(self):
-        return f"Clôture {self.exercise} — Résultat: {self.result_amount} FCFA"
+        return gettext("Clôture %(exercise)s — Résultat: %(result)s FCFA") % {'exercise': self.exercise, 'result': self.result_amount}
 

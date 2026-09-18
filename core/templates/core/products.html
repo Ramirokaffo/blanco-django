@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
 
-{% block title %}Produits - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Produits" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/products.css' %}">
@@ -11,8 +11,8 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Gestion des produits</h1>
-            <p class="text-secondary">Gérez votre catalogue de produits ({{ total_count }} produit{{ total_count|pluralize }})</p>
+            <h1>{% trans "Gestion des produits" %}</h1>
+            <p class="text-secondary">{% blocktrans count counter=total_count|default:0 %}Gérez votre catalogue de produits ({{ counter }} produit){% plural %}Gérez votre catalogue de produits ({{ counter }} produits){% endblocktrans %}</p>
         </div>
     </div>
 </div>
@@ -23,15 +23,15 @@
         <div class="filters-row">
             <!-- Recherche -->
             <div class="filter-group filter-search">
-                <label class="form-label">Recherche</label>
-                <input type="text" name="search" class="form-control" placeholder="Nom, code ou marque..." value="{{ current_search }}">
+                <label class="form-label">{% trans "Recherche" %}</label>
+                <input type="text" name="search" class="form-control" placeholder="{% trans "Nom, code ou marque..." %}" value="{{ current_search }}">
             </div>
 
             <!-- Catégorie -->
             <div class="filter-group">
-                <label class="form-label">Catégorie</label>
+                <label class="form-label">{% trans "Catégorie" %}</label>
                 <select name="category" class="form-control">
-                    <option value="">Toutes</option>
+                    <option value="">{% trans "Toutes" %}</option>
                     {% for cat in categories %}
                     <option value="{{ cat.id }}" {% if current_category == cat.id|stringformat:"d" %}selected{% endif %}>{{ cat.name }}</option>
                     {% endfor %}
@@ -40,9 +40,9 @@
 
             <!-- Gamme -->
             <div class="filter-group">
-                <label class="form-label">Gamme</label>
+                <label class="form-label">{% trans "Gamme" %}</label>
                 <select name="gamme" class="form-control">
-                    <option value="">Toutes</option>
+                    <option value="">{% trans "Toutes" %}</option>
                     {% for g in gammes %}
                     <option value="{{ g.id }}" {% if current_gamme == g.id|stringformat:"d" %}selected{% endif %}>{{ g.name }}</option>
                     {% endfor %}
@@ -51,9 +51,9 @@
 
             <!-- Rayon -->
             <div class="filter-group">
-                <label class="form-label">Rayon</label>
+                <label class="form-label">{% trans "Rayon" %}</label>
                 <select name="rayon" class="form-control">
-                    <option value="">Tous</option>
+                    <option value="">{% trans "Tous" %}</option>
                     {% for r in rayons %}
                     <option value="{{ r.id }}" {% if current_rayon == r.id|stringformat:"d" %}selected{% endif %}>{{ r.name }}</option>
                     {% endfor %}
@@ -62,12 +62,12 @@
 
             <!-- Statut stock -->
             <div class="filter-group">
-                <label class="form-label">Stock</label>
+                <label class="form-label">{% trans "Stock" %}</label>
                 <select name="stock_status" class="form-control">
-                    <option value="">Tous</option>
-                    <option value="in" {% if current_stock_status == 'in' %}selected{% endif %}>En stock</option>
-                    <option value="low" {% if current_stock_status == 'low' %}selected{% endif %}>Stock bas</option>
-                    <option value="out" {% if current_stock_status == 'out' %}selected{% endif %}>Rupture</option>
+                    <option value="">{% trans "Tous" %}</option>
+                    <option value="in" {% if current_stock_status == 'in' %}selected{% endif %}>{% trans "En stock" %}</option>
+                    <option value="low" {% if current_stock_status == 'low' %}selected{% endif %}>{% trans "Stock bas" %}</option>
+                    <option value="out" {% if current_stock_status == 'out' %}selected{% endif %}>{% trans "Rupture" %}</option>
                 </select>
             </div>
         </div>
@@ -77,9 +77,9 @@
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM15 15l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                Filtrer
+                {% trans "Filtrer" %}
             </button>
-            <a href="{% url 'products' %}" class="btn btn-secondary btn-sm">Réinitialiser</a>
+            <a href="{% url 'products' %}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser" %}</a>
         </div>
     </form>
 </div>
@@ -87,9 +87,9 @@
 <!-- Tableau des produits -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Liste des produits</h3>
+        <h3 class="card-title">{% trans "Liste des produits" %}</h3>
         <div class="pagination-info-header">
-            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+            {% blocktrans with number=page_obj.number num_pages=page_obj.paginator.num_pages %}Page {{ number }} sur {{ num_pages }}{% endblocktrans %}
         </div>
     </div>
     <div class="card-body">
@@ -97,15 +97,15 @@
             <table class="table products-table">
                 <thead>
                     <tr>
-                        <th>Code</th>
-                        <th>Nom</th>
-                        <th>Marque</th>
-                        <th>Catégorie</th>
-                        <th>Rayon</th>
-                        <th>Gamme</th>
-                        <th>Stock</th>
-                        <th>Prix max</th>
-                        <th>Prix actuel</th>
+                        <th>{% trans "Code" %}</th>
+                        <th>{% trans "Nom" %}</th>
+                        <th>{% trans "Marque" %}</th>
+                        <th>{% trans "Catégorie" %}</th>
+                        <th>{% trans "Rayon" %}</th>
+                        <th>{% trans "Gamme" %}</th>
+                        <th>{% trans "Stock" %}</th>
+                        <th>{% trans "Prix max" %}</th>
+                        <th>{% trans "Prix actuel" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -123,7 +123,7 @@
                         <td>{{ product.gamme.name|default:"-" }}</td>
                         <td>
                             {% if product.stock == 0 %}
-                                <span class="badge badge-danger">Rupture</span>
+                                <span class="badge badge-danger">{% trans "Rupture" %}</span>
                             {% elif product.is_low_stock %}
                                 <span class="badge badge-warning">{{ product.stock }}</span>
                             {% else %}
@@ -135,7 +135,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center">Aucun produit trouvé</td>
+                        <td colspan="9" class="text-center">{% trans "Aucun produit trouvé" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -146,12 +146,12 @@
         {% if page_obj.paginator.num_pages > 1 %}
         <div class="pagination-container">
             <div class="pagination-info">
-                Affichage de {{ page_obj.start_index }} à {{ page_obj.end_index }} sur {{ total_count }} produit{{ total_count|pluralize }}
+                {% blocktrans with start=page_obj.start_index end=page_obj.end_index count counter=total_count %}Affichage de {{ start }} à {{ end }} sur {{ counter }} produit{% plural %}Affichage de {{ start }} à {{ end }} sur {{ counter }} produits{% endblocktrans %}
             </div>
             <div class="pagination">
                 {% if page_obj.has_previous %}
-                <a href="?page=1{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="Première page">&laquo;</a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="Page précédente">&lsaquo;</a>
+                <a href="?page=1{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="{% trans "Première page" %}">&laquo;</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="{% trans "Page précédente" %}">&lsaquo;</a>
                 {% endif %}
 
                 {% for num in page_obj.paginator.page_range %}
@@ -163,8 +163,8 @@
                 {% endfor %}
 
                 {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="Page suivante">&rsaquo;</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="Dernière page">&raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="{% trans "Page suivante" %}">&rsaquo;</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_gamme %}&gamme={{ current_gamme }}{% endif %}{% if current_rayon %}&rayon={{ current_rayon }}{% endif %}{% if current_stock_status %}&stock_status={{ current_stock_status }}{% endif %}" class="pagination-btn" title="{% trans "Dernière page" %}">&raquo;</a>
                 {% endif %}
             </div>
         </div>

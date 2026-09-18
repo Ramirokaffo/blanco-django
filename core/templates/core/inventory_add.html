@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
-{% block title %}Nouvel enregistrement d'inventaire - {{ system_settings.company_name }}{% endblock %}
+{% block title %}{% trans "Nouvel enregistrement d'inventaire" %} - {{ system_settings.company_name }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/inventory.css' %}">
@@ -11,14 +12,14 @@
 <div class="page-header">
     <div class="header-content">
         <div>
-            <h1>Nouvel enregistrement d'inventaire</h1>
-            <p class="text-secondary">Enregistrer un comptage de produit</p>
+            <h1>{% trans "Nouvel enregistrement d'inventaire" %}</h1>
+            <p class="text-secondary">{% trans "Enregistrer un comptage de produit" %}</p>
         </div>
         <a href="{% url 'inventory' %}" class="btn btn-secondary btn-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Retour à la liste
+            {% trans "Retour à la liste" %}
         </a>
     </div>
 </div>
@@ -37,7 +38,7 @@
 <!-- Formulaire -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Informations de l'inventaire</h3>
+        <h3 class="card-title">{% trans "Informations de l'inventaire" %}</h3>
     </div>
     <div class="card-body">
         <form method="post" action="{% url 'add_inventory' %}" class="inventory-form" id="inventoryForm">
@@ -56,12 +57,12 @@
                 <div class="form-group">
                     <label class="form-label">{{ form.product.label }} <span class="required">*</span></label>
                     <div class="product-search-wrapper">
-                        <input type="text" id="productSearchInput" class="form-control" placeholder="Rechercher un produit par nom ou code..." autocomplete="off">
+                        <input type="text" id="productSearchInput" class="form-control" placeholder="{% trans "Rechercher un produit par nom ou code..." %}" autocomplete="off">
                         {{ form.product }}
                         <div class="product-search-results" id="productSearchResults"></div>
                         <div class="selected-product-badge" id="selectedProductBadge" style="display:none;">
                             <span id="selectedProductName"></span>
-                            <button type="button" class="badge-remove" id="clearProduct" title="Retirer">&times;</button>
+                            <button type="button" class="badge-remove" id="clearProduct" title="{% trans "Retirer" %}">&times;</button>
                         </div>
                     </div>
                     {% if form.product.errors %}
@@ -90,9 +91,9 @@
 
             <!-- Récapitulatif -->
             <div class="inventory-summary" id="inventorySummary" style="display:none;">
-                <h4>Récapitulatif</h4>
+                <h4>{% trans "Récapitulatif" %}</h4>
                 <div class="summary-row">
-                    <span>Total produits comptés :</span>
+                    <span>{% trans "Total produits comptés :" %}</span>
                     <strong id="totalCount">0</strong>
                 </div>
             </div>
@@ -111,9 +112,9 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    Enregistrer l'inventaire
+                    {% trans "Enregistrer l'inventaire" %}
                 </button>
-                <a href="{% url 'inventory' %}" class="btn btn-secondary">Annuler</a>
+                <a href="{% url 'inventory' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
             </div>
         </form>
     </div>
@@ -165,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function fetchProducts(query) {
-        searchResults.innerHTML = '<div class="ps-item ps-loading">Recherche en cours...</div>';
+        searchResults.innerHTML = `<div class="ps-item ps-loading">${gettext('Recherche en cours...')}</div>`;
         searchResults.classList.add('active');
 
         fetch(`/api/products/search/?q=${encodeURIComponent(query)}`)
@@ -175,15 +176,15 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(products => {
                 if (!products.length) {
-                    searchResults.innerHTML = '<div class="ps-item ps-empty">Aucun produit trouvé</div>';
+                    searchResults.innerHTML = `<div class="ps-item ps-empty">${gettext('Aucun produit trouvé')}</div>`;
                     return;
                 }
                 searchResults.innerHTML = products.map(p => `
-                    <div class="ps-item" data-id="${p.id}" data-name="${p.name}">
-                        <div class="ps-item-name">${p.name}</div>
+                    <div class="ps-item" data-id="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}">
+                        <div class="ps-item-name">${escapeHtml(p.name)}</div>
                         <div class="ps-item-info">
-                            <span>Code: ${p.code}</span>
-                            <span>Stock: ${p.stock}</span>
+                            <span>${gettext('Code:')} ${escapeHtml(p.code)}</span>
+                            <span>${gettext('Stock:')} ${escapeHtml(p.stock)}</span>
                             <span class="ps-item-price">${Number(p.actual_price).toLocaleString('fr-FR')} FCFA</span>
                         </div>
                     </div>
@@ -196,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             })
             .catch(() => {
-                searchResults.innerHTML = '<div class="ps-item ps-error">Erreur lors de la recherche</div>';
+                searchResults.innerHTML = `<div class="ps-item ps-error">${gettext('Erreur lors de la recherche')}</div>`;
             });
     }
 
