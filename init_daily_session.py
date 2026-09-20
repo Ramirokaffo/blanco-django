@@ -6,6 +6,10 @@ import os
 import django
 from datetime import datetime
 
+from blanco.console import configure_console
+
+configure_console()
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'blanco.settings')
 django.setup()
 

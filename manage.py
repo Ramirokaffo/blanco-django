@@ -6,6 +6,12 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    # Avant tout : sous Windows, une sortie redirigée est encodée en cp1252 et
+    # les emojis des messages de démarrage tueraient la commande.
+    from blanco.console import configure_console
+
+    configure_console()
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "blanco.settings")
     try:
         from django.core.management import execute_from_command_line

@@ -35,7 +35,10 @@ from pathlib import Path
 os.environ.setdefault("BLANCO_DESKTOP", "1")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "blanco.settings")
 
+from blanco.console import configure_console  # noqa: E402
 from blanco.desktop_env import APP_NAME, bootstrap  # noqa: E402
+
+configure_console()
 
 #: Nombre de threads de travail de Waitress (poste unique + application mobile).
 WAITRESS_THREADS = 8

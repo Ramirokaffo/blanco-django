@@ -40,6 +40,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # Les messages du projet contiennent des emojis ; sur un runner Windows la
+  # sortie est un pipe encodé en cp1252. configure_console() (blanco/console.py)
+  # empêche le plantage, et PYTHONUTF8 garde les messages intacts dans les logs.
+  PYTHONUTF8: '1'
+
   # blanco.settings exige ces variables pour makemigrations / collectstatic /
   # les tests. Elles ne servent qu'à la compilation : l'application installée
   # génère son propre .env dans %LOCALAPPDATA%\Blanco au premier démarrage.
