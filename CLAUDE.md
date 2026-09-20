@@ -93,6 +93,66 @@ docker-compose -f docker-compose.prod.yml up -d     # prod: pulls ramirokaffo/bl
 docker-compose -f docker-compose.win.yml up -d      # Windows: port mapping instead of host network
 ```
 
+### Windows desktop app (.exe)
+
+The same codebase ships as an installable Windows application (`WINDOWS_README.md`).
+Entry point `blanco_desktop.py` → PyInstaller recipe `blanco.spec` → Inno Setup
+script `installer/blanco.iss`, all driven by `installer/build_windows.ps1`
+(must run **on Windows**; PyInstaller does not cross-compile).
+
+```powershell
+powershell -ExecutionPolicy Bypass -File installer\build_windows.ps1   # -SkipInstaller, -Clean
+```
+
+The launcher runs `migrate` (which seeds modules + accounts through `post_migrate`),
+creates the `admin` account on first run and shows its generated password once,
+serves the app with **Waitress** on `0.0.0.0` (gunicorn cannot run on Windows),
+opens the default browser and keeps a small Tkinter window whose only job is to
+let the user stop the server. A second launch detects the running instance via
+`GET /api/test-connection/` and just reopens the browser.
+
+Things to keep in mind when touching this path:
+
+- `blanco/desktop_env.py` is imported by `blanco/settings.py` when `sys.frozen`
+  (or `BLANCO_DESKTOP=1`) and sets `DATA_DIR` to `%LOCALAPPDATA%\Blanco`: an app
+  installed in `Program Files` cannot write next to its exe, so `db.sqlite3`,
+  `media/`, `logs/` and a generated `.env` live there. `BASE_DIR` becomes
+  `sys._MEIPASS` (read-only bundle: templates, `staticfiles/`, `locale/`).
+  Outside frozen mode `DATA_DIR == BASE_DIR`, so nothing changes.
+- Migrations are not committed, so the build script runs `makemigrations core`
+  first and `blanco.spec` lists project modules by **walking the filesystem**
+  (`project_modules()`): `collect_submodules()` would have to import them, which
+  fails before `django.setup()`. Anything Django resolves by string (middleware,
+  context processors, migrations) must be reachable that way — `whitenoise` and
+  `waitress` are collected explicitly for the same reason.
+- `tzdata` is required: Windows has no system timezone database and
+  `TIME_ZONE='Africa/Douala'` would raise `ZoneInfoNotFoundError`.
+- Media files are served by a second WhiteNoise wrapper built in
+  `build_application()` (`autorefresh=True`): outside DEBUG, `blanco/urls.py`
+  does not route `MEDIA_URL`.
+- `console=False`, so `sys.stdout` is `None`: the launcher redirects both
+  streams to `%LOCALAPPDATA%\Blanco\logs\blanco.log` before anything else.
+- The Tkinter control window is French-only on purpose (it is drawn before
+  Django is initialised, outside the translation machinery).
+- `QRCodeService.get_local_ip()` is called during the import of
+  `blanco/settings.py`; `_get_ip_method()` therefore reads `GET_IP_METHOD`
+  defensively (falling back to `os.environ`) so that importing the settings
+  module without `DJANGO_SETTINGS_MODULE` — which PyInstaller's Django hook
+  does — cannot raise `ImproperlyConfigured`.
+- `AppConfig.ready()` reads `BLANCO_PORT` to put the real port in the QR code
+  when 8000 is already taken.
+
+`.github/workflows/build-windows.yml` (the only workflow) builds and publishes
+on tags: `test-v1.2.3` produces `Blanco-Setup-1.2.3-test.exe` as a GitHub
+pre-release, `prod-v1.2.3` produces `Blanco-Setup-1.2.3.exe` as a normal
+release; both also attach a portable zip. The job runs `manage.py test core`
+before building, then calls the same `installer/build_windows.ps1`, which now
+takes `-Version` / `-Channel` / `-RequireInstaller` and forwards them to
+`ISCC /DAppVersion /DChannel` (`blanco.iss` wraps its defines in `#ifndef`).
+Versions must be purely numeric — Inno Setup rejects `1.2.3-rc1`, so release
+candidates go through the `test-v*` channel. Both channels share one `AppId`
+and one data directory, so a test build migrates the production database.
+
 ## Architecture
 
 ### Layering

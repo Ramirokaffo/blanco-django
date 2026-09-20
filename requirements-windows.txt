@@ -1,0 +1,13 @@
+# Dépendances supplémentaires pour l'application de bureau Windows (.exe).
+# À installer en plus de requirements.txt :
+#     pip install -r requirements.txt -r requirements-windows.txt
+
+# Serveur WSGI 100 % Python, sans fork : gunicorn ne fonctionne pas sous Windows.
+waitress==3.0.2
+
+# Base de données des fuseaux horaires : Windows n'en fournit pas et le projet
+# utilise TIME_ZONE='Africa/Douala' (zoneinfo lève ZoneInfoNotFoundError sans elle).
+tzdata==2025.2
+
+# Compilation de l'exécutable.
+pyinstaller==6.16.0

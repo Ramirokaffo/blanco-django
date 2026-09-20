@@ -43,6 +43,8 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
+# Installeur Windows (généré par installer/build_windows.ps1)
+installer/Output/
 
 # Docker
 *.env.local

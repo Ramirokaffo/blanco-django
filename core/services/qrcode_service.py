@@ -13,6 +13,7 @@ import subprocess
 
 import qrcode
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 
 class QRCodeService:
@@ -23,12 +24,34 @@ class QRCodeService:
     _server_address: str = None
 
     @staticmethod
+    def _get_ip_method() -> int:
+        """
+        Lit GET_IP_METHOD sans exiger que Django soit déjà configuré.
+
+        get_local_ip() est appelée depuis blanco/settings.py pendant l'import
+        de ce module, et par des outils qui importent les réglages sans passer
+        par django.setup() (PyInstaller lit INSTALLED_APPS de cette façon) :
+        un accès direct à django.conf.settings lèverait alors
+        ImproperlyConfigured. On retombe sur l'environnement du processus.
+        """
+        try:
+            value = getattr(settings, 'GET_IP_METHOD', None)
+        except ImproperlyConfigured:
+            value = None
+        if value is None:
+            value = os.environ.get('GET_IP_METHOD', 0)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
     def get_local_ip() -> str:
         """
         Détecte l'adresse IP locale de la machine.
         Reproduit WIFIService.get_local_ip() de l'ancienne application.
         """
-        if getattr(settings, 'GET_IP_METHOD', 0) == 1:
+        if QRCodeService._get_ip_method() == 1:
             """Get the host IP by finding the default gateway."""
             try:
                 result = subprocess.run(

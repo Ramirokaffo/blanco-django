@@ -13,10 +13,26 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import logging
 import os
+import sys
 from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# ──── Mode application de bureau (exécutable Windows) ───────────────
+# Sous PyInstaller, le code est extrait dans un dossier temporaire en lecture
+# seule (sys._MEIPASS) : base de données, médias et configuration doivent
+# vivre dans un dossier inscriptible de l'utilisateur (%LOCALAPPDATA%\Blanco).
+# En développement, DATA_DIR vaut BASE_DIR : rien ne change.
+from blanco.desktop_env import bootstrap as _desktop_bootstrap, is_desktop as _is_desktop
+
+IS_DESKTOP = _is_desktop()
+if IS_DESKTOP:
+    if getattr(sys, "frozen", False):
+        BASE_DIR = Path(getattr(sys, "_MEIPASS", BASE_DIR))
+    DATA_DIR = _desktop_bootstrap()
+else:
+    DATA_DIR = BASE_DIR
 
 # ──── QR Code serveur ───────────────────────────────────────────────
 from core.services.qrcode_service import QRCodeService
@@ -121,7 +137,7 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            "NAME": DATA_DIR / "db.sqlite3",
         }
     }
 
@@ -216,7 +232,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Media files
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = os.path.join(DATA_DIR, 'media')
 
 # Login URL
 LOGIN_URL = '/login/'

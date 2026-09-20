@@ -34,7 +34,12 @@ class CoreConfig(AppConfig):
         if not is_runserver or is_main_process:
             from core.services.qrcode_service import QRCodeService
 
-            port = 8000  # Port par défaut Django
+            # Port par défaut : BLANCO_PORT (défini par le lanceur de
+            # l'application de bureau Windows), sinon le port Django habituel.
+            try:
+                port = int(os.environ.get('BLANCO_PORT') or 8000)
+            except ValueError:
+                port = 8000
             # Essayer de récupérer le port depuis les arguments de runserver
             for i, arg in enumerate(sys.argv):
                 if arg == 'runserver' and i + 1 < len(sys.argv):

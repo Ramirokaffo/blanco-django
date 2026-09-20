@@ -55,6 +55,22 @@ Le `docker-entrypoint.sh` compile les traductions au démarrage. Pour ajouter un
 python manage.py test core
 ```
 
+## Application Windows (.exe)
+
+Le projet se compile en application de bureau installable (icône, double clic,
+serveur local + ouverture du navigateur), pour un poste sans Docker ni Python :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File installer\build_windows.ps1
+```
+
+La compilation est aussi automatisée : pousser un tag `test-v1.2.3` (préversion)
+ou `prod-v1.2.3` (production) déclenche GitHub Actions, qui lance les tests,
+compile et publie l'installeur dans une release.
+
+Voir `WINDOWS_README.md` (compilation, publication, emplacement des données,
+accès depuis l'application mobile, dépannage).
+
 ## Docker
 
 Voir `DOCKER_README.md`.
