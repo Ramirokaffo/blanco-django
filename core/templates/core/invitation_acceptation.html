@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Créer mon compte" %}{% endblock %}
+{% block content %}
+<section class="card card--narrow">
+    <h2>{% trans "Créer mon compte" %}</h2>
+    <p class="text-muted">
+        {% blocktrans with entreprise=entreprise.name adresse=invitation.email %}Vous avez été invité à rejoindre {{ entreprise }}. Choisissez un identifiant et un mot de passe pour {{ adresse }}.{% endblocktrans %}
+    </p>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="acceptUsername">{% trans "Identifiant de connexion" %}</label>
+            <input type="text" id="acceptUsername" name="username" value="{{ identifiant_propose }}" required class="form-control">
+            {% if erreurs.username %}<p class="form-error">{{ erreurs.username }}</p>{% endif %}
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="acceptFirstname">{% trans "Prénom" %}</label>
+                <input type="text" id="acceptFirstname" name="firstname" value="{{ invitation.firstname }}" class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="acceptLastname">{% trans "Nom" %}</label>
+                <input type="text" id="acceptLastname" name="lastname" value="{{ invitation.lastname }}" class="form-control">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="acceptPassword">{% trans "Mot de passe" %}</label>
+            <input type="password" id="acceptPassword" name="password" required autocomplete="new-password" class="form-control">
+            {% if erreurs.password %}<p class="form-error">{{ erreurs.password }}</p>{% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="acceptPasswordConfirm">{% trans "Confirmez le mot de passe" %}</label>
+            <input type="password" id="acceptPasswordConfirm" name="password_confirmation" required autocomplete="new-password" class="form-control">
+            {% if erreurs.password_confirmation %}<p class="form-error">{{ erreurs.password_confirmation }}</p>{% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary">{% trans "Créer mon compte" %}</button>
+    </form>
+</section>
+{% endblock %}

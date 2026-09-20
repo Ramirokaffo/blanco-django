@@ -21,8 +21,14 @@ def seed_default_data(sender, **kwargs):
     from core.models.settings_models import AppModule
     from core.services.accounting_service import AccountingService
 
-    created_modules = AppModule.init_default_modules()
-    created_accounts = AccountingService.init_chart_of_accounts()
+    # `post_migrate` transmet l'alias réellement migré. Il DOIT être propagé :
+    # sans lui, un `migrate --database=<alias>` sèmerait dans la base par
+    # défaut au lieu de celle qui vient d'être créée, laissant la nouvelle
+    # base sans modules ni plan comptable.
+    using = kwargs.get('using')
+
+    created_modules = AppModule.init_default_modules(using=using)
+    created_accounts = AccountingService.init_chart_of_accounts(using=using)
 
     verbosity = kwargs.get('verbosity', 1)
     if verbosity >= 1 and (created_modules or created_accounts):

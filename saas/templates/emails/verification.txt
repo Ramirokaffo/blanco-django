@@ -1,0 +1,9 @@
+{% load i18n %}{% blocktrans %}Bonjour,
+
+Vous venez de créer l'espace {{ entreprise }} sur Blanco.
+
+Pour l'activer, confirmez votre adresse en ouvrant ce lien :
+{{ lien }}
+
+Ce lien est valable {{ heures }} heures. Si vous n'êtes pas à l'origine de cette
+demande, ignorez ce message : aucun espace ne sera créé.{% endblocktrans %}

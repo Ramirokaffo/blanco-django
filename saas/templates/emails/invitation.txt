@@ -1,0 +1,9 @@
+{% load i18n %}{% blocktrans %}Bonjour,
+
+{{ invitant }} vous invite à rejoindre l'espace {{ entreprise }} sur Blanco.
+
+Créez votre compte en ouvrant ce lien :
+{{ lien }}
+
+Ce lien est valable {{ jours }} jours et ne peut servir qu'une fois. Si vous ne
+vous attendiez pas à cette invitation, ignorez ce message.{% endblocktrans %}

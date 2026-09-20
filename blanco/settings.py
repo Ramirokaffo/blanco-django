@@ -15,6 +15,7 @@ import logging
 import os
 import sys
 from decouple import config, Csv
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -34,8 +35,24 @@ if IS_DESKTOP:
 else:
     DATA_DIR = BASE_DIR
 
+# ──── Mode de déploiement ───────────────────────────────────────────
+# standalone (défaut) : installation mono-client — Docker sur le réseau local
+#   du commerce, ou exécutable Windows. Comportement strictement identique à
+#   l'historique : une seule base, QR code LAN, aucun routage.
+# saas : plateforme hébergée multi-entreprises — une base MySQL par société,
+#   résolue depuis le nom d'hôte de la requête.
+from blanco.modes import SAAS as _MODE_SAAS, get_mode as _get_mode
+
+BLANCO_MODE = _get_mode()
+IS_SAAS = BLANCO_MODE == _MODE_SAAS
+
 # ──── QR Code serveur ───────────────────────────────────────────────
-from core.services.qrcode_service import QRCodeService
+# En mode SaaS, aucune IP locale n'est pertinente (les clients arrivent par
+# leur sous-domaine) : on évite l'appel réseau et l'import de `core` au
+# chargement des settings. Le pilote PyMySQL, qu'apportait cet import, est
+# désormais installé par blanco/__init__.py.
+if not IS_SAAS:
+    from core.services.qrcode_service import QRCodeService
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -43,10 +60,21 @@ SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", cast=bool)
 GET_IP_METHOD = config("GET_IP_METHOD", default=0, cast=int)
 
-local_ip = QRCodeService.get_local_ip()
+local_ip = QRCodeService.get_local_ip() if not IS_SAAS else None
 
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
-if local_ip and local_ip not in ALLOWED_HOSTS:
+if IS_SAAS:
+    # Domaine racine de la plateforme : sert à distinguer le site public et le
+    # back-office des espaces clients (voir saas.middleware.TenantMiddleware).
+    BLANCO_PLATFORM_DOMAIN = config("BLANCO_PLATFORM_DOMAIN")
+    # Joker natif de Django : autorise tous les sous-domaines de la plateforme.
+    # Les domaines PROPRES des clients ne peuvent pas figurer dans une liste
+    # statique ; ils sont validés par TenantMiddleware contre la table Domain,
+    # qui tient lieu de liste blanche adossée à des données réelles.
+    for _hote in (f".{BLANCO_PLATFORM_DOMAIN}",):
+        if _hote not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(_hote)
+elif local_ip and local_ip not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(local_ip)  # Autoriser l'accès via l'IP locale détectée
 
 logging.getLogger(__name__).debug("ALLOWED_HOSTS=%s", ALLOWED_HOSTS)
@@ -63,6 +91,11 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "core",
 ]
+
+# Plan de contrôle de l'offre hébergée : absent en installation mono-client.
+# Placé après "core" : ses modèles référencent AUTH_USER_MODEL.
+if IS_SAAS:
+    INSTALLED_APPS.append("saas")
 
 # Custom User Model
 AUTH_USER_MODEL = 'core.CustomUser'
@@ -84,7 +117,24 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "blanco.urls"
+if IS_SAAS:
+    # En tête (juste après SecurityMiddleware) : ce middleware valide le nom
+    # d'hôte contre la table Domain et doit précéder tout ce qui lit
+    # request.get_host() ; SessionMiddleware, qui charge la session depuis la
+    # base, exige par ailleurs que le routage soit déjà actif.
+    MIDDLEWARE.insert(1, "saas.middleware.TenantMiddleware")
+    # Juste après AuthenticationMiddleware : la session est chargée mais
+    # request.user reste paresseux — un rejet ne coûte aucune requête SQL.
+    MIDDLEWARE.insert(
+        MIDDLEWARE.index("django.contrib.auth.middleware.AuthenticationMiddleware") + 1,
+        "saas.middleware.TenantSessionGuardMiddleware",
+    )
+
+# En mode SaaS, l'URLconf par défaut est celle de la plateforme (site public,
+# inscription, administration). TenantMiddleware bascule sur
+# `blanco.urls_tenant` pour les requêtes visant l'espace d'un client.
+# En mono-client, rien ne change : `blanco.urls` comme auparavant.
+ROOT_URLCONF = "blanco.urls_platform" if IS_SAAS else "blanco.urls"
 
 TEMPLATES = [
     {
@@ -101,6 +151,7 @@ TEMPLATES = [
                 "core.context_processors.qrcode_context",
                 "core.context_processors.system_settings_context",
                 "core.context_processors.user_modules_context",
+                "core.context_processors.deployment_mode_context",
             ],
         },
     },
@@ -141,6 +192,50 @@ else:
         }
     }
 
+# ──── Multi-base : une base par entreprise cliente ──────────────────
+# En mode mono-client, DATABASE_ROUTERS n'est pas défini : Django applique sa
+# valeur par défaut (liste vide), donc aucun routage — comportement historique.
+if IS_SAAS:
+    DATABASE_ROUTERS = ["saas.routers.TenantRouter"]
+
+    # Modèle de nom des bases sociétés. Validé par saas.db.valider_nom_de_base
+    # avant toute interpolation dans du DDL.
+    TENANT_DB_NAME_TEMPLATE = config("TENANT_DB_NAME_TEMPLATE", default="blanco_t_{slug}")
+
+    # 0 = une connexion par requête. Le pire cas est
+    # workers × threads × sociétés servies par ce fil : avec des connexions
+    # persistantes et quelques centaines de clients, on dépasse largement le
+    # max_connections de MySQL. Ne relever qu'après mesure.
+    TENANT_CONN_MAX_AGE = config("TENANT_CONN_MAX_AGE", cast=int, default=0)
+
+    # Le routeur retombe sur `default` hors contexte société. En mode strict,
+    # une ÉCRITURE métier pendant une requête HTTP sans société active lève une
+    # exception au lieu d'atterrir silencieusement dans la base plateforme.
+    BLANCO_STRICT_TENANT = config("BLANCO_STRICT_TENANT", cast=bool, default=True)
+
+    # Compte MySQL autorisé à créer les bases. Distinct du compte applicatif et
+    # réservé au processus de travaux : une faille du serveur web ne doit pas
+    # permettre de créer ou détruire des bases.
+    MYSQL_PROVISION_USER = config("MYSQL_PROVISION_USER", default="")
+    MYSQL_PROVISION_PASSWORD = config("MYSQL_PROVISION_PASSWORD", default="")
+
+    # Bases de test d'isolation. Les alias sont dérivés d'une clé primaire
+    # (saas.db.alias_for) : on emploie donc des identifiants réels, que les
+    # tests attribuent aux entreprises factices. Sous SQLite, ce sont des
+    # bases distinctes et la suite tourne sans serveur MySQL.
+    TENANT_TEST_IDS = (1001, 1002)
+    if "test" in sys.argv:
+        for _tenant_id in TENANT_TEST_IDS:
+            _alias = f"tenant_{_tenant_id}"
+            DATABASES[_alias] = {
+                **DATABASES["default"],
+                "NAME": (
+                    DATA_DIR / f"{_alias}.sqlite3"
+                    if DATABASE_ENGINE == "django.db.backends.sqlite3"
+                    else f"blanco_{_alias}"
+                ),
+            }
+
 
 
 
@@ -170,6 +265,14 @@ USE_HTTPS = config('USE_HTTPS', cast=bool, default=False)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
+
+if IS_SAAS:
+    # INTERDICTION ABSOLUE de porter ces cookies sur un domaine parent
+    # (".exemple.com") : le navigateur les enverrait alors à TOUS les espaces
+    # clients, et un client pourrait rejouer la session d'un autre — voire
+    # celle d'un membre de la plateforme. `None` = cookie lié à l'hôte exact.
+    SESSION_COOKIE_DOMAIN = None
+    CSRF_COOKIE_DOMAIN = None
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'same-origin'
 X_FRAME_OPTIONS = 'DENY'
@@ -187,6 +290,33 @@ if USE_HTTPS:
 # Limitation des tentatives de connexion (vue web /login/)
 LOGIN_RATELIMIT_ATTEMPTS = config('LOGIN_RATELIMIT_ATTEMPTS', cast=int, default=5)
 LOGIN_RATELIMIT_WINDOW_SECONDS = config('LOGIN_RATELIMIT_WINDOW_SECONDS', cast=int, default=15 * 60)
+
+# ──── Cache ─────────────────────────────────────────────────────────
+# Sans réglage, Django utilise un cache MÉMOIRE PAR PROCESSUS : avec
+# `gunicorn --workers 3`, le compteur ci-dessus est réparti sur trois
+# processus et le seuil réel est triplé. Idem pour les throttles DRF.
+# Renseigner REDIS_URL corrige le problème, y compris en mono-client.
+REDIS_URL = config('REDIS_URL', default='')
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "KEY_PREFIX": "blanco",
+            # En SaaS, chaque clé est préfixée par la société active : sans
+            # cela, l'« admin » d'une société et celui d'une autre
+            # partageraient le même compteur de tentatives échouées.
+            **({"KEY_FUNCTION": "saas.cache.tenant_key_func"} if IS_SAAS else {}),
+        }
+    }
+elif IS_SAAS and "test" not in sys.argv:
+    # Même exemption : la suite de tests fournit son propre cache mémoire,
+    # avec la fonction de clé du mode SaaS (voir saas/tests/base.py).
+    raise ImproperlyConfigured(
+        "BLANCO_MODE=saas exige REDIS_URL : un cache mémoire par processus "
+        "rendrait inopérants la limitation des tentatives de connexion et la "
+        "résolution des noms d'hôte."
+    )
 
 
 # Internationalization
@@ -234,9 +364,61 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(DATA_DIR, 'media')
 
+if IS_SAAS:
+    # Les fichiers déposés sont rangés sous MEDIA_ROOT/tenants/<sous-domaine>/.
+    # Seule la RACINE change : les noms stockés en base ("product/x.jpg")
+    # restent identiques, donc aucune migration de données et aucun changement
+    # dans les gabarits. Noter que STORAGES et STATICFILES_STORAGE sont
+    # mutuellement exclusifs : ce projet définissant déjà STATICFILES_STORAGE,
+    # on utilise le réglage historique DEFAULT_FILE_STORAGE.
+    DEFAULT_FILE_STORAGE = "saas.storage.TenantFileSystemStorage"
+
 # Login URL
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
+
+# ──── Envoi d'e-mails ───────────────────────────────────────────────
+# En installation mono-client (LAN, exécutable Windows), aucun SMTP n'est
+# configuré : le backend « dummy » absorbe les envois sans lever d'erreur.
+# On évite volontairement le backend « console » : dans l'exécutable Windows,
+# PyInstaller met sys.stdout à None et un backend console planterait.
+# Le mode SaaS exige un SMTP (vérification d'adresse, invitations, mots de
+# passe oubliés) : l'absence de configuration y est une erreur de démarrage.
+EMAIL_HOST = config('EMAIL_HOST', default='')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
+EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=15, cast=int)
+DEFAULT_FROM_EMAIL = config(
+    'DEFAULT_FROM_EMAIL', default='Blanco <ne-pas-repondre@localhost>'
+)
+SERVER_EMAIL = config('SERVER_EMAIL', default=DEFAULT_FROM_EMAIL)
+EMAIL_SUBJECT_PREFIX = ''
+
+_backend_par_defaut = (
+    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST
+    else 'django.core.mail.backends.dummy.EmailBackend'
+)
+EMAIL_BACKEND = config('EMAIL_BACKEND', default=_backend_par_defaut)
+
+#: Vrai si les envois aboutissent réellement quelque part. Les vues qui
+#: dépendent d'un e-mail (invitation, mot de passe oublié) s'en servent pour
+#: ne pas promettre un message qui ne partira jamais.
+EMAIL_ENABLED = bool(EMAIL_HOST) or EMAIL_BACKEND.endswith(
+    ('locmem.EmailBackend', 'console.EmailBackend', 'filebased.EmailBackend')
+)
+
+# Contrôle de démarrage, hors exécution de la suite de tests (le lanceur
+# Django y substitue de toute façon un backend en mémoire).
+if IS_SAAS and not EMAIL_ENABLED and "test" not in sys.argv:
+    raise ImproperlyConfigured(
+        "BLANCO_MODE=saas exige une configuration SMTP (EMAIL_HOST) : sans "
+        "elle, ni la vérification d'adresse à l'inscription, ni les "
+        "invitations d'employés, ni la réinitialisation des mots de passe ne "
+        "peuvent fonctionner."
+    )
 
 
 

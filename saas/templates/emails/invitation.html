@@ -1,0 +1,14 @@
+{% extends "emails/base.html" %}{% load i18n %}
+{% block titre %}{% trans "Invitation" %}{% endblock %}
+{% block contenu %}
+    <p style="margin:0 0 16px;font-size:16px;">{% trans "Bonjour," %}</p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">
+        {% blocktrans %}<strong>{{ invitant }}</strong> vous invite à rejoindre l'espace <strong>{{ entreprise }}</strong> sur Blanco.{% endblocktrans %}
+    </p>
+    <p style="margin:0 0 24px;">
+        <a href="{{ lien }}" style="display:inline-block;background:#0b7285;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">{% trans "Créer mon compte" %}</a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#52606d;line-height:1.6;">
+        {% blocktrans %}Ce lien est valable {{ jours }} jours et ne peut servir qu'une fois. Si vous ne vous attendiez pas à cette invitation, ignorez ce message.{% endblocktrans %}
+    </p>
+{% endblock %}

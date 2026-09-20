@@ -72,6 +72,19 @@
                     <span class="user-name">{{ user.username }}</span>
                 </button>
                 <div class="user-dropdown" id="userDropdown">
+                    {# En mode plateforme, l'administration Django n'est pas montée sur
+                       l'espace d'un client : le lien planterait, et il ne doit de toute
+                       façon pas exister là-bas (il donnerait accès au plan de contrôle). #}
+                    {% if user.is_superuser and not is_saas %}
+                    <a href="{% url 'admin:index' %}" class="user-dropdown-item">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <polyline points="9 12 11 14 15 10"/>
+                        </svg>
+                        {% trans "Administration" %}
+                    </a>
+                    <div class="user-dropdown-divider"></div>
+                    {% endif %}
                     <form method="post" action="{% url 'logout' %}" class="logout-form">
                         {% csrf_token %}
                         <button type="submit" class="user-dropdown-item logout-link">

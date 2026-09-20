@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_invitations
 
 urlpatterns = [
     path('login/', views.login_view, name='login'),
@@ -30,6 +30,12 @@ urlpatterns = [
     path('supplies/<int:supply_id>/cancel/', views.cancel_supply, name='cancel_supply'),
     path('supplies/<int:supply_id>/partial-return/', views.partial_return_supply, name='partial_return_supply'),
     path('contacts/', views.contacts, name='contacts'),
+    # Invitations d'employés : mode plateforme uniquement (404 sinon).
+    path('contacts/invitations/', views_invitations.invitations, name='invitations'),
+    path('contacts/invitations/envoyer/', views_invitations.envoyer_invitation, name='send_invitation'),
+    path('contacts/invitations/<int:pk>/renvoyer/', views_invitations.renvoyer_invitation, name='resend_invitation'),
+    path('contacts/invitations/<int:pk>/revoquer/', views_invitations.revoquer_invitation, name='revoke_invitation'),
+    path('invitation/<str:token>/', views_invitations.accepter_invitation, name='accept_invitation'),
     path('contacts/clients/add/', views.add_client, name='add_client'),
     path('contacts/clients/<int:pk>/edit/', views.edit_client, name='edit_client'),
     path('suppliers/', views.suppliers_list, name='suppliers'),

@@ -1,10 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-# Les migrations ne sont pas versionnées (voir .gitignore : */migrations/*.py) :
-# elles sont régénérées à partir des modèles à chaque démarrage, puis appliquées.
-echo "Génération et application des migrations..."
-python manage.py makemigrations --noinput
+# Les migrations sont versionnées et livrées dans l'image : on ne les régénère
+# JAMAIS au démarrage. Un `makemigrations` ici recréerait un 0001_initial que
+# `migrate` croirait déjà appliqué (django_migrations ne stocke aucun hash de
+# contenu), et le schéma divergerait silencieusement d'une base à l'autre.
+echo "Contrôle de l'historique des migrations..."
+python manage.py check_migration_baseline
+
+echo "Application des migrations..."
 python manage.py migrate --noinput
 
 echo "Compilation des traductions (locale/*/LC_MESSAGES/*.po -> .mo)..."

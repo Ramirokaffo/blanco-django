@@ -86,10 +86,16 @@ $env:MYSQL_PASSWORD = ''
 $env:MYSQL_HOST = ''
 $env:MYSQL_PORT = ''
 
-# ── 4. Migrations (non versionnées : cf. .gitignore) ──────────────────
-Write-Host '[4/7] Génération des migrations…' -ForegroundColor Yellow
-& $VenvPython manage.py makemigrations core --noinput
-if ($LASTEXITCODE -ne 0) { throw 'Échec de makemigrations.' }
+# ── 4. Migrations (versionnées : filet de sécurité) ───────────────────
+# Les migrations sont committées ; cette étape ne doit rien produire. Si elle
+# génère un fichier, c'est qu'un modèle a changé sans migration associée —
+# --check le signale et interrompt la compilation plutôt que d'embarquer un
+# .exe dont le schéma diverge.
+Write-Host '[4/7] Contrôle des migrations…' -ForegroundColor Yellow
+& $VenvPython manage.py makemigrations core --check --dry-run
+if ($LASTEXITCODE -ne 0) {
+    throw 'Des modèles ont changé sans migration associée : lancez `manage.py makemigrations core` et commitez le fichier.'
+}
 
 # ── 5. Traductions et fichiers statiques ──────────────────────────────
 Write-Host '[5/7] Traductions et fichiers statiques…' -ForegroundColor Yellow

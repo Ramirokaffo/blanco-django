@@ -25,6 +25,17 @@ class CoreConfig(AppConfig):
             dispatch_uid='core.seed_default_data',
         )
 
+        # Le QR code ne sert qu'au mode mono-client : l'application mobile y
+        # lit l'IP locale du poste serveur pour le rejoindre sur le réseau du
+        # commerce. En plateforme hébergée, il n'y a pas d'IP locale
+        # pertinente, l'état de QRCodeService est global au processus (un
+        # worker servirait à une société le QR d'une autre) et l'écriture se
+        # ferait à un chemin fixe partagé. On ne le génère donc pas.
+        from django.conf import settings as django_settings
+
+        if getattr(django_settings, 'IS_SAAS', False):
+            return
+
         # En mode runserver, Django lance 2 processus : le reloader et le serveur.
         # RUN_MAIN='true' indique qu'on est dans le processus fils (le vrai serveur).
         # En production (gunicorn, etc.), RUN_MAIN n'existe pas, donc on exécute aussi.

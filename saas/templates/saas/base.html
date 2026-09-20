@@ -1,0 +1,27 @@
+{% load i18n static %}<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block titre %}Blanco{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'saas/css/plateforme.css' %}">
+    {% block entete %}{% endblock %}
+</head>
+<body>
+    <header class="entete">
+        <a class="marque" href="{% url 'saas:accueil' %}">Blanco</a>
+        <nav>
+            <a class="bouton bouton--discret" href="{% url 'saas:inscription' %}">{% trans "Créer mon espace" %}</a>
+        </nav>
+    </header>
+
+    <main class="contenu">
+        {% block contenu %}{% endblock %}
+    </main>
+
+    <footer class="pied">
+        <p>&copy; {% now "Y" %} Blanco</p>
+    </footer>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,113 @@
+{% extends "saas/base.html" %}{% load i18n %}
+{% block titre %}{% trans "Créer mon espace" %}{% endblock %}
+{% block contenu %}
+<section class="formulaire">
+    <h1>{% trans "Créer mon espace" %}</h1>
+    <p class="accroche">{% trans "Quelques informations suffisent. Votre espace est prêt en moins d'une minute." %}</p>
+
+    {% if formulaire.non_field_errors %}
+        <div class="alerte alerte--erreur">{{ formulaire.non_field_errors }}</div>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="champ">
+            <label for="{{ formulaire.nom.id_for_label }}">{{ formulaire.nom.label }}</label>
+            {{ formulaire.nom }}
+            {% if formulaire.nom.errors %}<p class="erreur">{{ formulaire.nom.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div class="champ">
+            <label for="{{ formulaire.slug.id_for_label }}">{{ formulaire.slug.label }}</label>
+            <div class="champ-suffixe">
+                {{ formulaire.slug }}
+                <span class="suffixe">.{{ domaine_plateforme }}</span>
+            </div>
+            <p class="aide">{{ formulaire.slug.help_text }}</p>
+            <p class="etat-slug" id="etatSlug" role="status" aria-live="polite"></p>
+            {% if formulaire.slug.errors %}<p class="erreur">{{ formulaire.slug.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div class="champ">
+            <label for="{{ formulaire.email.id_for_label }}">{{ formulaire.email.label }}</label>
+            {{ formulaire.email }}
+            <p class="aide">{{ formulaire.email.help_text }}</p>
+            {% if formulaire.email.errors %}<p class="erreur">{{ formulaire.email.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div class="grille-deux">
+            <div class="champ">
+                <label for="{{ formulaire.contact_nom.id_for_label }}">{{ formulaire.contact_nom.label }}</label>
+                {{ formulaire.contact_nom }}
+            </div>
+            <div class="champ">
+                <label for="{{ formulaire.contact_telephone.id_for_label }}">{{ formulaire.contact_telephone.label }}</label>
+                {{ formulaire.contact_telephone }}
+            </div>
+        </div>
+
+        <div class="grille-deux">
+            <div class="champ">
+                <label for="{{ formulaire.mot_de_passe.id_for_label }}">{{ formulaire.mot_de_passe.label }}</label>
+                {{ formulaire.mot_de_passe }}
+                {% if formulaire.mot_de_passe.errors %}<p class="erreur">{{ formulaire.mot_de_passe.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="champ">
+                <label for="{{ formulaire.mot_de_passe_confirmation.id_for_label }}">{{ formulaire.mot_de_passe_confirmation.label }}</label>
+                {{ formulaire.mot_de_passe_confirmation }}
+                {% if formulaire.mot_de_passe_confirmation.errors %}<p class="erreur">{{ formulaire.mot_de_passe_confirmation.errors.0 }}</p>{% endif %}
+            </div>
+        </div>
+
+        <div class="champ">
+            <label for="{{ formulaire.langue.id_for_label }}">{{ formulaire.langue.label }}</label>
+            {{ formulaire.langue }}
+        </div>
+
+        <div class="champ champ--case">
+            {{ formulaire.conditions }}
+            <label for="{{ formulaire.conditions.id_for_label }}">{{ formulaire.conditions.label }}</label>
+            {% if formulaire.conditions.errors %}<p class="erreur">{{ formulaire.conditions.errors.0 }}</p>{% endif %}
+        </div>
+
+        <button type="submit" class="bouton bouton--principal">{% trans "Créer mon espace" %}</button>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% url 'javascript-catalog' %}"></script>
+<script>
+(function () {
+    var champ = document.getElementById("{{ formulaire.slug.id_for_label }}");
+    var etat = document.getElementById("etatSlug");
+    if (!champ || !etat) { return; }
+
+    var minuteur = null;
+
+    function verifier() {
+        var valeur = champ.value.trim();
+        if (valeur.length < 3) { etat.textContent = ""; etat.className = "etat-slug"; return; }
+
+        fetch("{% url 'saas:verifier_slug' %}?slug=" + encodeURIComponent(valeur))
+            .then(function (r) { return r.json(); })
+            .then(function (donnees) {
+                etat.textContent = donnees.message;
+                etat.className = "etat-slug " + (donnees.disponible ? "etat-slug--libre" : "etat-slug--pris");
+            })
+            .catch(function () {
+                etat.textContent = "";
+                etat.className = "etat-slug";
+            });
+    }
+
+    champ.addEventListener("input", function () {
+        window.clearTimeout(minuteur);
+        // On attend la fin de la saisie : inutile d'interroger le serveur à
+        // chaque frappe, et la vérification est limitée en fréquence.
+        minuteur = window.setTimeout(verifier, 400);
+    });
+})();
+</script>
+{% endblock %}

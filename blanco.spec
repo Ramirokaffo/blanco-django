@@ -11,8 +11,8 @@ l'arborescence à l'utilisateur final).
 Prérequis avant de lancer la compilation — automatisés par
 installer/build_windows.ps1 :
 
-  * python manage.py makemigrations core   (les migrations ne sont pas
-    versionnées : sans elles, le .exe ne saurait pas créer la base) ;
+  * python manage.py makemigrations core   (les migrations sont désormais
+    versionnées : cette étape est un filet de sécurité, normalement sans effet) ;
   * python manage.py translations compile  (fichiers .mo, sinon l'anglais
     retombe silencieusement en français) ;
   * python manage.py collectstatic         (le stockage manifeste de

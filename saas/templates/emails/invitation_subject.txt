@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktrans %}{{ invitant }} vous invite à rejoindre {{ entreprise }}{% endblocktrans %}

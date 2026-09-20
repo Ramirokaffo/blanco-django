@@ -1,0 +1,11 @@
+{% extends "saas/base.html" %}{% load i18n %}
+{% block titre %}{% trans "Lien invalide" %}{% endblock %}
+{% block contenu %}
+<section class="message">
+    <h1>{% trans "Ce lien n'est plus valide" %}</h1>
+    <p class="accroche">
+        {% trans "Il a peut-être expiré, ou il a déjà été utilisé." %}
+    </p>
+    <p><a class="bouton bouton--principal" href="{% url 'saas:inscription' %}">{% trans "Recommencer l'inscription" %}</a></p>
+</section>
+{% endblock %}

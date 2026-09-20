@@ -1,0 +1,26 @@
+{% extends "saas/base.html" %}{% load i18n %}
+{% block titre %}{% trans "Blanco — la caisse et la comptabilité de votre commerce" %}{% endblock %}
+{% block contenu %}
+<section class="heros">
+    <h1>{% trans "La caisse et la comptabilité de votre commerce, en ligne." %}</h1>
+    <p class="accroche">
+        {% trans "Ventes, stock, approvisionnements, crédits clients et comptabilité OHADA — dans un seul outil, accessible depuis votre ordinateur et votre téléphone." %}
+    </p>
+    <p><a class="bouton bouton--principal" href="{% url 'saas:inscription' %}">{% trans "Créer mon espace gratuitement" %}</a></p>
+</section>
+
+<section class="atouts">
+    <article>
+        <h2>{% trans "Conçu pour le Cameroun" %}</h2>
+        <p>{% trans "Facturation en FCFA, TVA à 19,25 %, plan comptable OHADA prêt à l'emploi." %}</p>
+    </article>
+    <article>
+        <h2>{% trans "Vos données vous appartiennent" %}</h2>
+        <p>{% trans "Chaque entreprise dispose de sa propre base de données, isolée des autres. Export complet en un clic, à tout moment." %}</p>
+    </article>
+    <article>
+        <h2>{% trans "Aussi en installation locale" %}</h2>
+        <p>{% trans "Vous préférez héberger vous-même ? La même application s'installe sur un poste de votre boutique." %}</p>
+    </article>
+</section>
+{% endblock %}

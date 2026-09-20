@@ -71,23 +71,37 @@ class AccountingService:
     # ── Initialisation du plan comptable ──────────────────────────────
 
     @staticmethod
-    def init_chart_of_accounts():
+    def init_chart_of_accounts(using=None):
         """
         Initialise le plan comptable OHADA avec les comptes par défaut.
         Ne crée que les comptes manquants (idempotent).
         Retourne le nombre de comptes créés.
+
+        ``using`` désigne la base à peupler. Il est indispensable en
+        multi-base : ``migrate --database=<alias>`` transmet l'alias migré
+        au signal ``post_migrate``, et sans lui le seed irait dans la base
+        par défaut au lieu de celle qui vient d'être créée.
+        La résolution du parent doit viser la MÊME base, sinon un compte
+        serait rattaché au parent d'une autre société.
+        ``using=None`` laisse le routeur décider (comportement mono-base).
         """
         created_count = 0
         for code, name, account_type, parent_code in DEFAULT_ACCOUNTS:
-            parent = None
+            parent_id = None
             if parent_code:
-                parent = Account.objects.filter(code=parent_code).first()
-            _unused, created = Account.objects.get_or_create(
+                # On ne récupère que l'identifiant : affecter l'OBJET parent
+                # ferait passer l'affectation par le routeur de bases, qui,
+                # hors contexte société (cas d'un `migrate --database=...`),
+                # rattacherait la nouvelle ligne à la mauvaise base.
+                parent_id = Account.objects.db_manager(using).filter(
+                    code=parent_code
+                ).values_list('pk', flat=True).first()
+            _unused, created = Account.objects.db_manager(using).get_or_create(
                 code=code,
                 defaults={
                     'name': name,
                     'account_type': account_type,
-                    'parent': parent,
+                    'parent_id': parent_id,
                 },
             )
             if created:

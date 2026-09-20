@@ -25,6 +25,7 @@ from .models import (
     # Settings models
     SystemSettings, AppModule,
 )
+from core.services.staff_service import StaffService
 
 
 def configure_admin_site():
@@ -95,6 +96,28 @@ class CustomUserAdmin(UserAdmin):
     )
 
     filter_horizontal = ('allowed_modules', 'groups', 'user_permissions')
+
+    def save_model(self, request, obj, form, change):
+        """
+        Empêche de retirer les droits du dernier administrateur.
+
+        Sans ce contrôle, un administrateur peut se décocher « Actif » ou
+        « Statut super-utilisateur » et s'enfermer dehors : plus personne ne
+        peut alors gérer les comptes, et seule une intervention sur la base
+        rouvre l'accès.
+        """
+        if change and obj.pk:
+            ancien = CustomUser.objects.filter(pk=obj.pk).first()
+            perd_ses_droits = ancien is not None and ancien.is_superuser and (
+                not obj.is_superuser or not obj.is_active or obj.delete_at is not None
+            )
+            if perd_ses_droits:
+                StaffService.ensure_not_last_superuser(ancien)
+        super().save_model(request, obj, form, change)
+
+    def delete_model(self, request, obj):
+        StaffService.ensure_not_last_superuser(obj)
+        super().delete_model(request, obj)
 
 
 @admin.register(Client)

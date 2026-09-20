@@ -14,6 +14,7 @@ Note : cette initialisation est aussi exécutée automatiquement après chaque
 """
 
 from django.core.management.base import BaseCommand
+from django.db import DEFAULT_DB_ALIAS
 
 from core.models.settings_models import AppModule, DEFAULT_MODULES
 
@@ -27,11 +28,17 @@ class Command(BaseCommand):
             action='store_true',
             help="Réaligne aussi le nom, l'icône et l'ordre des modules existants.",
         )
+        parser.add_argument(
+            '--database',
+            default=DEFAULT_DB_ALIAS,
+            help="Base à peupler (multi-base : alias de la société visée).",
+        )
 
     def handle(self, *args, **options):
-        created = AppModule.init_default_modules()
-        updated = AppModule.sync_default_modules() if options['update'] else 0
-        total = AppModule.objects.count()
+        using = options['database']
+        created = AppModule.init_default_modules(using=using)
+        updated = AppModule.sync_default_modules(using=using) if options['update'] else 0
+        total = AppModule.objects.db_manager(using).count()
 
         self.stdout.write(self.style.SUCCESS(
             f"✅ Modules applicatifs : {created} créé(s), {updated} mis à jour, "
@@ -39,6 +46,6 @@ class Command(BaseCommand):
         ))
 
         if options['verbosity'] >= 2:
-            for module in AppModule.objects.order_by('order', 'name'):
+            for module in AppModule.objects.db_manager(using).order_by('order', 'name'):
                 state = 'actif' if module.is_active else 'inactif'
                 self.stdout.write(f"   {module.order:>2}. {module.icon} {module.name} [{module.code}] ({state})")

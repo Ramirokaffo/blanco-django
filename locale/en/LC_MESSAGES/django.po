@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Blanco 1.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-07 01:04+0100\n"
+"POT-Creation-Date: 2026-09-20 19:02+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: en\n"
@@ -18,51 +18,51 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: core/admin.py:32 core/admin.py:33
+#: core/admin.py:33 core/admin.py:34
 msgid "Administration BLANCO"
 msgstr "BLANCO administration"
 
-#: core/admin.py:34
+#: core/admin.py:35
 msgid "Panneau d'administration BLANCO"
 msgstr "BLANCO administration panel"
 
-#: core/admin.py:81 core/admin.py:92
+#: core/admin.py:82 core/admin.py:93
 msgid "Informations supplémentaires"
 msgstr "Additional information"
 
-#: core/admin.py:84 core/models/user_models.py:30
+#: core/admin.py:85 core/models/user_models.py:30 core/templates/core/invitations.html:46
 msgid "Modules autorisés"
 msgstr "Allowed modules"
 
-#: core/admin.py:86
+#: core/admin.py:87
 msgid "Sélectionnez les modules auxquels cet utilisateur a accès. Les superusers ont accès à tout."
 msgstr "Select the modules this user can access. Superusers have access to everything."
 
-#: core/admin.py:385 core/templates/core/supplier_form.html:40
+#: core/admin.py:408 core/templates/core/supplier_form.html:40
 msgid "Informations de l'entreprise"
 msgstr "Company information"
 
-#: core/admin.py:391
+#: core/admin.py:414
 msgid "Informations fiscales / légales"
 msgstr "Tax / legal information"
 
-#: core/admin.py:394
+#: core/admin.py:417
 msgid "Paramètres monétaires"
 msgstr "Currency settings"
 
-#: core/admin.py:397
+#: core/admin.py:420
 msgid "Paramètres de tickets / reçus"
 msgstr "Receipt settings"
 
-#: core/admin.py:400
+#: core/admin.py:423
 msgid "Paramètres de stock"
 msgstr "Stock settings"
 
-#: core/admin.py:403
+#: core/admin.py:426
 msgid "Paramètres par défaut"
 msgstr "Default settings"
 
-#: core/admin.py:406
+#: core/admin.py:429
 msgid "Métadonnées"
 msgstr "Metadata"
 
@@ -247,7 +247,7 @@ msgstr "e.g. 5000"
 #: core/models/accounting_models.py:489 core/models/product_models.py:84 core/models/user_models.py:115
 #: core/templates/core/accounting/bank_reconciliation.html:112 core/templates/core/expenses.html:145
 #: core/templates/core/expenses.html:253 core/templates/core/statistics_expenses.html:23
-#: core/views.py:4452
+#: core/views.py:4452 saas/models/plan_models.py:29
 msgid "Description"
 msgstr "Description"
 
@@ -289,6 +289,8 @@ msgid "Féminin"
 msgstr "Female"
 
 #: core/forms.py:279 core/models/user_models.py:17 core/templates/core/contacts.html:98
+#: core/templates/core/invitation_acceptation.html:21 core/templates/core/invitations.html:36
+#: saas/models/invitation_models.py:129
 msgid "Prénom"
 msgstr "First name"
 
@@ -297,8 +299,10 @@ msgid "Prénom du client"
 msgstr "Customer's first name"
 
 #: core/forms.py:285 core/models/product_models.py:83 core/models/user_models.py:18
-#: core/templates/core/contacts.html:99 core/templates/core/products.html:101
-#: core/templates/core/suppliers.html:71
+#: core/templates/core/contacts.html:99 core/templates/core/invitation_acceptation.html:25
+#: core/templates/core/invitations.html:40 core/templates/core/products.html:101
+#: core/templates/core/suppliers.html:71 saas/models/invitation_models.py:130
+#: saas/models/plan_models.py:28
 msgid "Nom"
 msgstr "Name"
 
@@ -306,7 +310,7 @@ msgstr "Name"
 msgid "Nom du client"
 msgstr "Customer's last name"
 
-#: core/forms.py:292 core/forms.py:468 core/models/settings_models.py:107 core/models/user_models.py:19
+#: core/forms.py:292 core/forms.py:468 core/models/settings_models.py:117 core/models/user_models.py:19
 #: core/models/user_models.py:112 core/templates/core/contacts.html:100
 #: core/templates/core/suppliers.html:72
 msgid "Téléphone"
@@ -316,7 +320,7 @@ msgstr "Phone"
 msgid "Ex: 6XXXXXXXX"
 msgstr "e.g. 6XXXXXXXX"
 
-#: core/forms.py:299 core/forms.py:475 core/models/settings_models.py:110
+#: core/forms.py:299 core/forms.py:475 core/models/settings_models.py:120
 #: core/models/user_models.py:113 core/templates/core/contacts.html:101
 #: core/templates/core/suppliers.html:73
 msgid "Email"
@@ -404,12 +408,13 @@ msgstr "Columns: id, path, description, product_id, create_at, delete_at"
 msgid "Veuillez remplir au moins un champ avec des données à migrer."
 msgstr "Please fill in at least one field with data to migrate."
 
-#: core/forms.py:449 core/forms.py:451 core/models/settings_models.py:101
+#: core/forms.py:449 core/forms.py:451 core/models/settings_models.py:111
 #: core/models/user_models.py:109
 msgid "Nom de l'entreprise"
 msgstr "Company name"
 
-#: core/forms.py:455 core/models/user_models.py:110 core/templates/core/suppliers.html:75
+#: core/forms.py:455 core/models/user_models.py:110 core/templates/core/invitations.html:67
+#: core/templates/core/suppliers.html:75 saas/templates/emails/bienvenue.html:10
 msgid "Adresse"
 msgstr "Address"
 
@@ -426,7 +431,7 @@ msgstr "NIU"
 msgid "Numéro d'Identifiant Unique"
 msgstr "Unique identification number"
 
-#: core/forms.py:481 core/models/settings_models.py:113 core/models/user_models.py:114
+#: core/forms.py:481 core/models/settings_models.py:123 core/models/user_models.py:114
 msgid "Site web"
 msgstr "Website"
 
@@ -707,7 +712,7 @@ msgstr "Closing"
 msgid "Date de l'écriture"
 msgstr "Entry date"
 
-#: core/models/accounting_models.py:102 core/templates/components/navigation.html:137
+#: core/models/accounting_models.py:102 core/templates/components/navigation.html:152
 #: core/templates/core/accounting/chart_of_accounts.html:51
 #: core/templates/core/accounting/general_ledger.html:68
 #: core/templates/core/accounting/journal.html:111 core/templates/core/accounting/journal.html:148
@@ -1277,7 +1282,7 @@ msgstr "Customer receivable"
 msgid "Dette fournisseur"
 msgstr "Supplier payable"
 
-#: core/models/inventory_models.py:212
+#: core/models/inventory_models.py:212 saas/models/invitation_models.py:34 saas/models/job_models.py:43
 msgid "En attente"
 msgstr "Pending"
 
@@ -1589,8 +1594,8 @@ msgstr "Refund %(value)s for sale #%(sale_id)s"
 msgid "Dépenses"
 msgstr "Expenses"
 
-#: core/models/settings_models.py:22 core/templates/components/navigation.html:125
-#: core/templates/components/navigation.html:135
+#: core/models/settings_models.py:22 core/templates/components/navigation.html:140
+#: core/templates/components/navigation.html:150
 msgid "Comptabilité"
 msgstr "Accounting"
 
@@ -1610,7 +1615,7 @@ msgstr "Display name"
 msgid "Icône (emoji)"
 msgstr "Icon (emoji)"
 
-#: core/models/settings_models.py:47
+#: core/models/settings_models.py:47 saas/models/plan_models.py:53
 msgid "Ordre d'affichage"
 msgstr "Display order"
 
@@ -1630,97 +1635,99 @@ msgstr "Application module"
 msgid "Modules applicatifs"
 msgstr "Application modules"
 
-#: core/models/settings_models.py:104
+#: core/models/settings_models.py:114
 msgid "Adresse de l'entreprise"
 msgstr "Company address"
 
-#: core/models/settings_models.py:116
+#: core/models/settings_models.py:126
 msgid "Logo"
 msgstr "Logo"
 
-#: core/models/settings_models.py:122
+#: core/models/settings_models.py:132
 msgid "Numéro d'identification fiscale (NIF)"
 msgstr "Tax identification number (NIF)"
 
-#: core/models/settings_models.py:126
+#: core/models/settings_models.py:136
 msgid "Registre de commerce (RCCM)"
 msgstr "Trade register number (RCCM)"
 
-#: core/models/settings_models.py:131
+#: core/models/settings_models.py:141
 msgid "Symbole monétaire"
 msgstr "Currency symbol"
 
-#: core/models/settings_models.py:134
+#: core/models/settings_models.py:144
 msgid "Code devise (ISO 4217)"
 msgstr "Currency code (ISO 4217)"
 
-#: core/models/settings_models.py:140
+#: core/models/settings_models.py:150
 msgid "En-tête du reçu"
 msgstr "Receipt header"
 
-#: core/models/settings_models.py:141
+#: core/models/settings_models.py:151
 msgid "Texte affiché en haut des reçus/tickets"
 msgstr "Text shown at the top of receipts"
 
-#: core/models/settings_models.py:145
+#: core/models/settings_models.py:155
 msgid "Pied de page du reçu"
 msgstr "Receipt footer"
 
-#: core/models/settings_models.py:146
+#: core/models/settings_models.py:156
 msgid "Texte affiché en bas des reçus/tickets"
 msgstr "Text shown at the bottom of receipts"
 
-#: core/models/settings_models.py:152
+#: core/models/settings_models.py:162
 msgid "Seuil d'alerte stock bas"
 msgstr "Low-stock threshold"
 
-#: core/models/settings_models.py:153
+#: core/models/settings_models.py:163
 msgid "Quantité en dessous de laquelle une alerte est déclenchée"
 msgstr "Quantity below which an alert is triggered"
 
-#: core/models/settings_models.py:163
+#: core/models/settings_models.py:173
 msgid "Type de dépense par défaut pour les approvisionnements"
 msgstr "Default expense type for supplies"
 
-#: core/models/settings_models.py:168
+#: core/models/settings_models.py:178
 msgid "Immédiat - À chaque vente"
 msgstr "Immediate - On each sale"
 
-#: core/models/settings_models.py:169
+#: core/models/settings_models.py:179
 msgid "Différé - En fin de journée (clôture du Daily)"
 msgstr "Deferred - At end of day (day closing)"
 
-#: core/models/settings_models.py:175
+#: core/models/settings_models.py:185
 msgid "Mode d'enregistrement de la TVA"
 msgstr "VAT recording mode"
 
-#: core/models/settings_models.py:176
+#: core/models/settings_models.py:186
 msgid "Immédiat : écritures TVA créées à chaque vente. Différé : écritures créées à la clôture du Daily."
 msgstr "Immediate: VAT entries created on each sale. Deferred: entries created at day closing."
 
-#: core/models/settings_models.py:180
+#: core/models/settings_models.py:190
 msgid "Activer la comptabilité TVA"
 msgstr "Enable VAT accounting"
 
-#: core/models/settings_models.py:181
+#: core/models/settings_models.py:191
 msgid "Activer l'enregistrement des écritures de TVA sur les ventes"
 msgstr "Enable recording of VAT entries on sales"
 
-#: core/models/settings_models.py:185
+#: core/models/settings_models.py:195
 msgid "Dernière modification"
 msgstr "Last modified"
 
-#: core/models/settings_models.py:188 core/models/settings_models.py:189
+#: core/models/settings_models.py:198 core/models/settings_models.py:199
 msgid "Paramètres Système"
 msgstr "System settings"
 
-#: core/models/settings_models.py:193
+#: core/models/settings_models.py:203
 #, python-format
 msgid "Paramètres système - %(company)s"
 msgstr "System settings - %(company)s"
 
 #: core/models/user_models.py:20 core/templates/core/contacts.html:103
+#: core/templates/core/invitations.html:30 core/templates/core/invitations.html:68
 #: core/templates/core/statistics_personnel.html:17 core/templates/core/statistics_personnel.html:23
+#: saas/models/invitation_models.py:131
 msgid "Rôle"
 msgstr "Role"
 
@@ -1925,421 +1932,421 @@ msgstr "Other revenue"
 msgid "Produits divers"
 msgstr "Miscellaneous revenue"
 
-#: core/services/accounting_service.py:152
+#: core/services/accounting_service.py:166
 #, python-format
 msgid "Mode de paiement inconnu : %(method)s"
 msgstr "Unknown payment method: %(method)s"
 
-#: core/services/accounting_service.py:210
+#: core/services/accounting_service.py:224
 #, python-format
 msgid "Annulation vente #%(id)s"
 msgstr "Cancellation of sale #%(id)s"
 
-#: core/services/accounting_service.py:223
+#: core/services/accounting_service.py:237
 #, python-format
 msgid "Contrepassation vente #%(id)s"
 msgstr "Reversal of sale #%(id)s"
 
-#: core/services/accounting_service.py:233
+#: core/services/accounting_service.py:247
 #, python-format
 msgid "Contrepassation TVA collectée – vente #%(id)s"
 msgstr "Reversal of output VAT – sale #%(id)s"
 
-#: core/services/accounting_service.py:238
+#: core/services/accounting_service.py:252
 #, python-format
 msgid "Annulation créance client – vente #%(id)s"
 msgstr "Cancellation of customer receivable – sale #%(id)s"
 
-#: core/services/accounting_service.py:242
+#: core/services/accounting_service.py:256
 #, python-format
 msgid "Remboursement client – vente #%(id)s"
 msgstr "Customer refund – sale #%(id)s"
 
-#: core/services/accounting_service.py:258
+#: core/services/accounting_service.py:272
 #, python-format
 msgid "Remboursement client – annulation vente #%(id)s"
 msgstr "Customer refund – cancellation of sale #%(id)s"
 
-#: core/services/accounting_service.py:271
+#: core/services/accounting_service.py:285
 #, python-format
 msgid "Extinction avoir client – vente #%(id)s"
 msgstr "Settlement of customer credit note – sale #%(id)s"
 
-#: core/services/accounting_service.py:278
+#: core/services/accounting_service.py:292
 #, python-format
 msgid "Sortie trésorerie – vente #%(id)s"
 msgstr "Cash outflow – sale #%(id)s"
 
-#: core/services/accounting_service.py:311
+#: core/services/accounting_service.py:325
 #, python-format
 msgid "Retour partiel vente #%(id)s"
 msgstr "Partial return on sale #%(id)s"
 
-#: core/services/accounting_service.py:324
+#: core/services/accounting_service.py:338
 #, python-format
 msgid "Contrepassation retour partiel – vente #%(id)s"
 msgstr "Partial return reversal – sale #%(id)s"
 
-#: core/services/accounting_service.py:334
+#: core/services/accounting_service.py:348
 #, python-format
 msgid "Contrepassation TVA – retour partiel vente #%(id)s"
 msgstr "VAT reversal – partial return on sale #%(id)s"
 
-#: core/services/accounting_service.py:339
+#: core/services/accounting_service.py:353
 #, python-format
 msgid "Réduction créance client – vente #%(id)s"
 msgstr "Reduction of customer receivable – sale #%(id)s"
 
-#: core/services/accounting_service.py:343 core/services/accounting_service.py:359
+#: core/services/accounting_service.py:357 core/services/accounting_service.py:373
 #, python-format
 msgid "Remboursement client – retour partiel vente #%(id)s"
 msgstr "Customer refund – partial return on sale #%(id)s"
 
-#: core/services/accounting_service.py:372
+#: core/services/accounting_service.py:386
 #, python-format
 msgid "Extinction avoir client – retour partiel vente #%(id)s"
 msgstr "Settlement of customer credit note – partial return on sale #%(id)s"
 
-#: core/services/accounting_service.py:379
+#: core/services/accounting_service.py:393
 #, python-format
 msgid "Sortie trésorerie – retour partiel vente #%(id)s"
 msgstr "Cash outflow – partial return on sale #%(id)s"
 
-#: core/services/accounting_service.py:419
+#: core/services/accounting_service.py:433
 #, python-format
 msgid "Annulation approvisionnement #%(id)s"
 msgstr "Cancellation of supply #%(id)s"
 
-#: core/services/accounting_service.py:432
+#: core/services/accounting_service.py:446
 #, python-format
 msgid "Contrepassation achat – appro. #%(id)s"
 msgstr "Purchase reversal – supply #%(id)s"
 
-#: core/services/accounting_service.py:442
+#: core/services/accounting_service.py:456
 #, python-format
 msgid "Contrepassation TVA déductible – appro. #%(id)s"
 msgstr "Reversal of input VAT – supply #%(id)s"
 
-#: core/services/accounting_service.py:447
+#: core/services/accounting_service.py:461
 #, python-format
 msgid "Annulation dette fournisseur – appro. #%(id)s"
 msgstr "Cancellation of supplier payable – supply #%(id)s"
 
-#: core/services/accounting_service.py:451
+#: core/services/accounting_service.py:465
 #, python-format
 msgid "Remboursement fournisseur – appro. #%(id)s"
 msgstr "Supplier refund – supply #%(id)s"
 
-#: core/services/accounting_service.py:467
+#: core/services/accounting_service.py:481
 #, python-format
 msgid "Remboursement fournisseur – annulation approvisionnement #%(id)s"
 msgstr "Supplier refund – cancellation of supply #%(id)s"
 
-#: core/services/accounting_service.py:480
+#: core/services/accounting_service.py:494
 #, python-format
 msgid "Entrée trésorerie – appro. #%(id)s"
 msgstr "Cash inflow – supply #%(id)s"
 
-#: core/services/accounting_service.py:487
+#: core/services/accounting_service.py:501
 #, python-format
 msgid "Extinction avoir fournisseur – appro. #%(id)s"
 msgstr "Settlement of supplier credit note – supply #%(id)s"
 
-#: core/services/accounting_service.py:519
+#: core/services/accounting_service.py:533
 #, python-format
 msgid "Retour partiel approvisionnement #%(id)s"
 msgstr "Partial return on supply #%(id)s"
 
-#: core/services/accounting_service.py:532
+#: core/services/accounting_service.py:546
 #, python-format
 msgid "Contrepassation retour partiel – appro. #%(id)s"
 msgstr "Partial return reversal – supply #%(id)s"
 
-#: core/services/accounting_service.py:542
+#: core/services/accounting_service.py:556
 #, python-format
 msgid "Contrepassation TVA – retour partiel appro. #%(id)s"
 msgstr "VAT reversal – partial return on supply #%(id)s"
 
-#: core/services/accounting_service.py:547
+#: core/services/accounting_service.py:561
 #, python-format
 msgid "Réduction dette fournisseur – appro. #%(id)s"
 msgstr "Reduction of supplier payable – supply #%(id)s"
 
-#: core/services/accounting_service.py:551
+#: core/services/accounting_service.py:565
 #, python-format
 msgid "Remboursement fournisseur – retour partiel appro. #%(id)s"
 msgstr "Supplier refund – partial return on supply #%(id)s"
 
-#: core/services/accounting_service.py:567
+#: core/services/accounting_service.py:581
 #, python-format
 msgid "Remboursement fournisseur – retour partiel approvisionnement #%(id)s"
 msgstr "Supplier refund – partial return on supply #%(id)s"
 
-#: core/services/accounting_service.py:580
+#: core/services/accounting_service.py:594
 #, python-format
 msgid "Entrée trésorerie – retour partiel appro. #%(id)s"
 msgstr "Cash inflow – partial return on supply #%(id)s"
 
-#: core/services/accounting_service.py:587
+#: core/services/accounting_service.py:601
 #, python-format
 msgid "Extinction avoir fournisseur – retour partiel appro. #%(id)s"
 msgstr "Settlement of supplier credit note – partial return on supply #%(id)s"
 
-#: core/services/accounting_service.py:620
+#: core/services/accounting_service.py:634
 #, python-format
 msgid "Vente #%(id)s (crédit) TVA %(rate)s%%"
 msgstr "Sale #%(id)s (credit) VAT %(rate)s%%"
 
-#: core/services/accounting_service.py:624
+#: core/services/accounting_service.py:638
 #, python-format
 msgid "Vente #%(id)s (crédit)"
 msgstr "Sale #%(id)s (credit)"
 
-#: core/services/accounting_service.py:626
+#: core/services/accounting_service.py:640
 #, python-format
 msgid "Vente #%(id)s TVA %(rate)s%%"
 msgstr "Sale #%(id)s VAT %(rate)s%%"
 
-#: core/services/accounting_service.py:628 core/services/accounting_service.py:1321
+#: core/services/accounting_service.py:642 core/services/accounting_service.py:1335
 #, python-format
 msgid "Vente #%(id)s"
 msgstr "Sale #%(id)s"
 
-#: core/services/accounting_service.py:643
+#: core/services/accounting_service.py:657
 #, python-format
 msgid "Créance client – vente #%(id)s"
 msgstr "Customer receivable – sale #%(id)s"
 
-#: core/services/accounting_service.py:647
+#: core/services/accounting_service.py:661
 #, python-format
 msgid "Encaissement vente #%(id)s"
 msgstr "Cash received – sale #%(id)s"
 
-#: core/services/accounting_service.py:660
+#: core/services/accounting_service.py:674
 #, python-format
 msgid "Vente de marchandises #%(id)s (HT)"
 msgstr "Sale of goods #%(id)s (excl. VAT)"
 
-#: core/services/accounting_service.py:669 core/services/accounting_service.py:748
+#: core/services/accounting_service.py:683 core/services/accounting_service.py:762
 #, python-format
 msgid "TVA collectée – vente #%(id)s"
 msgstr "Output VAT – sale #%(id)s"
 
-#: core/services/accounting_service.py:728
+#: core/services/accounting_service.py:742
 #, python-format
 msgid "TVA collectée - Vente #%(id)s (clôture daily)"
 msgstr "Output VAT - sale #%(id)s (day closing)"
 
-#: core/services/accounting_service.py:741
+#: core/services/accounting_service.py:755
 #, python-format
 msgid "Constatation TVA différée – vente #%(id)s"
 msgstr "Deferred VAT recognition – sale #%(id)s"
 
-#: core/services/accounting_service.py:792
+#: core/services/accounting_service.py:806
 #, python-format
 msgid "Approvisionnement #%(id)s – %(product)s (crédit) TVA %(rate)s%%"
 msgstr "Supply #%(id)s – %(product)s (credit) VAT %(rate)s%%"
 
-#: core/services/accounting_service.py:796
+#: core/services/accounting_service.py:810
 #, python-format
 msgid "Approvisionnement #%(id)s – %(product)s (crédit)"
 msgstr "Supply #%(id)s – %(product)s (credit)"
 
-#: core/services/accounting_service.py:800
+#: core/services/accounting_service.py:814
 #, python-format
 msgid "Approvisionnement #%(id)s – %(product)s TVA %(rate)s%%"
 msgstr "Supply #%(id)s – %(product)s VAT %(rate)s%%"
 
-#: core/services/accounting_service.py:804
+#: core/services/accounting_service.py:818
 #, python-format
 msgid "Approvisionnement #%(id)s – %(product)s"
 msgstr "Supply #%(id)s – %(product)s"
 
-#: core/services/accounting_service.py:821
+#: core/services/accounting_service.py:835
 #, python-format
 msgid "Dette fournisseur – appro. #%(id)s"
 msgstr "Supplier payable – supply #%(id)s"
 
-#: core/services/accounting_service.py:825
+#: core/services/accounting_service.py:839
 #, python-format
 msgid "Paiement fournisseur – appro. #%(id)s"
 msgstr "Supplier payment – supply #%(id)s"
 
-#: core/services/accounting_service.py:832
+#: core/services/accounting_service.py:846
 #, python-format
 msgid "Achat %(product)s (HT)"
 msgstr "Purchase of %(product)s (excl. VAT)"
 
-#: core/services/accounting_service.py:847
+#: core/services/accounting_service.py:861
 #, python-format
 msgid "TVA déductible – appro. #%(id)s"
 msgstr "Input VAT – supply #%(id)s"
 
-#: core/services/accounting_service.py:878
+#: core/services/accounting_service.py:892
 #, python-format
 msgid "Une dépense doit être imputée sur un compte de charge (classe 6), pas sur %(code)s."
 msgstr "An expense must be posted to an expense account (class 6), not to %(code)s."
 
-#: core/services/accounting_service.py:888
+#: core/services/accounting_service.py:902
 #, python-format
 msgid "Dépense – %(type)s"
 msgstr "Expense – %(type)s"
 
-#: core/services/accounting_service.py:889 core/services/accounting_service.py:946
+#: core/services/accounting_service.py:903 core/services/accounting_service.py:960
 msgid "Divers"
 msgstr "Miscellaneous"
 
-#: core/services/accounting_service.py:901
+#: core/services/accounting_service.py:915
 #, python-format
 msgid "Dépense #%(id)s"
 msgstr "Expense #%(id)s"
 
-#: core/services/accounting_service.py:907
+#: core/services/accounting_service.py:921
 #, python-format
 msgid "Sortie de caisse – dépense #%(id)s"
 msgstr "Cash paid out – expense #%(id)s"
 
-#: core/services/accounting_service.py:935
+#: core/services/accounting_service.py:949
 #, python-format
 msgid "Une recette doit être imputée sur un compte de produit (classe 7), pas sur %(code)s."
 msgstr "A receipt must be posted to a revenue account (class 7), not to %(code)s."
 
-#: core/services/accounting_service.py:945
+#: core/services/accounting_service.py:959
 #, python-format
 msgid "Recette – %(type)s"
 msgstr "Receipt – %(type)s"
 
-#: core/services/accounting_service.py:957
+#: core/services/accounting_service.py:971
 #, python-format
 msgid "Entrée de caisse – recette #%(id)s"
 msgstr "Cash received – receipt #%(id)s"
 
-#: core/services/accounting_service.py:963
+#: core/services/accounting_service.py:977
 #, python-format
 msgid "Recette #%(id)s"
 msgstr "Receipt #%(id)s"
 
-#: core/services/accounting_service.py:987
+#: core/services/accounting_service.py:1001
 #, python-format
 msgid "Paiement crédit – Vente #%(id)s"
 msgstr "Credit payment – sale #%(id)s"
 
-#: core/services/accounting_service.py:997
+#: core/services/accounting_service.py:1011
 #, python-format
 msgid "Encaissement crédit – Vente #%(id)s"
 msgstr "Credit collection – sale #%(id)s"
 
-#: core/services/accounting_service.py:1003
+#: core/services/accounting_service.py:1017
 #, python-format
 msgid "Règlement client – Vente #%(id)s"
 msgstr "Customer payment – sale #%(id)s"
 
-#: core/services/accounting_service.py:1029
+#: core/services/accounting_service.py:1043
 #, python-format
 msgid "Paiement fournisseur – %(supplier)s"
 msgstr "Supplier payment – %(supplier)s"
 
-#: core/services/accounting_service.py:1039
+#: core/services/accounting_service.py:1053
 #, python-format
 msgid "Règlement fournisseur – %(supplier)s"
 msgstr "Supplier settlement – %(supplier)s"
 
-#: core/services/accounting_service.py:1046
+#: core/services/accounting_service.py:1060
 #, python-format
 msgid "Sortie trésorerie – paiement %(supplier)s"
 msgstr "Cash outflow – payment to %(supplier)s"
 
-#: core/services/accounting_service.py:1322
+#: core/services/accounting_service.py:1336
 msgid "Client anonyme"
 msgstr "Anonymous customer"
 
-#: core/services/accounting_service.py:1341 core/services/accounting_service.py:1349
-#: core/services/accounting_service.py:1408 core/templates/core/accounting/aged_balance.html:23
+#: core/services/accounting_service.py:1355 core/services/accounting_service.py:1363
+#: core/services/accounting_service.py:1422 core/templates/core/accounting/aged_balance.html:23
 #: core/templates/core/accounting/treasury.html:33 core/templates/core/statistics.html:39
 #: core/templates/core/statistics.html:63
 msgid "Créances clients"
 msgstr "Customer receivables"
 
-#: core/services/accounting_service.py:1416 core/templates/core/accounting/aged_balance.html:24
+#: core/services/accounting_service.py:1430 core/templates/core/accounting/aged_balance.html:24
 #: core/templates/core/accounting/treasury.html:39 core/templates/core/statistics.html:40
 #: core/templates/core/statistics.html:65 core/templates/core/supplies.html:24
 msgid "Dettes fournisseurs"
 msgstr "Supplier payables"
 
-#: core/services/accounting_service.py:1683
+#: core/services/accounting_service.py:1697
 msgid "Cette ligne de relevé est déjà rapprochée."
 msgstr "This statement line is already reconciled."
 
-#: core/services/accounting_service.py:1694
+#: core/services/accounting_service.py:1708
 msgid "Ligne d'écriture introuvable ou non rapprochable avec ce compte."
 msgstr "Entry line not found or cannot be reconciled with this account."
 
-#: core/services/accounting_service.py:1698
+#: core/services/accounting_service.py:1712
 msgid "Cette ligne d'écriture est déjà rapprochée avec un autre relevé."
 msgstr "This entry line is already reconciled with another statement."
 
-#: core/services/accounting_service.py:1740 core/templates/core/accounting/exercise_closing.html:71
+#: core/services/accounting_service.py:1754 core/templates/core/accounting/exercise_closing.html:71
 msgid "Cet exercice est déjà clôturé."
 msgstr "This fiscal year is already closed."
 
-#: core/services/accounting_service.py:1742
+#: core/services/accounting_service.py:1756
 msgid "Cet exercice a déjà fait l'objet d'une clôture."
 msgstr "A closing has already been recorded for this fiscal year."
 
-#: core/services/accounting_service.py:1747
+#: core/services/accounting_service.py:1761
 msgid "Une journée est encore ouverte sur cet exercice. Clôturez la journée avant de clôturer l'exercice."
 msgstr "A business day is still open in this fiscal year. Close the day before closing the year."
 
-#: core/services/accounting_service.py:1755
+#: core/services/accounting_service.py:1769
 msgid "Cet exercice ne contient aucune opération : rien à clôturer."
 msgstr "This fiscal year contains no transactions: nothing to close."
 
-#: core/services/accounting_service.py:1797
+#: core/services/accounting_service.py:1811
 #, python-format
 msgid "Clôture exercice %(exercise)s — Résultat: %(result)s FCFA"
 msgstr "Year-end closing %(exercise)s — Net income: %(result)s FCFA"
 
-#: core/services/accounting_service.py:1811
+#: core/services/accounting_service.py:1825
 #, python-format
 msgid "Clôture %(code)s — %(name)s"
 msgstr "Closing %(code)s — %(name)s"
 
-#: core/services/accounting_service.py:1824
+#: core/services/accounting_service.py:1838
 msgid "Résultat de l'exercice (bénéfice)"
 msgstr "Net income for the year (profit)"
 
-#: core/services/accounting_service.py:1832
+#: core/services/accounting_service.py:1846
 msgid "Résultat de l'exercice (perte)"
 msgstr "Net income for the year (loss)"
 
-#: core/services/accounting_service.py:1871
+#: core/services/accounting_service.py:1885
 msgid "Un nouvel exercice a déjà été ouvert pour cette clôture."
 msgstr "A new fiscal year has already been opened for this closing."
 
-#: core/services/accounting_service.py:1883
+#: core/services/accounting_service.py:1897
 #, python-format
 msgid "Report à nouveau — ouverture exercice %(exercise)s"
 msgstr "Balances brought forward — opening of fiscal year %(exercise)s"
 
-#: core/services/accounting_service.py:1912 core/services/accounting_service.py:1919
-#: core/services/accounting_service.py:1928 core/services/accounting_service.py:1935
+#: core/services/accounting_service.py:1926 core/services/accounting_service.py:1933
+#: core/services/accounting_service.py:1942 core/services/accounting_service.py:1949
 #, python-format
 msgid "Report à nouveau %(code)s"
 msgstr "Balance brought forward %(code)s"
 
-#: core/services/accounting_service.py:1946
+#: core/services/accounting_service.py:1960
 msgid "Affectation résultat bénéficiaire"
 msgstr "Appropriation of profit"
 
-#: core/services/accounting_service.py:1952
+#: core/services/accounting_service.py:1966
 msgid "Report à nouveau — bénéfice"
 msgstr "Retained earnings carried forward — profit"
 
-#: core/services/accounting_service.py:1960
+#: core/services/accounting_service.py:1974
 msgid "Affectation résultat déficitaire"
 msgstr "Appropriation of loss"
 
-#: core/services/accounting_service.py:1966
+#: core/services/accounting_service.py:1980
 msgid "Report à nouveau — perte"
 msgstr "Retained earnings carried forward — loss"
 
@@ -2373,7 +2380,7 @@ msgstr "Image skipped (product with legacy ID=%(old_id)s not found): %(path)s"
 msgid "Erreur image (row=%(row)s): %(error)s"
 msgstr "Image error (row=%(row)s): %(error)s"
 
-#: core/services/product_service.py:86
+#: core/services/product_service.py:87
 msgid "Le stock initial ne peut pas être négatif."
 msgstr "Initial stock cannot be negative."
 
@@ -2483,6 +2490,14 @@ msgstr "Partial return on %(date)s — Amount returned: %(amount)s FCFA"
 msgid "%(note)s — Remboursement: %(amount)s FCFA"
 msgstr "%(note)s — Refund: %(amount)s FCFA"
 
+#: core/services/staff_service.py:68
+msgid ""
+"Vous ne pouvez pas retirer les droits du dernier administrateur de l'espace. Nommez d'abord un "
+"autre administrateur."
+msgstr ""
+"You cannot remove the rights of the last administrator of this workspace. Appoint another "
+"administrator first."
+
 #: core/services/supply_service.py:50
 #, python-format
 msgid "Retour partiel approvisionnement #%(id)s : -%(amount)s FCFA"
@@ -2556,15 +2571,15 @@ msgstr "Search for a feature..."
 msgid "Afficher le QR Code serveur"
 msgstr "Show server QR code"
 
-#: core/templates/components/header.html:49 core/templates/core/login.html:39
-msgid "Langue"
-msgstr "Language"
-
 #: core/templates/components/header.html:57 core/templates/core/login.html:28
 msgid "Changer de thème"
 msgstr "Switch theme"
 
-#: core/templates/components/header.html:83
+#: core/templates/components/header.html:84
+msgid "Administration"
+msgstr "Administration"
+
+#: core/templates/components/header.html:96
 msgid "Déconnexion"
 msgstr "Sign out"
 
@@ -2572,36 +2587,36 @@ msgstr "Sign out"
 msgid "Navigation principale"
 msgstr "Main navigation"
 
-#: core/templates/components/navigation.html:138 core/templates/core/accounting/journal.html:71
+#: core/templates/components/navigation.html:153 core/templates/core/accounting/journal.html:71
 #: core/templates/core/reports.html:117
 msgid "Grand livre"
 msgstr "General ledger"
 
-#: core/templates/components/navigation.html:139
+#: core/templates/components/navigation.html:154
 #: core/templates/core/accounting/chart_of_accounts.html:53
 #: core/templates/core/accounting/general_ledger.html:69 core/templates/core/accounting/journal.html:72
 msgid "Balance"
 msgstr "Trial balance"
 
-#: core/templates/components/navigation.html:162
+#: core/templates/components/navigation.html:177
 msgid "Centre de rapports"
 msgstr "Reports centre"
 
-#: core/templates/components/navigation.html:164
+#: core/templates/components/navigation.html:179
 #: core/templates/core/accounting/income_statement.html:15
 msgid "Bilan"
 msgstr "Balance sheet"
 
-#: core/templates/components/navigation.html:165 core/templates/core/accounting/aged_balance.html:5
+#: core/templates/components/navigation.html:180 core/templates/core/accounting/aged_balance.html:5
 #: core/templates/core/reports.html:46
 msgid "Balance âgée"
 msgstr "Aged balance"
 
-#: core/templates/components/navigation.html:166
+#: core/templates/components/navigation.html:181
 msgid "Marges produits"
 msgstr "Product margins"
 
-#: core/templates/components/navigation.html:167
+#: core/templates/components/navigation.html:182
 msgid "Déclaration TVA"
 msgstr "VAT return"
 
@@ -2951,10 +2966,6 @@ msgstr "Close the fiscal year"
 #: core/templates/core/accounting/exercise_closing.html:79
 msgid "Historique des clôtures"
 msgstr "Closing history"
-
-#: core/templates/core/accounting/exercise_closing.html:88
-msgid "Résultat"
-msgstr "Net income"
 
 #: core/templates/core/accounting/exercise_closing.html:89
 msgid "Nouvel exercice"
@@ -3500,14 +3511,15 @@ msgstr "Staff list"
 msgid "Page %(number)s sur %(num_pages)s"
 msgstr "Page %(number)s of %(num_pages)s"
 
-#: core/templates/core/contacts.html:96
+#: core/templates/core/contacts.html:96 saas/templates/emails/bienvenue.html:11
 msgid "Identifiant"
 msgstr "Username"
 
 #: core/templates/core/accounting/chart_of_accounts.html:104
 #: core/templates/core/accounting/credit_sales.html:73 core/templates/core/contacts.html:106
-#: core/templates/core/sales.html:299 core/templates/core/sales_history.html:277
-#: core/templates/core/suppliers.html:76 core/templates/core/supplies.html:115
+#: core/templates/core/invitations.html:71 core/templates/core/sales.html:299
+#: core/templates/core/sales_history.html:277 core/templates/core/suppliers.html:76
+#: core/templates/core/supplies.html:115
 msgid "Actions"
 msgstr "Actions"
 
@@ -3821,12 +3833,6 @@ msgstr "Total inventories"
 msgid "Nom ou code produit..."
 msgstr "Product name or code..."
 
-#: core/templates/core/accounting/credit_sales.html:90 core/templates/core/inventory.html:112
-#: core/templates/core/inventory_close_summary.html:16 core/templates/core/inventory_history.html:89
-#: core/templates/core/inventory_history.html:146 core/templates/core/supplies.html:135
-msgid "En cours"
-msgstr "In progress"
-
 #: core/templates/core/inventory.html:126 core/templates/core/inventory_history.html:95
 msgid "Par page"
 msgstr "Per page"
@@ -4020,6 +4026,86 @@ msgstr "Selling price"
 msgid "Aucun historique d'inventaire trouvé"
 msgstr "No inventory history found"
 
+#: core/templates/core/invitation_acceptation.html:2 core/templates/core/invitation_acceptation.html:5
+#: core/templates/core/invitation_acceptation.html:42 saas/templates/emails/invitation.html:9
+msgid "Créer mon compte"
+msgstr "Create my account"
+
+#: core/templates/core/invitation_acceptation.html:7
+#, python-format
+msgid ""
+"Vous avez été invité à rejoindre %(entreprise)s. Choisissez un identifiant et un mot de passe "
+"pour %(adresse)s."
+msgstr "You have been invited to join %(entreprise)s. Choose a username and a password for %(adresse)s."
+
+#: core/templates/core/invitation_acceptation.html:14
+msgid "Identifiant de connexion"
+msgstr "Sign-in username"
+
+#: core/templates/core/invitation_invalide.html:2
+msgid "Invitation invalide"
+msgstr "Invalid invitation"
+
+#: core/templates/core/invitation_invalide.html:5
+msgid "Cette invitation n'est plus valide"
+msgstr "This invitation is no longer valid"
+
+#: core/templates/core/invitation_invalide.html:7
+msgid ""
+"Elle a peut-être expiré, été révoquée, ou déjà utilisée. Demandez une nouvelle invitation au "
+"responsable de votre espace."
+msgstr ""
+"It may have expired, been revoked, or already been used. Ask the manager of your workspace for a "
+"new invitation."
+
+#: core/templates/core/invitation_invalide.html:9
+msgid "Aller à la connexion"
+msgstr "Go to sign-in"
+
+#: core/templates/core/invitations.html:6
+msgid "Inviter un employé"
+msgstr "Invite an employee"
+
+#: core/templates/core/invitations.html:7
+msgid "Retour aux utilisateurs"
+msgstr "Back to users"
+
+#: core/templates/core/invitations.html:17
+msgid "Nouvelle invitation"
+msgstr "New invitation"
+
+#: core/templates/core/invitations.html:19
+msgid ""
+"L'employé recevra un lien par e-mail pour créer son compte. Vous choisissez dès maintenant les "
+"modules auxquels il aura accès."
+msgstr ""
+"The employee will receive a link by email to create their account. You choose right now which "
+"modules they will have access to."
+
+#: core/templates/core/invitations.html:26
+msgid "Adresse e-mail"
+msgstr "Email address"
+
+#: core/templates/core/invitations.html:31
+msgid "Ex. : Caissier"
+msgstr "E.g. Cashier"
+
+#: core/templates/core/invitations.html:57
+msgid "Envoyer l'invitation"
+msgstr "Send the invitation"
+
+#: core/templates/core/invitations.html:87
+msgid "Renvoyer"
+msgstr "Send again"
+
+#: core/templates/core/invitations.html:92
+msgid "Révoquer"
+msgstr "Revoke"
+
+#: core/templates/core/invitations.html:103
+msgid "Aucune invitation pour le moment."
+msgstr "No invitations yet."
+
 #: core/templates/core/login.html:7
 msgid "Connexion"
 msgstr "Login"
@@ -4040,10 +4126,6 @@ msgstr "Username"
 #: core/templates/core/login.html:87
 msgid "Entrez votre identifiant"
 msgstr "Enter your username"
-
-#: core/templates/core/login.html:94
-msgid "Mot de passe"
-msgstr "Password"
 
 #: core/templates/core/login.html:104
 msgid "Entrez votre mot de passe"
@@ -4368,10 +4450,6 @@ msgstr "Unit price"
 msgid "Sous-total"
 msgstr "Subtotal"
 
-#: core/templates/core/sales.html:181
-msgid "Action"
-msgstr "Action"
-
 #: core/templates/core/sales.html:186
 msgid "Le panier est vide"
 msgstr "The cart is empty"
@@ -4550,10 +4628,6 @@ msgstr "All customers"
 #: core/templates/core/sales_history.html:92 core/templates/core/statistics_sales.html:17
 msgid "Tous les vendeurs"
 msgstr "All salespeople"
-
-#: core/templates/core/sales_history.html:118
-msgid "Annulé"
-msgstr "Cancelled"
 
 #: core/templates/core/sales_history.html:151
 msgid "Liste des produits vendus"
@@ -5213,10 +5287,6 @@ msgid "CA"
 msgstr "Revenue"
 
 #: core/templates/core/statistics_clients.html:23 core/templates/core/statistics_suppliers.html:23
-msgid "Contact"
-msgstr "Contact"
-
-#: core/templates/core/statistics_clients.html:23 core/templates/core/statistics_suppliers.html:23
 #, python-format
 msgid "Créé le %(created)s"
 msgstr "Created on %(created)s"
@@ -5369,10 +5439,6 @@ msgstr "No receipt matches the current filters."
 #: core/templates/core/statistics_expenses.html:23
 msgid "Dernières opérations filtrées"
 msgstr "Latest filtered transactions"
-
-#: core/templates/core/statistics_expenses.html:23
-msgid "Nature"
-msgstr "Nature"
 
 #: core/templates/core/statistics_expenses.html:23
 msgid "Aucune opération ne correspond aux filtres actuels."
@@ -6113,12 +6179,12 @@ msgid "Veuillez remplir tous les champs."
 msgstr "Please fill in all fields."
 
 #: core/models/settings_models.py:14 core/templates/components/navigation.html:14
-#: core/templates/components/navigation.html:149 core/templates/core/dashboard.html:5
+#: core/templates/components/navigation.html:164 core/templates/core/dashboard.html:5
 #: core/templates/core/dashboard.html:13 core/templates/core/statistics.html:18 core/views.py:302
 msgid "Tableau de bord"
 msgstr "Dashboard"
 
-#: core/templates/components/navigation.html:188 core/templates/core/statistics.html:5
+#: core/templates/components/navigation.html:203 core/templates/core/statistics.html:5
 #: core/views.py:455
 msgid "Statistiques"
 msgstr "Statistics"
@@ -6248,7 +6314,7 @@ msgstr "Debtor"
 
 #: core/models/accounting_models.py:40 core/models/accounting_models.py:488
 #: core/templates/core/statistics_personnel.html:17 core/views.py:1293 core/views.py:1632
-#: core/views.py:2557 core/views.py:2587 core/views.py:4452
+#: core/views.py:2557 core/views.py:2587 core/views.py:4452 saas/models/company_models.py:36
 msgid "Actif"
 msgstr "Active"
 
@@ -6430,7 +6496,7 @@ msgid "Produits"
 msgstr "Products"
 
 #: core/models/inventory_models.py:106 core/models/settings_models.py:21
-#: core/templates/components/navigation.html:109 core/templates/core/inventory.html:5
+#: core/templates/components/navigation.html:124 core/templates/core/inventory.html:5
 #: core/templates/core/inventory.html:15 core/templates/core/statistics.html:57
 #: core/templates/core/statistics.html:69 core/views.py:3215
 msgid "Inventaire"
@@ -6586,7 +6652,7 @@ msgstr "Receipt of %(amount)s FCFA recorded successfully."
 msgid "Nouvelle recette"
 msgstr "New receipt"
 
-#: core/models/settings_models.py:24 core/templates/components/navigation.html:160
+#: core/models/settings_models.py:24 core/templates/components/navigation.html:175
 #: core/templates/core/accounting/aged_balance.html:16
 #: core/templates/core/accounting/balance_sheet.html:17
 #: core/templates/core/accounting/bank_reconciliation.html:14
@@ -6638,7 +6704,7 @@ msgid "La journée a été clôturée avec succès."
 msgstr "The business day was closed successfully."
 
 #: core/models/settings_models.py:25 core/templates/core/settings.html:4
-#: core/templates/core/settings.html:8 core/views.py:4197
+#: core/templates/core/settings.html:8 core/views.py:4197 saas/models/job_models.py:88
 msgid "Paramètres"
 msgstr "Settings"
 
@@ -6714,7 +6780,7 @@ msgstr "Revenue"
 msgid "Autres"
 msgstr "Other"
 
-#: core/templates/components/navigation.html:140
+#: core/templates/components/navigation.html:155
 #: core/templates/core/accounting/chart_of_accounts.html:4
 #: core/templates/core/accounting/general_ledger.html:70 core/templates/core/accounting/journal.html:70
 #: core/templates/core/accounting/trial_balance.html:24 core/templates/core/reports.html:123
@@ -6747,7 +6813,7 @@ msgstr "Description"
 #: core/templates/core/sales.html:297 core/templates/core/sales_history.html:103
 #: core/templates/core/sales_history.html:170 core/templates/core/sales_history.html:275
 #: core/templates/core/statistics_expenses.html:23 core/templates/core/statistics_sales.html:17
-#: core/templates/core/statistics_supplies.html:17 core/views.py:4452
+#: core/templates/core/statistics_supplies.html:17 core/views.py:4452 saas/models/company_models.py:215
 msgid "Type"
 msgstr "Type"
 
@@ -6757,7 +6823,7 @@ msgstr "Type"
 #: core/templates/core/accounting/trial_balance.html:38
 #: core/templates/core/inventory_close_summary.html:87 core/templates/core/product_detail.html:108
 #: core/templates/core/products.html:100 core/views.py:4452 core/views.py:5291 core/views.py:5297
-#: core/views.py:5310 core/views.py:5317
+#: core/views.py:5310 core/views.py:5317 saas/models/plan_models.py:27
 msgid "Code"
 msgstr "Code"
 
@@ -6887,7 +6953,7 @@ msgstr "Internal error while creating the journal entry. Nothing was saved."
 msgid "Nouvelle écriture comptable"
 msgstr "New journal entry"
 
-#: core/templates/components/navigation.html:150 core/templates/core/accounting/credit_sales.html:4
+#: core/templates/components/navigation.html:165 core/templates/core/accounting/credit_sales.html:4
 #: core/templates/core/accounting/credit_sales.html:10 core/templates/core/reports.html:140
 #: core/templates/core/statistics.html:63 core/templates/core/statistics.html:73
 #: core/templates/core/statistics_sales.html:19 core/views.py:4776
@@ -6917,7 +6983,7 @@ msgstr "Payment of %(amount)s FCFA recorded. Outstanding balance: %(remaining)s 
 msgid "Paiement – Vente #%(id)s"
 msgstr "Payment – Sale #%(id)s"
 
-#: core/models/accounting_models.py:412 core/templates/components/navigation.html:151
+#: core/models/accounting_models.py:412 core/templates/components/navigation.html:166
 #: core/templates/core/accounting/supplier_payments.html:5
 #: core/templates/core/accounting/supplier_payments.html:11 core/templates/core/reports.html:143
 #: core/templates/core/statistics.html:65 core/views.py:4899
@@ -6956,7 +7022,7 @@ msgstr "Payment of %(amount)s FCFA for %(product)s recorded. Outstanding: %(rema
 msgid "Paiement – %(product)s"
 msgstr "Payment – %(product)s"
 
-#: core/models/accounting_models.py:450 core/templates/components/navigation.html:152
+#: core/models/accounting_models.py:450 core/templates/components/navigation.html:167
 #: core/templates/core/accounting/invoices.html:4 core/templates/core/accounting/invoices.html:10
 #: core/templates/core/reports.html:146 core/views.py:5096
 msgid "Factures"
@@ -6972,13 +7038,13 @@ msgstr "Invoice %(number)s already exists for this sale."
 msgid "Facture %(number)s générée avec succès."
 msgstr "Invoice %(number)s generated successfully."
 
-#: core/models/settings_models.py:23 core/templates/components/navigation.html:147
+#: core/models/settings_models.py:23 core/templates/components/navigation.html:162
 #: core/templates/core/accounting/credit_sales.html:14 core/templates/core/accounting/treasury.html:5
 #: core/views.py:5192
 msgid "Trésorerie"
 msgstr "Treasury"
 
-#: core/templates/components/navigation.html:163 core/templates/core/accounting/balance_sheet.html:16
+#: core/templates/components/navigation.html:178 core/templates/core/accounting/balance_sheet.html:16
 #: core/templates/core/accounting/income_statement.html:4
 #: core/templates/core/accounting/income_statement.html:10 core/templates/core/reports.html:18
 #: core/views.py:5217 core/views.py:5288
@@ -7145,7 +7211,7 @@ msgstr "VAT return"
 msgid "Compte bancaire introuvable"
 msgstr "Bank account not found"
 
-#: core/templates/components/navigation.html:168
+#: core/templates/components/navigation.html:183
 #: core/templates/core/accounting/bank_reconciliation.html:4
 #: core/templates/core/accounting/bank_reconciliation.html:10 core/templates/core/reports.html:86
 #: core/views.py:5412
@@ -7180,7 +7246,7 @@ msgstr "Reconciliation cancelled"
 msgid "Annulation du rapprochement impossible."
 msgstr "Unable to cancel the reconciliation."
 
-#: core/models/accounting_models.py:596 core/templates/components/navigation.html:169
+#: core/models/accounting_models.py:596 core/templates/components/navigation.html:184
 #: core/templates/core/accounting/exercise_closing.html:5
 #: core/templates/core/accounting/exercise_closing.html:11 core/templates/core/reports.html:97
 #: core/views.py:5490
@@ -7203,4 +7269,1033 @@ msgstr "Fiscal year closed successfully. Net income: %(result)s FCFA. New fiscal
 #: core/views.py:5537
 msgid "Erreur interne lors de la clôture. Aucune modification n'a été enregistrée."
 msgstr "Internal error during closing. No changes were saved."
+
+#: core/views_invitations.py:134
+#, python-format
+msgid "Invitation envoyée à %(email)s."
+msgstr "Invitation sent to %(email)s."
+
+#: core/views_invitations.py:156
+msgid "Cette invitation a déjà été envoyée plusieurs fois. Révoquez-la et créez-en une nouvelle."
+msgstr "This invitation has already been sent several times. Revoke it and create a new one."
+
+#: core/views_invitations.py:163
+#, python-format
+msgid "Invitation renvoyée à %(email)s."
+msgstr "Invitation sent again to %(email)s."
+
+#: core/views_invitations.py:184
+msgid "Invitation révoquée."
+msgstr "Invitation revoked."
+
+#: core/views_invitations.py:218
+msgid "Choisissez un identifiant."
+msgstr "Choose a username."
+
+#: core/views_invitations.py:220 saas/forms.py:72
+msgid "Les deux mots de passe ne correspondent pas."
+msgstr "The two passwords do not match."
+
+#: core/views_invitations.py:227
+msgid "Choisissez un mot de passe."
+msgstr "Choose a password."
+
+#: core/views_invitations.py:245
+msgid "Bienvenue ! Votre compte est prêt."
+msgstr "Welcome! Your account is ready."
+
+#: saas/admin.py:49
+msgid "Base de données"
+msgstr "Database"
+
+#: saas/admin.py:52
+msgid ""
+"Chaque entreprise dispose de sa propre base. Ne jamais la créer par clonage d'une autre : deux "
+"bases clonées partageraient les mêmes comptes utilisateurs."
+msgstr ""
+"Each company has its own database. Never create one by cloning another: two cloned databases "
+"would share the same user accounts."
+
+#: core/templates/core/statistics_clients.html:23 core/templates/core/statistics_suppliers.html:23
+#: saas/admin.py:57
+msgid "Contact"
+msgstr "Contact"
+
+#: saas/admin.py:60
+msgid "Propriétaire"
+msgstr "Owner"
+
+#: saas/admin.py:61
+msgid "Cycle de vie"
+msgstr "Lifecycle"
+
+#: saas/admin.py:70
+msgid "Suspendre les espaces sélectionnés"
+msgstr "Suspend the selected workspaces"
+
+#: saas/admin.py:78
+msgid "Suspension depuis l'administration."
+msgstr "Suspended from the admin site."
+
+#: saas/admin.py:87
+#, python-format
+msgid "%(n)d espace suspendu."
+msgid_plural "%(n)d espaces suspendus."
+msgstr[0] "%(n)d workspace suspended."
+msgstr[1] "%(n)d workspaces suspended."
+
+#: saas/admin.py:90
+msgid "Réactiver les espaces sélectionnés"
+msgstr "Reactivate the selected workspaces"
+
+#: saas/admin.py:107
+#, python-format
+msgid "%(n)d espace réactivé."
+msgid_plural "%(n)d espaces réactivés."
+msgstr[0] "%(n)d workspace reactivated."
+msgstr[1] "%(n)d workspaces reactivated."
+
+#: saas/admin.py:110
+msgid "Relancer la création des espaces sélectionnés"
+msgstr "Retry setup for the selected workspaces"
+
+#: saas/admin.py:119
+#, python-format
+msgid "%(n)d création remise en file."
+msgid_plural "%(n)d créations remises en file."
+msgstr[0] "%(n)d setup re-queued."
+msgstr[1] "%(n)d setups re-queued."
+
+#: saas/apps.py:10
+msgid "Plateforme"
+msgstr "Platform"
+
+#: saas/constants.py:86
+msgid "Inscription créée"
+msgstr "Sign-up created"
+
+#: saas/constants.py:87
+msgid "Adresse vérifiée"
+msgstr "Address verified"
+
+#: saas/constants.py:88
+msgid "Création mise en file"
+msgstr "Setup queued"
+
+#: saas/constants.py:89
+msgid "Création démarrée"
+msgstr "Setup started"
+
+#: saas/constants.py:90
+msgid "Création réussie"
+msgstr "Setup succeeded"
+
+#: saas/constants.py:91
+msgid "Création échouée"
+msgstr "Setup failed"
+
+#: saas/constants.py:92
+msgid "Espace suspendu"
+msgstr "Workspace suspended"
+
+#: saas/constants.py:93
+msgid "Espace réactivé"
+msgstr "Workspace reactivated"
+
+#: saas/constants.py:94 saas/models/company_models.py:39
+msgid "Suppression programmée"
+msgstr "Deletion scheduled"
+
+#: saas/constants.py:95
+msgid "Suppression annulée"
+msgstr "Deletion cancelled"
+
+#: saas/constants.py:96
+msgid "Espace supprimé"
+msgstr "Workspace deleted"
+
+#: saas/constants.py:97
+msgid "Invitation envoyée"
+msgstr "Invitation sent"
+
+#: saas/constants.py:98
+msgid "Invitation acceptée"
+msgstr "Invitation accepted"
+
+#: saas/constants.py:99
+msgid "Invitation révoquée"
+msgstr "Invitation revoked"
+
+#: saas/constants.py:100
+msgid "Nom d'hôte ajouté"
+msgstr "Hostname added"
+
+#: saas/constants.py:101
+msgid "Nom d'hôte vérifié"
+msgstr "Hostname verified"
+
+#: saas/constants.py:102
+msgid "Nom d'hôte retiré"
+msgstr "Hostname removed"
+
+#: saas/constants.py:103
+msgid "Connexion à la plateforme"
+msgstr "Platform sign-in"
+
+#: saas/constants.py:104
+msgid "Échec de connexion à la plateforme"
+msgstr "Failed platform sign-in"
+
+#: saas/constants.py:105
+msgid "Changement d'offre"
+msgstr "Plan changed"
+
+#: saas/constants.py:106
+msgid "E-mail envoyé"
+msgstr "Email sent"
+
+#: saas/constants.py:107
+msgid "Échec d'envoi d'e-mail"
+msgstr "Email delivery failed"
+
+#: saas/forms.py:17
+msgid "Nom de votre entreprise"
+msgstr "Your company name"
+
+#: saas/forms.py:18
+msgid "Ex. : Boutique Awa"
+msgstr "E.g. Awa's Shop"
+
+#: saas/forms.py:22
+msgid "Adresse de votre espace"
+msgstr "Your workspace address"
+
+#: saas/forms.py:23
+msgid "Lettres minuscules, chiffres et tirets."
+msgstr "Lowercase letters, digits and hyphens."
+
+#: saas/forms.py:24
+msgid "ex-boutique-awa"
+msgstr "eg-awa-shop"
+
+#: saas/forms.py:27
+msgid "Votre adresse e-mail"
+msgstr "Your email address"
+
+#: saas/forms.py:28
+msgid "Elle servira à confirmer votre inscription et à vous contacter."
+msgstr "We will use it to confirm your sign-up and to contact you."
+
+#: saas/forms.py:31
+msgid "Votre nom"
+msgstr "Your name"
+
+#: saas/forms.py:34
+msgid "Votre téléphone"
+msgstr "Your phone number"
+
+#: core/templates/core/invitation_acceptation.html:31 core/templates/core/login.html:94
+#: saas/forms.py:37
+msgid "Mot de passe"
+msgstr "Password"
+
+#: core/templates/core/invitation_acceptation.html:37 saas/forms.py:42
+msgid "Confirmez le mot de passe"
+msgstr "Confirm password"
+
+#: core/templates/components/header.html:49 core/templates/core/login.html:39 saas/forms.py:47
+#: saas/models/company_models.py:121
+msgid "Langue"
+msgstr "Language"
+
+#: saas/forms.py:50
+msgid "J'accepte les conditions d'utilisation"
+msgstr "I accept the terms of use"
+
+#: saas/forms.py:51
+msgid "Vous devez accepter les conditions pour continuer."
+msgstr "You must accept the terms to continue."
+
+#: saas/middleware.py:134
+msgid "Espace introuvable."
+msgstr "Workspace not found."
+
+#: saas/models/audit_models.py:20
+msgid "Équipe plateforme"
+msgstr "Platform team"
+
+#: saas/models/audit_models.py:21
+msgid "Propriétaire de l'espace"
+msgstr "Workspace owner"
+
+#: saas/models/audit_models.py:22
+msgid "Utilisateur de l'espace"
+msgstr "Workspace user"
+
+#: saas/models/audit_models.py:23
+msgid "Automatique"
+msgstr "Automatic"
+
+#: saas/models/audit_models.py:37
+msgid "Type d'acteur"
+msgstr "Actor type"
+
+#: saas/models/audit_models.py:41
+msgid "Acteur"
+msgstr "Actor"
+
+#: saas/models/audit_models.py:42
+msgid "Conservé en clair : l'acteur peut disparaître."
+msgstr "Stored as plain text: the actor may be deleted."
+
+#: saas/models/audit_models.py:50 saas/models/company_models.py:150 saas/models/company_models.py:206
+#: saas/models/invitation_models.py:56 saas/models/invitation_models.py:126
+#: saas/models/job_models.py:75
+msgid "Entreprise"
+msgstr "Company"
+
+#: saas/models/audit_models.py:54
+msgid "Conservé en clair : survit à la suppression de l'espace."
+msgstr "Stored as plain text: survives deletion of the workspace."
+
+#: core/templates/core/sales.html:181 saas/models/audit_models.py:59
+msgid "Action"
+msgstr "Action"
+
+#: saas/models/audit_models.py:69
+msgid "Entrée du journal d'audit"
+msgstr "Audit log entry"
+
+#: saas/models/audit_models.py:70
+msgid "Journal d'audit"
+msgstr "Audit log"
+
+#: saas/models/company_models.py:34
+msgid "En attente de vérification"
+msgstr "Awaiting verification"
+
+#: saas/models/company_models.py:35
+msgid "Création en cours"
+msgstr "Setup in progress"
+
+#: saas/models/company_models.py:37
+msgid "Suspendu"
+msgstr "Suspended"
+
+#: saas/models/company_models.py:38
+msgid "Échec de création"
+msgstr "Setup failed"
+
+#: saas/models/company_models.py:40
+msgid "Supprimé"
+msgstr "Deleted"
+
+#: saas/models/company_models.py:44
+msgid "Sous-domaine de la plateforme"
+msgstr "Platform subdomain"
+
+#: saas/models/company_models.py:45
+msgid "Domaine propre du client"
+msgstr "Customer's own domain"
+
+#: saas/models/company_models.py:49
+msgid "Sans certificat"
+msgstr "No certificate"
+
+#: saas/models/company_models.py:50
+msgid "Certificat en cours d'obtention"
+msgstr "Certificate being issued"
+
+#: saas/models/company_models.py:51
+msgid "Certificat délivré"
+msgstr "Certificate issued"
+
+#: saas/models/company_models.py:52
+msgid "Échec d'obtention"
+msgstr "Issuance failed"
+
+#: saas/models/company_models.py:60
+msgid "Raison sociale"
+msgstr "Legal name"
+
+#: saas/models/company_models.py:62
+msgid ""
+"Libellé utilisé par la plateforme. Le nom imprimé sur les reçus se règle dans les paramètres de "
+"l'espace."
+msgstr "Label used by the platform. The name printed on receipts is set in the workspace settings."
+
+#: saas/models/company_models.py:69
+msgid "Sous-domaine"
+msgstr "Subdomain"
+
+#: saas/models/company_models.py:70
+msgid "Identifiant de l'espace : <sous-domaine>.exemple.com"
+msgstr "Workspace identifier: <subdomain>.example.com"
+
+#: saas/models/company_models.py:77
+msgid "Nom de la base de données"
+msgstr "Database name"
+
+#: saas/models/company_models.py:81
+msgid "Serveur de base de données"
+msgstr "Database server"
+
+#: saas/models/company_models.py:82
+msgid "Vide : le serveur par défaut. Permet de répartir les sociétés."
+msgstr "Empty: the default server. Allows companies to be spread across servers."
+
+#: core/templates/core/invitations.html:69 saas/models/company_models.py:91
+#: saas/models/invitation_models.py:140 saas/models/job_models.py:82
+msgid "État"
+msgstr "Status"
+
+#: saas/models/company_models.py:94
+msgid "Créé le"
+msgstr "Created on"
+
+#: saas/models/company_models.py:97
+msgid "Suspendu le"
+msgstr "Suspended on"
+
+#: saas/models/company_models.py:100
+msgid "Motif de suspension"
+msgstr "Reason for suspension"
+
+#: saas/models/company_models.py:103
+msgid "Suppression prévue le"
+msgstr "Deletion scheduled for"
+
+#: saas/models/company_models.py:108
+msgid "E-mail du titulaire du compte"
+msgstr "Account holder's email"
+
+#: saas/models/company_models.py:110
+msgid ""
+"Adresse du responsable de l'abonnement. Distincte de l'e-mail public de la boutique, réglé dans "
+"les paramètres de l'espace."
+msgstr ""
+"Address of the person responsible for the subscription. Distinct from the shop's public email, "
+"set in the workspace settings."
+
+#: saas/models/company_models.py:115
+msgid "Nom du contact"
+msgstr "Contact name"
+
+#: saas/models/company_models.py:118
+msgid "Téléphone du contact"
+msgstr "Contact phone number"
+
+#: saas/models/company_models.py:122
+msgid "Langue des messages envoyés par la plateforme."
+msgstr "Language of messages sent by the platform."
+
+#: saas/models/company_models.py:129
+msgid "Identifiant du propriétaire"
+msgstr "Owner identifier"
+
+#: saas/models/company_models.py:133
+msgid "Identifiant de connexion du propriétaire"
+msgstr "Owner's sign-in name"
+
+#: saas/models/company_models.py:142 saas/models/plan_models.py:57
+msgid "Offre"
+msgstr "Plan"
+
+#: saas/models/company_models.py:145
+msgid "Fin de la période d'essai"
+msgstr "Trial ends on"
+
+#: saas/models/company_models.py:151
+msgid "Entreprises"
+msgstr "Companies"
+
+#: saas/models/company_models.py:209 saas/models/company_models.py:236
+msgid "Nom d'hôte"
+msgstr "Hostname"
+
+#: saas/models/company_models.py:217
+msgid "Principal"
+msgstr "Primary"
+
+#: saas/models/company_models.py:218
+msgid "Vérifié"
+msgstr "Verified"
+
+#: saas/models/company_models.py:221
+msgid "Jeton de vérification DNS"
+msgstr "DNS verification token"
+
+#: saas/models/company_models.py:224
+msgid "Vérifié le"
+msgstr "Verified on"
+
+#: saas/models/company_models.py:230
+msgid "État du certificat"
+msgstr "Certificate status"
+
+#: saas/models/company_models.py:237
+msgid "Noms d'hôte"
+msgstr "Hostnames"
+
+#: saas/models/invitation_models.py:35
+msgid "Acceptée"
+msgstr "Accepted"
+
+#: saas/models/invitation_models.py:36
+msgid "Expirée"
+msgstr "Expired"
+
+#: saas/models/invitation_models.py:37
+msgid "Révoquée"
+msgstr "Revoked"
+
+#: saas/models/invitation_models.py:58
+msgid "Adresse à vérifier"
+msgstr "Address to verify"
+
+#: core/templates/core/invitations.html:70 saas/models/invitation_models.py:65
+#: saas/models/invitation_models.py:142
+msgid "Expire le"
+msgstr "Expires on"
+
+#: saas/models/invitation_models.py:66
+msgid "Vérifiée le"
+msgstr "Verified on"
+
+#: saas/models/invitation_models.py:83
+msgid "Inscription"
+msgstr "Sign-up"
+
+#: saas/models/invitation_models.py:84
+msgid "Inscriptions"
+msgstr "Sign-ups"
+
+#: saas/models/invitation_models.py:128
+msgid "Adresse de l'employé"
+msgstr "Employee's address"
+
+#: saas/models/invitation_models.py:134
+msgid "Modules attribués"
+msgstr "Assigned modules"
+
+#: saas/models/invitation_models.py:156 saas/templates/emails/invitation.html:2
+msgid "Invitation"
+msgstr "Invitation"
+
+#: core/templates/components/navigation.html:107 core/templates/core/invitations.html:2
+#: core/templates/core/invitations.html:62 saas/models/invitation_models.py:157
+msgid "Invitations"
+msgstr "Invitations"
+
+#: saas/models/job_models.py:33
+msgid "Création d'un espace"
+msgstr "Workspace setup"
+
+#: saas/models/job_models.py:34
+msgid "Envoi d'un e-mail"
+msgstr "Email delivery"
+
+#: saas/models/job_models.py:35
+msgid "Sauvegarde"
+msgstr "Backup"
+
+#: saas/models/job_models.py:36
+msgid "Export client"
+msgstr "Customer export"
+
+#: saas/models/job_models.py:37
+msgid "Suppression d'un espace"
+msgstr "Workspace deletion"
+
+#: saas/models/job_models.py:38
+msgid "Rafraîchissement de l'usage"
+msgstr "Usage refresh"
+
+#: saas/models/job_models.py:39
+msgid "Vérification d'un nom d'hôte"
+msgstr "Hostname verification"
+
+#: core/templates/core/accounting/credit_sales.html:90 core/templates/core/inventory.html:112
+#: core/templates/core/inventory_close_summary.html:16 core/templates/core/inventory_history.html:89
+#: core/templates/core/inventory_history.html:146 core/templates/core/supplies.html:135
+#: saas/models/job_models.py:44
+msgid "En cours"
+msgstr "In progress"
+
+#: saas/models/job_models.py:45 saas/models/job_models.py:64
+msgid "Terminé"
+msgstr "Completed"
+
+#: saas/models/job_models.py:46
+msgid "Échoué"
+msgstr "Failed"
+
+#: core/templates/core/sales_history.html:118 saas/models/job_models.py:47
+msgid "Annulé"
+msgstr "Cancelled"
+
+#: saas/models/job_models.py:59
+msgid "Création de la base"
+msgstr "Creating the database"
+
+#: saas/models/job_models.py:60
+msgid "Installation des tables"
+msgstr "Installing the tables"
+
+#: saas/models/job_models.py:61
+msgid "Chargement des données de référence"
+msgstr "Loading reference data"
+
+#: saas/models/job_models.py:62
+msgid "Création du compte propriétaire"
+msgstr "Creating the owner account"
+
+#: saas/models/job_models.py:63
+msgid "Mise en service du nom d'hôte"
+msgstr "Bringing the hostname into service"
+
+#: core/templates/core/statistics_expenses.html:23 saas/models/job_models.py:78
+msgid "Nature"
+msgstr "Nature"
+
+#: saas/models/job_models.py:85
+msgid "Étape atteinte"
+msgstr "Step reached"
+
+#: core/templates/core/accounting/exercise_closing.html:88 saas/models/job_models.py:89
+msgid "Résultat"
+msgstr "Net income"
+
+#: saas/models/job_models.py:91
+msgid "Tentatives"
+msgstr "Attempts"
+
+#: saas/models/job_models.py:93
+msgid "Tentatives maximum"
+msgstr "Maximum attempts"
+
+#: saas/models/job_models.py:95
+msgid "Dernière erreur"
+msgstr "Last error"
+
+#: saas/models/job_models.py:98
+msgid "À exécuter après"
+msgstr "Run after"
+
+#: saas/models/job_models.py:100
+msgid "Priorité"
+msgstr "Priority"
+
+#: saas/models/job_models.py:113
+msgid "Travail"
+msgstr "Job"
+
+#: saas/models/job_models.py:114
+msgid "Travaux"
+msgstr "Jobs"
+
+#: saas/models/plan_models.py:33
+msgid "Nombre d'utilisateurs maximum"
+msgstr "Maximum number of users"
+
+#: saas/models/plan_models.py:34 saas/models/plan_models.py:38
+msgid "Vide = illimité."
+msgstr "Empty = unlimited."
+
+#: saas/models/plan_models.py:37
+msgid "Nombre de produits maximum"
+msgstr "Maximum number of products"
+
+#: saas/models/plan_models.py:42
+msgid "Prix mensuel (FCFA)"
+msgstr "Monthly price (FCFA)"
+
+#: saas/models/plan_models.py:45
+msgid "Durée de l'essai (jours)"
+msgstr "Trial length (days)"
+
+#: saas/models/plan_models.py:48
+msgid "Offre proposée"
+msgstr "Plan offered"
+
+#: saas/models/plan_models.py:50
+msgid "Offre par défaut"
+msgstr "Default plan"
+
+#: saas/models/plan_models.py:51
+msgid "Attribuée aux nouvelles inscriptions."
+msgstr "Assigned to new sign-ups."
+
+#: saas/models/plan_models.py:58
+msgid "Offres"
+msgstr "Plans"
+
+#: saas/models/plan_models.py:89
+msgid "Gratuit"
+msgstr "Free"
+
+#: saas/models/plan_models.py:90
+msgid "Accès complet, sans limite d'utilisateurs."
+msgstr "Full access, with no user limit."
+
+#: saas/services/invitation_service.py:75
+msgid "Indiquez une adresse e-mail."
+msgstr "Enter an email address."
+
+#: saas/services/invitation_service.py:84
+msgid "Cette personne fait déjà partie de votre équipe."
+msgstr "This person is already part of your team."
+
+#: saas/services/invitation_service.py:90
+msgid "Une invitation est déjà en cours pour cette adresse."
+msgstr "An invitation is already pending for this address."
+
+#: saas/services/invitation_service.py:97
+msgid "Votre offre ne permet pas d'ajouter un utilisateur de plus."
+msgstr "Your plan does not allow you to add another user."
+
+#: saas/services/invitation_service.py:177
+msgid "Cet identifiant est déjà pris."
+msgstr "This username is already taken."
+
+#: saas/services/slug_service.py:50
+msgid "Indiquez un sous-domaine."
+msgstr "Enter a subdomain."
+
+#: saas/services/slug_service.py:53
+#, python-format
+msgid "Le sous-domaine doit comporter au moins %(n)s caractères."
+msgstr "The subdomain must be at least %(n)s characters long."
+
+#: saas/services/slug_service.py:57
+#, python-format
+msgid "Le sous-domaine ne peut pas dépasser %(n)s caractères."
+msgstr "The subdomain cannot be longer than %(n)s characters."
+
+#: saas/services/slug_service.py:60
+msgid "Le sous-domaine ne peut pas contenir deux tirets de suite."
+msgstr "The subdomain cannot contain two consecutive hyphens."
+
+#: saas/services/slug_service.py:63
+msgid ""
+"Le sous-domaine ne peut contenir que des lettres minuscules, des chiffres et des tirets, et doit "
+"commencer par une lettre."
+msgstr ""
+"The subdomain may only contain lowercase letters, digits and hyphens, and must start with a "
+"letter."
+
+#: saas/services/slug_service.py:67
+msgid "Le sous-domaine ne peut pas être composé uniquement de chiffres."
+msgstr "The subdomain cannot consist only of digits."
+
+#: saas/services/slug_service.py:104
+msgid "Ce sous-domaine n'est pas disponible. Essayez-en un autre."
+msgstr "This subdomain is not available. Please try another one."
+
+#: saas/templates/emails/base.html:19
+msgid "Ce message vous est envoyé automatiquement. Merci de ne pas y répondre."
+msgstr "This message was sent automatically. Please do not reply."
+
+#: saas/templates/emails/bienvenue.html:2
+msgid "Votre espace est prêt"
+msgstr "Your workspace is ready"
+
+#: saas/templates/emails/bienvenue.html:4 saas/templates/emails/invitation.html:4
+#: saas/templates/emails/verification.html:4
+msgid "Bonjour,"
+msgstr "Hello,"
+
+#: saas/templates/emails/bienvenue.html:6
+#, python-format
+msgid "L'espace <strong>%(entreprise)s</strong> est en service."
+msgstr "The <strong>%(entreprise)s</strong> workspace is up and running."
+
+#: saas/templates/emails/bienvenue.html:15
+msgid "Ouvrir mon espace"
+msgstr "Open my workspace"
+
+#: saas/templates/emails/bienvenue.html:18
+msgid ""
+"Connectez-vous avec le mot de passe choisi à l'inscription. Vous pourrez ensuite inviter vos "
+"employés depuis la page Utilisateurs."
+msgstr ""
+"Sign in with the password you chose when signing up. You can then invite your employees from the "
+"Users page."
+
+#: saas/templates/emails/bienvenue.txt:1
+#, python-format
+msgid ""
+"Bonjour,\n"
+"\n"
+"L'espace %(entreprise)s est en service.\n"
+"\n"
+"Adresse : %(url)s\n"
+"Identifiant : %(identifiant)s\n"
+"\n"
+"Connectez-vous avec le mot de passe choisi à l'inscription. Vous pourrez\n"
+"ensuite inviter vos employés depuis la page Utilisateurs et leur attribuer\n"
+"les modules auxquels ils doivent accéder."
+msgstr ""
+"Hello,\n"
+"\n"
+"The %(entreprise)s workspace is up and running.\n"
+"\n"
+"Address: %(url)s\n"
+"Username: %(identifiant)s\n"
+"\n"
+"Sign in with the password you chose when signing up. You can then invite\n"
+"your employees from the Users page and assign them the modules they need\n"
+"access to."
+
+#: saas/templates/emails/bienvenue_subject.txt:1
+#, python-format
+msgid "Votre espace %(entreprise)s est prêt"
+msgstr "Your %(entreprise)s workspace is ready"
+
+#: saas/templates/emails/invitation.html:6
+#, python-format
+msgid ""
+"<strong>%(invitant)s</strong> vous invite à rejoindre l'espace <strong>%(entreprise)s</strong> "
+"sur Blanco."
+msgstr ""
+"<strong>%(invitant)s</strong> is inviting you to join the <strong>%(entreprise)s</strong> "
+"workspace on Blanco."
+
+#: saas/templates/emails/invitation.html:12
+#, python-format
+msgid ""
+"Ce lien est valable %(jours)s jours et ne peut servir qu'une fois. Si vous ne vous attendiez pas "
+"à cette invitation, ignorez ce message."
+msgstr ""
+"This link is valid for %(jours)s days and can only be used once. If you were not expecting this "
+"invitation, please ignore this message."
+
+#: saas/templates/emails/invitation.txt:1
+#, python-format
+msgid ""
+"Bonjour,\n"
+"\n"
+"%(invitant)s vous invite à rejoindre l'espace %(entreprise)s sur Blanco.\n"
+"\n"
+"Créez votre compte en ouvrant ce lien :\n"
+"%(lien)s\n"
+"\n"
+"Ce lien est valable %(jours)s jours et ne peut servir qu'une fois. Si vous ne\n"
+"vous attendiez pas à cette invitation, ignorez ce message."
+msgstr ""
+"Hello,\n"
+"\n"
+"%(invitant)s is inviting you to join the %(entreprise)s workspace on Blanco.\n"
+"\n"
+"Create your account by opening this link:\n"
+"%(lien)s\n"
+"\n"
+"This link is valid for %(jours)s days and can only be used once. If you were\n"
+"not expecting this invitation, please ignore this message."
+
+#: saas/templates/emails/invitation_subject.txt:1
+#, python-format
+msgid "%(invitant)s vous invite à rejoindre %(entreprise)s"
+msgstr "%(invitant)s is inviting you to join %(entreprise)s"
+
+#: saas/templates/emails/verification.html:2 saas/templates/saas/verification_envoyee.html:2
+msgid "Confirmez votre adresse"
+msgstr "Confirm your address"
+
+#: saas/templates/emails/verification.html:6
+#, python-format
+msgid "Vous venez de créer l'espace <strong>%(entreprise)s</strong> sur Blanco."
+msgstr "You have just created the <strong>%(entreprise)s</strong> workspace on Blanco."
+
+#: saas/templates/emails/verification.html:9
+msgid "Pour l'activer, confirmez votre adresse :"
+msgstr "To activate it, confirm your address:"
+
+#: saas/templates/emails/verification.html:12
+msgid "Confirmer mon adresse"
+msgstr "Confirm my address"
+
+#: saas/templates/emails/verification.html:15
+#, python-format
+msgid ""
+"Ce lien est valable %(heures)s heures. Si vous n'êtes pas à l'origine de cette demande, ignorez "
+"ce message : aucun espace ne sera créé."
+msgstr ""
+"This link is valid for %(heures)s hours. If you did not make this request, please ignore this "
+"message: no workspace will be created."
+
+#: saas/templates/emails/verification.txt:1
+#, python-format
+msgid ""
+"Bonjour,\n"
+"\n"
+"Vous venez de créer l'espace %(entreprise)s sur Blanco.\n"
+"\n"
+"Pour l'activer, confirmez votre adresse en ouvrant ce lien :\n"
+"%(lien)s\n"
+"\n"
+"Ce lien est valable %(heures)s heures. Si vous n'êtes pas à l'origine de cette\n"
+"demande, ignorez ce message : aucun espace ne sera créé."
+msgstr ""
+"Hello,\n"
+"\n"
+"You have just created the %(entreprise)s workspace on Blanco.\n"
+"\n"
+"To activate it, confirm your address by opening this link:\n"
+"%(lien)s\n"
+"\n"
+"This link is valid for %(heures)s hours. If you did not make this request,\n"
+"please ignore this message: no workspace will be created."
+
+#: saas/templates/emails/verification_subject.txt:1
+#, python-format
+msgid "Confirmez votre adresse pour activer %(entreprise)s"
+msgstr "Confirm your address to activate %(entreprise)s"
+
+#: saas/templates/saas/accueil.html:2
+msgid "Blanco — la caisse et la comptabilité de votre commerce"
+msgstr "Blanco — point of sale and accounting for your shop"
+
+#: saas/templates/saas/accueil.html:5
+msgid "La caisse et la comptabilité de votre commerce, en ligne."
+msgstr "Point of sale and accounting for your shop, online."
+
+#: saas/templates/saas/accueil.html:7
+msgid ""
+"Ventes, stock, approvisionnements, crédits clients et comptabilité OHADA — dans un seul outil, "
+"accessible depuis votre ordinateur et votre téléphone."
+msgstr ""
+"Sales, stock, supplies, customer credit and OHADA accounting — in a single tool, available from "
+"your computer and your phone."
+
+#: saas/templates/saas/accueil.html:9
+msgid "Créer mon espace gratuitement"
+msgstr "Create my workspace for free"
+
+#: saas/templates/saas/accueil.html:14
+msgid "Conçu pour le Cameroun"
+msgstr "Built for Cameroon"
+
+#: saas/templates/saas/accueil.html:15
+#, python-format
+msgid "Facturation en FCFA, TVA à 19,25 %%, plan comptable OHADA prêt à l'emploi."
+msgstr "Invoicing in FCFA, 19.25%% VAT, OHADA chart of accounts ready to use."
+
+#: saas/templates/saas/accueil.html:18
+msgid "Vos données vous appartiennent"
+msgstr "Your data belongs to you"
+
+#: saas/templates/saas/accueil.html:19
+msgid ""
+"Chaque entreprise dispose de sa propre base de données, isolée des autres. Export complet en un "
+"clic, à tout moment."
+msgstr ""
+"Each company has its own database, isolated from the others. Full export in one click, at any "
+"time."
+
+#: saas/templates/saas/accueil.html:22
+msgid "Aussi en installation locale"
+msgstr "Also available as a local install"
+
+#: saas/templates/saas/accueil.html:23
+msgid "Vous préférez héberger vous-même ? La même application s'installe sur un poste de votre boutique."
+msgstr "Prefer to host it yourself? The same application installs on a computer in your shop."
+
+#: saas/templates/saas/base.html:14 saas/templates/saas/inscription.html:2
+#: saas/templates/saas/inscription.html:5 saas/templates/saas/inscription.html:74
+msgid "Créer mon espace"
+msgstr "Create my workspace"
+
+#: saas/templates/saas/inscription.html:6
+msgid "Quelques informations suffisent. Votre espace est prêt en moins d'une minute."
+msgstr "Just a few details. Your workspace is ready in under a minute."
+
+#: saas/templates/saas/lien_invalide.html:2
+msgid "Lien invalide"
+msgstr "Invalid link"
+
+#: saas/templates/saas/lien_invalide.html:5
+msgid "Ce lien n'est plus valide"
+msgstr "This link is no longer valid"
+
+#: saas/templates/saas/lien_invalide.html:7
+msgid "Il a peut-être expiré, ou il a déjà été utilisé."
+msgstr "It may have expired, or it has already been used."
+
+#: saas/templates/saas/lien_invalide.html:9
+msgid "Recommencer l'inscription"
+msgstr "Start the sign-up again"
+
+#: saas/templates/saas/preparation.html:2
+msgid "Création de votre espace"
+msgstr "Setting up your workspace"
+
+#: saas/templates/saas/preparation.html:5
+msgid "Nous préparons votre espace"
+msgstr "We are preparing your workspace"
+
+#: saas/templates/saas/preparation.html:6
+msgid "Cela prend moins d'une minute. Vous pouvez laisser cette page ouverte."
+msgstr "This takes less than a minute. You can leave this page open."
+
+#: saas/templates/saas/preparation.html:14
+msgid "Un e-mail de bienvenue vous attend également : si vous fermez cette page, rien n'est perdu."
+msgstr "A welcome email is also on its way: if you close this page, nothing is lost."
+
+#: saas/templates/saas/verification_envoyee.html:5
+msgid "Vérifiez votre boîte e-mail"
+msgstr "Check your inbox"
+
+#: saas/templates/saas/verification_envoyee.html:7
+#, python-format
+msgid "Nous venons d'envoyer un lien de confirmation à <strong>%(adresse)s</strong>."
+msgstr "We have just sent a confirmation link to <strong>%(adresse)s</strong>."
+
+#: saas/templates/saas/verification_envoyee.html:9
+msgid "Ouvrez ce lien pour activer votre espace. Pensez à regarder dans les courriers indésirables."
+msgstr "Open that link to activate your workspace. Remember to check your spam folder."
+
+#: saas/templates/saas/verification_envoyee.html:13
+msgid "Renvoyer le message"
+msgstr "Send the message again"
+
+#: saas/views/public_views.py:168
+msgid "Trop de vérifications. Patientez un instant."
+msgstr "Too many checks. Please wait a moment."
+
+#: saas/views/public_views.py:183
+msgid "Ce sous-domaine est disponible."
+msgstr "This subdomain is available."
+
+#: saas/templates/saas/preparation.html:11 saas/views/public_views.py:207
+msgid "Mise en file d'attente…"
+msgstr "Queuing…"
+
+#: saas/views/public_views.py:208
+msgid "Création de votre espace…"
+msgstr "Creating your workspace…"
+
+#: saas/views/public_views.py:209
+msgid "Installation des tables…"
+msgstr "Installing the tables…"
+
+#: saas/views/public_views.py:210
+msgid "Mise en place du plan comptable OHADA…"
+msgstr "Setting up the OHADA chart of accounts…"
+
+#: saas/views/public_views.py:211
+msgid "Création de votre compte…"
+msgstr "Creating your account…"
+
+#: saas/views/public_views.py:212
+msgid "Mise en service de votre adresse…"
+msgstr "Bringing your address into service…"
+
+#: saas/views/public_views.py:213
+msgid "C'est prêt !"
+msgstr "It's ready!"
+
+#: saas/views/public_views.py:240
+msgid "Nous n'avons pas pu créer votre espace. Notre équipe est prévenue."
+msgstr "We could not create your workspace. Our team has been notified."
 

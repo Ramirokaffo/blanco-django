@@ -93,9 +93,13 @@ docker-compose down -v
 
 ### Migrations Django
 
+Les migrations sont **versionnées** et livrées dans l'image ; l'entrypoint ne
+les régénère plus. Elles se créent sur le poste de développement, puis se
+commitent.
+
 ```bash
-# Créer de nouvelles migrations
-docker-compose exec web python manage.py makemigrations
+# Contrôler schéma et historique (joué automatiquement avant chaque migrate)
+docker-compose exec web python manage.py check_migration_baseline
 
 # Appliquer les migrations
 docker-compose exec web python manage.py migrate

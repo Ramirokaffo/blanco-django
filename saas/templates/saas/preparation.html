@@ -1,0 +1,60 @@
+{% extends "saas/base.html" %}{% load i18n %}
+{% block titre %}{% trans "Création de votre espace" %}{% endblock %}
+{% block contenu %}
+<section class="message" data-url-etat="{% url 'saas:etat' entreprise.slug %}">
+    <h1>{% trans "Nous préparons votre espace" %}</h1>
+    <p class="accroche">{% trans "Cela prend moins d'une minute. Vous pouvez laisser cette page ouverte." %}</p>
+
+    <div class="jauge" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="5" id="jauge">
+        <div class="jauge-remplissage" id="jaugeRemplissage" style="width:5%"></div>
+    </div>
+    <p class="etape" id="etape" role="status" aria-live="polite">{% trans "Mise en file d'attente…" %}</p>
+
+    <p class="aide" id="rassurance">
+        {% trans "Un e-mail de bienvenue vous attend également : si vous fermez cette page, rien n'est perdu." %}
+    </p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% url 'javascript-catalog' %}"></script>
+<script>
+(function () {
+    var section = document.querySelector("[data-url-etat]");
+    if (!section) { return; }
+
+    var urlEtat = section.getAttribute("data-url-etat");
+    var jauge = document.getElementById("jauge");
+    var remplissage = document.getElementById("jaugeRemplissage");
+    var etape = document.getElementById("etape");
+    var echecs = 0;
+
+    function sonder() {
+        fetch(urlEtat)
+            .then(function (r) { return r.json(); })
+            .then(function (donnees) {
+                echecs = 0;
+                remplissage.style.width = donnees.progress + "%";
+                jauge.setAttribute("aria-valuenow", donnees.progress);
+                etape.textContent = donnees.label;
+
+                if (donnees.redirect_url) {
+                    window.location.href = donnees.redirect_url;
+                    return;
+                }
+                if (donnees.status === "PROVISION_FAILED") { return; }
+                window.setTimeout(sonder, 2000);
+            })
+            .catch(function () {
+                // Une coupure réseau ne doit pas figer la page : on réessaie,
+                // en espaçant, et on abandonne au bout de plusieurs échecs.
+                echecs += 1;
+                if (echecs < 5) { window.setTimeout(sonder, 4000); }
+                else { etape.textContent = gettext("Connexion interrompue. Rechargez la page."); }
+            });
+    }
+
+    window.setTimeout(sonder, 1500);
+})();
+</script>
+{% endblock %}

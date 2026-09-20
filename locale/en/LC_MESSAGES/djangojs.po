@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Blanco 1.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-07 01:04+0100\n"
+"POT-Creation-Date: 2026-09-20 19:02+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: en\n"
@@ -841,4 +841,8 @@ msgstr "The add expense page has been opened in a new tab."
 #: core/templates/core/supplies_add.html:525
 msgid "Une erreur est survenue lors de l'enregistrement."
 msgstr "An error occurred while saving."
+
+#: saas/templates/saas/preparation.html:53
+msgid "Connexion interrompue. Rechargez la page."
+msgstr "Connection lost. Please reload the page."
 

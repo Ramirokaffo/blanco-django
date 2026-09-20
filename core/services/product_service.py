@@ -3,7 +3,7 @@ Service pour la gestion des produits.
 """
 
 import os
-from django.conf import settings
+
 from django.core.exceptions import SuspiciousFileOperation
 from django.db import transaction
 from django.db.models import Q
@@ -14,6 +14,7 @@ from core.models import (
     Product, ProductImage, Supply, Inventory,
     Category, Gamme, Rayon, GrammageType,
 )
+from core.services.media import current_media_root
 
 
 class ProductService:
@@ -168,7 +169,11 @@ class ProductService:
         if not filename or filename in ('.', '..') or '/' in filename or '\\' in filename:
             return None
         try:
-            base = safe_join(settings.MEDIA_ROOT, folder)
+            # La racine dépend du contexte : en mode SaaS, elle est propre à la
+            # société résolue depuis le nom d'hôte. Un lien d'image ne peut donc
+            # pas atteindre le fichier d'une autre entreprise, même en devinant
+            # son nom. En mono-client, c'est MEDIA_ROOT comme auparavant.
+            base = safe_join(current_media_root(), folder)
             path = safe_join(base, filename)
         except (SuspiciousFileOperation, ValueError):
             return None

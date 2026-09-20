@@ -28,6 +28,22 @@ def system_settings_context(request):
     }
 
 
+def deployment_mode_context(request):
+    """
+    Expose le mode de déploiement et l'entreprise courante aux gabarits.
+
+    Permet de n'afficher les éléments propres à l'offre hébergée (invitation
+    d'employés, par exemple) que lorsqu'ils ont un sens. En installation
+    mono-client, ``is_saas`` est faux et ``tenant`` vaut ``None``.
+    """
+    from blanco.modes import is_saas
+
+    return {
+        'is_saas': is_saas(),
+        'tenant': getattr(request, 'tenant', None),
+    }
+
+
 def user_modules_context(request):
     """
     Injecte la liste des codes de modules autorisés pour l'utilisateur connecté.

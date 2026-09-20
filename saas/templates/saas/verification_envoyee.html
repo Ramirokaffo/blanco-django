@@ -1,0 +1,16 @@
+{% extends "saas/base.html" %}{% load i18n %}
+{% block titre %}{% trans "Confirmez votre adresse" %}{% endblock %}
+{% block contenu %}
+<section class="message">
+    <h1>{% trans "Vérifiez votre boîte e-mail" %}</h1>
+    <p class="accroche">
+        {% blocktrans with adresse=email %}Nous venons d'envoyer un lien de confirmation à <strong>{{ adresse }}</strong>.{% endblocktrans %}
+    </p>
+    <p>{% trans "Ouvrez ce lien pour activer votre espace. Pensez à regarder dans les courriers indésirables." %}</p>
+
+    <form method="post" action="{% url 'saas:renvoyer_verification' entreprise.slug %}">
+        {% csrf_token %}
+        <button type="submit" class="bouton bouton--discret">{% trans "Renvoyer le message" %}</button>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Invitation invalide" %}{% endblock %}
+{% block content %}
+<section class="card">
+    <h2>{% trans "Cette invitation n'est plus valide" %}</h2>
+    <p class="text-muted">
+        {% trans "Elle a peut-être expiré, été révoquée, ou déjà utilisée. Demandez une nouvelle invitation au responsable de votre espace." %}
+    </p>
+    <a href="{% url 'login' %}" class="btn btn-primary">{% trans "Aller à la connexion" %}</a>
+</section>
+{% endblock %}

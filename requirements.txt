@@ -11,3 +11,4 @@ typing-extensions==4.15.0
 cryptography==50.0.1
 gunicorn==26.2.0
 whitenoise==6.12.0
+redis==5.2.1

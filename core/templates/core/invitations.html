@@ -1,0 +1,106 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Invitations" %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>{% trans "Inviter un employé" %}</h2>
+    <a href="{% url 'contacts' %}" class="btn btn-secondary">{% trans "Retour aux utilisateurs" %}</a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<section class="card">
+    <h3>{% trans "Nouvelle invitation" %}</h3>
+    <p class="text-muted">
+        {% trans "L'employé recevra un lien par e-mail pour créer son compte. Vous choisissez dès maintenant les modules auxquels il aura accès." %}
+    </p>
+
+    <form method="post" action="{% url 'send_invitation' %}">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label for="inviteEmail">{% trans "Adresse e-mail" %}</label>
+                <input type="email" id="inviteEmail" name="email" required class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="inviteRole">{% trans "Rôle" %}</label>
+                <input type="text" id="inviteRole" name="role" class="form-control" placeholder="{% trans "Ex. : Caissier" %}">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="inviteFirstname">{% trans "Prénom" %}</label>
+                <input type="text" id="inviteFirstname" name="firstname" class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="inviteLastname">{% trans "Nom" %}</label>
+                <input type="text" id="inviteLastname" name="lastname" class="form-control">
+            </div>
+        </div>
+
+        <fieldset class="form-group">
+            <legend>{% trans "Modules autorisés" %}</legend>
+            <div class="modules-grid">
+                {% for module in modules_disponibles %}
+                    <label class="module-choice">
+                        <input type="checkbox" name="modules" value="{{ module.code }}">
+                        <span>{{ module.icon }} {% trans module.name %}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary">{% trans "Envoyer l'invitation" %}</button>
+    </form>
+</section>
+
+<section class="card">
+    <h3>{% trans "Invitations" %}</h3>
+    {% if invitations %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>{% trans "Adresse" %}</th>
+                <th>{% trans "Rôle" %}</th>
+                <th>{% trans "État" %}</th>
+                <th>{% trans "Expire le" %}</th>
+                <th>{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for invitation in invitations %}
+            <tr>
+                <td>{{ invitation.email }}</td>
+                <td>{{ invitation.role|default:"—" }}</td>
+                <td>{{ invitation.get_status_display }}</td>
+                <td>{{ invitation.expires_at|date:"d/m/Y H:i" }}</td>
+                <td>
+                    {% if invitation.status == "PENDING" %}
+                        <form method="post" action="{% url 'resend_invitation' invitation.pk %}" class="inline-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-secondary"
+                                    {% if invitation.send_count >= renvoi_max %}disabled{% endif %}>
+                                {% trans "Renvoyer" %}
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'revoke_invitation' invitation.pk %}" class="inline-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger">{% trans "Révoquer" %}</button>
+                        </form>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p class="text-muted">{% trans "Aucune invitation pour le moment." %}</p>
+    {% endif %}
+</section>
+{% endblock %}

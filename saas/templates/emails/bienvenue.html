@@ -1,0 +1,20 @@
+{% extends "emails/base.html" %}{% load i18n %}
+{% block titre %}{% trans "Votre espace est prêt" %}{% endblock %}
+{% block contenu %}
+    <p style="margin:0 0 16px;font-size:16px;">{% trans "Bonjour," %}</p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">
+        {% blocktrans %}L'espace <strong>{{ entreprise }}</strong> est en service.{% endblocktrans %}
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#f4f5f7;border-radius:8px;padding:16px;margin:0 0 24px;">
+        <tr><td style="font-size:14px;line-height:1.8;">
+            {% trans "Adresse" %} : <a href="{{ url }}" style="color:#0b7285;">{{ url }}</a><br>
+            {% trans "Identifiant" %} : <strong>{{ identifiant }}</strong>
+        </td></tr>
+    </table>
+    <p style="margin:0 0 24px;">
+        <a href="{{ url }}" style="display:inline-block;background:#0b7285;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">{% trans "Ouvrir mon espace" %}</a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#52606d;line-height:1.6;">
+        {% trans "Connectez-vous avec le mot de passe choisi à l'inscription. Vous pourrez ensuite inviter vos employés depuis la page Utilisateurs." %}
+    </p>
+{% endblock %}

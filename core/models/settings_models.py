@@ -62,11 +62,19 @@ class AppModule(models.Model):
         return f"{self.icon} {name}" if self.icon else name
 
     @classmethod
-    def init_default_modules(cls):
-        """Crée les modules par défaut s'ils n'existent pas."""
+    def init_default_modules(cls, using=None):
+        """
+        Crée les modules par défaut s'ils n'existent pas.
+
+        ``using`` désigne la base à peupler. Il est indispensable en
+        multi-base : ``migrate --database=<alias>`` transmet l'alias migré
+        au signal ``post_migrate``, et sans lui le seed irait dans la base
+        par défaut au lieu de celle qui vient d'être créée.
+        ``using=None`` laisse le routeur décider (comportement mono-base).
+        """
         created = 0
         for code, name, icon, order in DEFAULT_MODULES:
-            _module, was_created = cls.objects.get_or_create(
+            _module, was_created = cls.objects.db_manager(using).get_or_create(
                 code=code,
                 defaults={'name': name, 'icon': icon, 'order': order}
             )
@@ -75,15 +83,17 @@ class AppModule(models.Model):
         return created
 
     @classmethod
-    def sync_default_modules(cls):
+    def sync_default_modules(cls, using=None):
         """
         Réaligne le nom, l'icône et l'ordre des modules existants sur DEFAULT_MODULES.
         Ne touche ni à `is_active` ni aux attributions par utilisateur.
         Retourne le nombre de modules modifiés.
+
+        ``using`` : voir ``init_default_modules``.
         """
         updated = 0
         for code, name, icon, order in DEFAULT_MODULES:
-            changed = cls.objects.filter(code=code).exclude(
+            changed = cls.objects.db_manager(using).filter(code=code).exclude(
                 name=name, icon=icon, order=order
             ).update(name=name, icon=icon, order=order)
             updated += changed

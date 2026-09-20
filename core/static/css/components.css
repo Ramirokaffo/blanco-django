@@ -318,6 +318,13 @@
     color: var(--danger-color);
 }
 
+/* Séparateur entre les entrées du menu utilisateur */
+.user-dropdown-divider {
+    height: 1px;
+    margin: 6px 0;
+    background: var(--border-color);
+}
+
 /* Navigation Styles */
 .navigation {
     position: fixed;

@@ -9,11 +9,30 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env          # puis renseigner les variables
 
-python manage.py makemigrations core   # les migrations ne sont pas versionnées
 python manage.py migrate               # crée les tables ET charge les données par défaut
+                                       # (les migrations sont versionnées : rien à générer)
 DJANGO_SUPERUSER_PASSWORD='...' python create_superuser.py   # crée « admin » (mot de passe généré et affiché si la variable est absente)
 python manage.py runserver 0.0.0.0:8000
 ```
+
+### Migrations
+
+Les migrations sont **versionnées** (`core/migrations/`) : ne jamais relancer
+`makemigrations` au démarrage d'un conteneur. `django_migrations` ne stocke
+aucun condensat du contenu, donc une migration régénérée serait considérée
+comme déjà appliquée et les changements de modèle ne seraient jamais appliqués.
+
+```bash
+python manage.py makemigrations core            # uniquement après un changement de modèle, puis commiter
+python manage.py makemigrations --check --dry-run  # garde-fou d'intégration continue
+python manage.py check_migration_baseline       # contrôle schéma + historique avant migrate
+```
+
+`check_migration_baseline` est appelée par l'entrypoint Docker avant `migrate`.
+Elle bloque si le schéma réel manque une table ou une colonne, avertit si
+l'historique contient une migration générée localement (réparable avec
+`--repair-history`), et indique la manœuvre de rattrapage pour une base
+peuplée sans historique.
 
 ### Données par défaut (modules applicatifs, plan comptable)
 

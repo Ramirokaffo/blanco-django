@@ -1,0 +1,17 @@
+{% extends "emails/base.html" %}{% load i18n %}
+{% block titre %}{% trans "Confirmez votre adresse" %}{% endblock %}
+{% block contenu %}
+    <p style="margin:0 0 16px;font-size:16px;">{% trans "Bonjour," %}</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">
+        {% blocktrans %}Vous venez de créer l'espace <strong>{{ entreprise }}</strong> sur Blanco.{% endblocktrans %}
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">
+        {% trans "Pour l'activer, confirmez votre adresse :" %}
+    </p>
+    <p style="margin:0 0 24px;">
+        <a href="{{ lien }}" style="display:inline-block;background:#0b7285;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">{% trans "Confirmer mon adresse" %}</a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#52606d;line-height:1.6;">
+        {% blocktrans %}Ce lien est valable {{ heures }} heures. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : aucun espace ne sera créé.{% endblocktrans %}
+    </p>
+{% endblock %}

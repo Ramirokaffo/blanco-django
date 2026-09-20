@@ -4,9 +4,9 @@
 *.mo
 *.pyc
 __pycache__/
-*/migrations/*.py
-!*/migrations/__init__.py
-# /migrations/
+# Les migrations SONT versionnées depuis le passage au multi-base : appliquer
+# un schéma reproductible à N bases exige un historique stable et partagé.
+# Ne JAMAIS relancer `makemigrations` au démarrage d'un conteneur.
 
 db.sqlite3
 media/

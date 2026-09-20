@@ -1,0 +1,107 @@
+/* Site public de la plateforme. Volontairement autonome : ces pages sont
+   servies sur le domaine racine, sans le thème de l'application métier. */
+
+:root {
+    --teinte: #0b7285;
+    --teinte-sombre: #095c6b;
+    --texte: #1f2933;
+    --texte-doux: #52606d;
+    --fond: #f4f5f7;
+    --surface: #ffffff;
+    --bordure: #e4e7eb;
+    --erreur: #c92a2a;
+    --succes: #2b8a3e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--texte);
+    background: var(--fond);
+    line-height: 1.6;
+}
+
+.entete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--bordure);
+}
+
+.marque { font-size: 20px; font-weight: 700; color: var(--teinte); text-decoration: none; }
+
+.contenu { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+
+h1 { font-size: 30px; line-height: 1.25; margin: 0 0 12px; }
+h2 { font-size: 18px; margin: 0 0 8px; }
+.accroche { font-size: 17px; color: var(--texte-doux); margin: 0 0 24px; }
+
+.heros { text-align: center; padding: 24px 0 40px; }
+
+.atouts { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.atouts article { background: var(--surface); border: 1px solid var(--bordure); border-radius: 12px; padding: 20px; }
+.atouts p { margin: 0; color: var(--texte-doux); font-size: 15px; }
+
+.formulaire, .message {
+    background: var(--surface);
+    border: 1px solid var(--bordure);
+    border-radius: 12px;
+    padding: 32px;
+}
+
+.champ { margin: 0 0 20px; }
+.champ label { display: block; font-weight: 600; margin: 0 0 6px; font-size: 14px; }
+.champ input[type="text"],
+.champ input[type="email"],
+.champ input[type="password"],
+.champ select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--bordure);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+}
+.champ input:focus, .champ select:focus { outline: 2px solid var(--teinte); outline-offset: 1px; }
+
+.champ-suffixe { display: flex; align-items: stretch; }
+.champ-suffixe input { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.suffixe {
+    display: flex; align-items: center; padding: 0 12px;
+    background: var(--fond); border: 1px solid var(--bordure); border-left: none;
+    border-radius: 0 8px 8px 0; color: var(--texte-doux); font-size: 14px; white-space: nowrap;
+}
+
+.champ--case { display: flex; align-items: flex-start; gap: 8px; }
+.champ--case label { font-weight: 400; margin: 0; }
+
+.grille-deux { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 560px) { .grille-deux { grid-template-columns: 1fr; } }
+
+.aide { font-size: 13px; color: var(--texte-doux); margin: 6px 0 0; }
+.erreur { font-size: 13px; color: var(--erreur); margin: 6px 0 0; }
+.etat-slug { font-size: 13px; margin: 6px 0 0; min-height: 20px; }
+.etat-slug--libre { color: var(--succes); }
+.etat-slug--pris { color: var(--erreur); }
+
+.alerte { padding: 12px 16px; border-radius: 8px; margin: 0 0 20px; font-size: 14px; }
+.alerte--erreur { background: #fff5f5; color: var(--erreur); border: 1px solid #ffc9c9; }
+
+.bouton {
+    display: inline-block; padding: 12px 24px; border-radius: 8px;
+    font-size: 15px; font-weight: 600; text-decoration: none;
+    border: 1px solid transparent; cursor: pointer; font-family: inherit;
+}
+.bouton--principal { background: var(--teinte); color: #fff; }
+.bouton--principal:hover { background: var(--teinte-sombre); }
+.bouton--discret { background: transparent; color: var(--teinte); border-color: var(--bordure); }
+
+.jauge { height: 8px; background: var(--fond); border-radius: 99px; overflow: hidden; margin: 24px 0 12px; }
+.jauge-remplissage { height: 100%; background: var(--teinte); transition: width .4s ease; }
+.etape { font-size: 15px; color: var(--texte-doux); margin: 0 0 24px; }
+
+.pied { text-align: center; padding: 24px; color: var(--texte-doux); font-size: 13px; }
