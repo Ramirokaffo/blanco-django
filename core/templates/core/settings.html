@@ -1,7 +1,12 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load static %}
 
 {% block title %}{% trans "Paramètres" %} - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/contacts.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -9,12 +14,217 @@
     <p class="text-secondary">{% trans "Configurez votre application" %}</p>
 </div>
 
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="contact-form">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="form-errors">
+        {% for error in form.non_field_errors %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Entreprise" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.company_name.id_for_label }}">{{ form.company_name.label }}</label>
+                    {{ form.company_name }}
+                    {% if form.company_name.errors %}<div class="field-error">{{ form.company_name.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.company_phone.id_for_label }}">{{ form.company_phone.label }}</label>
+                    {{ form.company_phone }}
+                    {% if form.company_phone.errors %}<div class="field-error">{{ form.company_phone.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.company_email.id_for_label }}">{{ form.company_email.label }}</label>
+                    {{ form.company_email }}
+                    {% if form.company_email.errors %}<div class="field-error">{{ form.company_email.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.company_website.id_for_label }}">{{ form.company_website.label }}</label>
+                    {{ form.company_website }}
+                    {% if form.company_website.errors %}<div class="field-error">{{ form.company_website.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label class="form-label" for="{{ form.company_address.id_for_label }}">{{ form.company_address.label }}</label>
+                    {{ form.company_address }}
+                    {% if form.company_address.errors %}<div class="field-error">{{ form.company_address.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.company_logo.id_for_label }}">{{ form.company_logo.label }}</label>
+                    {% if form.instance.company_logo %}
+                    <p class="text-secondary" style="margin: 0 0 8px;">
+                        <img src="{{ form.instance.company_logo.url }}" alt="{% trans 'Logo actuel' %}" style="max-height: 48px;">
+                    </p>
+                    {% endif %}
+                    {{ form.company_logo }}
+                    {% if form.company_logo.errors %}<div class="field-error">{{ form.company_logo.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Informations fiscales et légales" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.tax_id.id_for_label }}">{{ form.tax_id.label }}</label>
+                    {{ form.tax_id }}
+                    {% if form.tax_id.errors %}<div class="field-error">{{ form.tax_id.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.trade_register.id_for_label }}">{{ form.trade_register.label }}</label>
+                    {{ form.trade_register }}
+                    {% if form.trade_register.errors %}<div class="field-error">{{ form.trade_register.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Devise" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.currency_symbol.id_for_label }}">{{ form.currency_symbol.label }}</label>
+                    {{ form.currency_symbol }}
+                    {% if form.currency_symbol.errors %}<div class="field-error">{{ form.currency_symbol.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.currency_code.id_for_label }}">{{ form.currency_code.label }}</label>
+                    {{ form.currency_code }}
+                    {% if form.currency_code.errors %}<div class="field-error">{{ form.currency_code.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Tickets / reçus" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label class="form-label" for="{{ form.receipt_header.id_for_label }}">{{ form.receipt_header.label }}</label>
+                    {{ form.receipt_header }}
+                    {% if form.receipt_header.errors %}<div class="field-error">{{ form.receipt_header.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label class="form-label" for="{{ form.receipt_footer.id_for_label }}">{{ form.receipt_footer.label }}</label>
+                    {{ form.receipt_footer }}
+                    {% if form.receipt_footer.errors %}<div class="field-error">{{ form.receipt_footer.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Stock" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.low_stock_threshold.id_for_label }}">{{ form.low_stock_threshold.label }}</label>
+                    {{ form.low_stock_threshold }}
+                    {% if form.low_stock_threshold.errors %}<div class="field-error">{{ form.low_stock_threshold.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Approvisionnements" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                        <label class="form-label" for="{{ form.default_supply_expense_type.id_for_label }}">{{ form.default_supply_expense_type.label }}</label>
+                        <a href="{% url 'accounting_references' %}?tab=types-depense" class="btn btn-secondary btn-sm">{% trans "Gérer" %}</a>
+                    </div>
+                    {{ form.default_supply_expense_type }}
+                    {% if form.default_supply_expense_type.help_text %}<p class="text-secondary" style="font-size:12px;">{{ form.default_supply_expense_type.help_text }}</p>{% endif %}
+                    {% if form.default_supply_expense_type.errors %}<div class="field-error">{{ form.default_supply_expense_type.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "TVA" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.tva_accounting_mode.id_for_label }}">{{ form.tva_accounting_mode.label }}</label>
+                    {{ form.tva_accounting_mode }}
+                    {% if form.tva_accounting_mode.errors %}<div class="field-error">{{ form.tva_accounting_mode.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 24px;">
+                    {{ form.enable_tva_accounting }}
+                    <label class="form-label" for="{{ form.enable_tva_accounting.id_for_label }}" style="margin: 0;">{{ form.enable_tva_accounting.label }}</label>
+                    {% if form.enable_tva_accounting.errors %}<div class="field-error">{{ form.enable_tva_accounting.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+            <p style="margin-top: 12px;">
+                <a href="{% url 'accounting_references' %}?tab=taux-tva" class="btn btn-secondary btn-sm">{% trans "Gérer les taux de TVA" %}</a>
+            </p>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2"/>
+                <polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2"/>
+                <polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            {% trans "Enregistrer" %}
+        </button>
+    </div>
+</form>
+
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">{% trans "Paramètres de l'application" %}</h3>
+        <h3 class="card-title">{% trans "Types de recette et de dépense" %}</h3>
     </div>
     <div class="card-body">
-        <p>{% trans "Contenu à venir..." %}</p>
+        <p class="text-secondary">{% trans "Gérer les catégories utilisées pour classer les recettes et les dépenses journalières." %}</p>
+        <a href="{% url 'accounting_references' %}?tab=types-recette" class="btn btn-secondary">{% trans "Types de recette" %}</a>
+        <a href="{% url 'accounting_references' %}?tab=types-depense" class="btn btn-secondary">{% trans "Types de dépense" %}</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">{% trans "Migration des données" %}</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-secondary">{% trans "Importer les données de l'ancien système." %}</p>
+        <a href="{% url 'data_migration' %}" class="btn btn-secondary">{% trans "Aller à la migration" %}</a>
     </div>
 </div>
 {% endblock %}

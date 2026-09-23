@@ -14,6 +14,21 @@
             <h1>{% trans "Gestion des produits" %}</h1>
             <p class="text-secondary">{% blocktrans count counter=total_count|default:0 %}Gérez votre catalogue de produits ({{ counter }} produit){% plural %}Gérez votre catalogue de produits ({{ counter }} produits){% endblocktrans %}</p>
         </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a href="{% url 'product_references' %}" class="btn btn-secondary btn-sm">{% trans "Catégories / gammes / rayons" %}</a>
+            <a href="{% url 'export_products_csv' %}" class="btn btn-secondary btn-sm">{% trans "Exporter (CSV)" %}</a>
+            <form method="post" action="{% url 'import_products_csv' %}" enctype="multipart/form-data" style="display:inline-flex; align-items:center; gap:4px;">
+                {% csrf_token %}
+                <input type="file" name="file" accept=".csv" required style="max-width:160px;">
+                <button type="submit" class="btn btn-secondary btn-sm" title="{% trans "Met à jour les prix/seuils des produits existants à partir du code" %}">{% trans "Importer les prix" %}</button>
+            </form>
+            <a href="{% url 'add_product' %}" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                {% trans "Nouveau produit" %}
+            </a>
+        </div>
     </div>
 </div>
 
@@ -106,6 +121,7 @@
                         <th>{% trans "Stock" %}</th>
                         <th>{% trans "Prix max" %}</th>
                         <th>{% trans "Prix actuel" %}</th>
+                        <th class="text-center">{% trans "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -132,10 +148,18 @@
                         </td>
                         <td>{% if product.max_salable_price %}{{ product.max_salable_price|floatformat:0 }} FCFA{% else %}-{% endif %}</td>
                         <td>{% if product.actual_price %}{{ product.actual_price|floatformat:0 }} FCFA{% else %}-{% endif %}</td>
+                        <td class="text-center">
+                            <a href="{% url 'edit_product' product.id %}" class="btn-icon" title="{% trans "Modifier" %}">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </a>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center">{% trans "Aucun produit trouvé" %}</td>
+                        <td colspan="10" class="text-center">{% trans "Aucun produit trouvé" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

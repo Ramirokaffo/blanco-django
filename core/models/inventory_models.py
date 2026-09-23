@@ -7,6 +7,7 @@ from django.utils.translation import gettext, gettext_lazy as _, pgettext_lazy
 from django.conf import settings
 
 from core.models.base_models import SoftDeleteModel
+from core.models.accounting_models import PAYMENT_METHOD_CHOICES
 
 
 class Supply(SoftDeleteModel):
@@ -24,7 +25,11 @@ class Supply(SoftDeleteModel):
     expiration_date = models.DateField(null=True, blank=True, verbose_name=_("Date d'expiration"))
     is_credit = models.BooleanField(default=False, verbose_name=_("Achat à crédit"))
     is_paid = models.BooleanField(default=True, verbose_name=_("Entièrement payé"))
-    
+    payment_method = models.CharField(
+        max_length=20, choices=PAYMENT_METHOD_CHOICES, null=True, blank=True,
+        verbose_name=_("Mode de paiement"),
+    )
+
     # Champs TVA
     tax_rate = models.ForeignKey(
         'core.TaxRate', 
@@ -86,6 +91,49 @@ class SupplyReturn(SoftDeleteModel):
 
     def __str__(self):
         return gettext("Retour %(total)s pour Appro. #%(supply_id)s") % {'total': self.total, 'supply_id': self.supply_id}
+
+
+class PurchaseOrder(SoftDeleteModel):
+    """
+    Commande fournisseur, distincte de la réception (``Supply``).
+
+    Une commande n'a aucun effet sur le stock ni sur la comptabilité : ce ne
+    sont que des intentions (quantité et coût estimés). Elle ne devient un
+    ``Supply`` — avec mise à jour du stock et écriture comptable — qu'à la
+    réception (``SupplyService.receive_purchase_order``). Modéliser ceci
+    comme une table séparée plutôt qu'un statut sur ``Supply`` évite qu'une
+    commande non reçue ne pollue les nombreux totaux et rapports qui
+    parcourent déjà ``Supply.objects`` en confiance (tableau de bord,
+    statistiques, historique des approvisionnements).
+    """
+    STATUS_CHOICES = [
+        ('ORDERED', _('Commandé')),
+        ('RECEIVED', _('Reçu')),
+    ]
+
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='purchase_orders', verbose_name=_("Produit"))
+    supplier = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True, related_name='purchase_orders', verbose_name=_("Fournisseur"))
+    staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchase_orders', verbose_name=_("Personnel"))
+    daily = models.ForeignKey('Daily', on_delete=models.CASCADE, related_name='purchase_orders', verbose_name=_("Journée"))
+    quantity = models.IntegerField(verbose_name=_("Quantité commandée"))
+    estimated_purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_("Coût d'achat unitaire estimé"))
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ORDERED', verbose_name=_("Statut"))
+    supply = models.OneToOneField(
+        Supply, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='purchase_order', verbose_name=_("Approvisionnement reçu"),
+    )
+
+    class Meta:
+        db_table = 'purchase_order'
+        verbose_name = _('Commande fournisseur')
+        verbose_name_plural = _('Commandes fournisseurs')
+        ordering = ['-create_at']
+
+    def __str__(self):
+        return gettext("Commande %(product)s x%(quantity)s") % {'product': self.product.name, 'quantity': self.quantity}
+
+    def get_estimated_total(self):
+        return self.quantity * self.estimated_purchase_cost
 
 
 class Inventory(SoftDeleteModel):

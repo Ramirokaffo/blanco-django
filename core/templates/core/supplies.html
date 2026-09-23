@@ -17,6 +17,12 @@
             <p class="text-secondary">{% blocktrans count counter=total_count|default:0 %}Historique des approvisionnements ({{ counter }} enregistrement){% plural %}Historique des approvisionnements ({{ counter }} enregistrements){% endblocktrans %}</p>
         </div>
         <div class="header-buttons">
+            <a href="{% url 'purchase_orders' %}" class="btn btn-secondary btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {% trans "Commandes fournisseurs" %}
+            </a>
             <a href="{% url 'supplier_payments' %}" class="btn btn-secondary btn-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>

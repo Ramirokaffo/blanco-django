@@ -832,6 +832,52 @@ body.sidebar-collapsed .nav-dropdown-menu {
 }
 
 
+/* ── Cloche de notifications (Header) ────────────────────────────── */
+.alerts-menu {
+    position: relative;
+}
+
+.alerts-toggle {
+    position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+}
+
+.alerts-toggle:hover {
+    background-color: var(--bg-secondary);
+    color: var(--primary-color);
+}
+
+.alerts-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--danger-color);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+}
+
+.alerts-dropdown-empty {
+    padding: 10px 16px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
 /* ── QR Code Button (Header) ──────────────────────────────────── */
 .qr-toggle {
     background: none;

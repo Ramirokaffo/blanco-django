@@ -17,6 +17,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggleAdvancedBtn = document.getElementById('toggleAdvancedOptions');
     const advancedOptions = document.getElementById('advancedOptions');
     const saleNotification = document.getElementById('saleNotification');
+    const clientSelect = document.getElementById('clientSelect');
+    const clientRequiredHint = document.getElementById('clientRequiredHint');
+    const clientFormGroup = clientSelect ? clientSelect.closest('.form-group') : null;
+    const clientPassageOption = clientSelect ? clientSelect.querySelector('option[value=""]') : null;
+    const addClientBtn = document.getElementById('addClientBtn');
+    const addClientModal = document.getElementById('addClientModal');
+    const addClientModalClose = document.getElementById('addClientModalClose');
+    const addClientCancelBtn = document.getElementById('addClientCancelBtn');
+    const addClientForm = document.getElementById('addClientForm');
+    const addClientSubmitBtn = document.getElementById('addClientSubmitBtn');
+    const addClientNonFieldErrors = document.getElementById('addClientNonFieldErrors');
 
     // Fonction pour afficher une notification
     // Le message est inséré en texte brut (textContent). Passer allowHtml = true uniquement
@@ -101,6 +112,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Gestion du type de vente (comptant/crédit)
     const paymentMethodSection = document.getElementById('paymentMethodSection');
+
+    // Une vente à crédit doit être rattachée à un client identifié (pas
+    // "Client de passage"), pour pouvoir en suivre le remboursement.
+    function setClientInvalid(isInvalid) {
+        if (clientRequiredHint) clientRequiredHint.style.display = isInvalid ? 'block' : 'none';
+        if (clientFormGroup) clientFormGroup.classList.toggle('client-select-invalid', isInvalid);
+    }
+
+    function updateClientRequirement(saleType) {
+        if (!clientSelect) return;
+        if (saleType === 'credit') {
+            if (clientPassageOption) clientPassageOption.disabled = true;
+            setClientInvalid(!clientSelect.value);
+        } else {
+            if (clientPassageOption) clientPassageOption.disabled = false;
+            setClientInvalid(false);
+        }
+    }
+
+    if (clientSelect) {
+        clientSelect.addEventListener('change', function() {
+            const saleType = document.querySelector('input[name="saleType"]:checked')?.value;
+            setClientInvalid(saleType === 'credit' && !this.value);
+        });
+    }
+
     saleTypeRadios.forEach(radio => {
         radio.addEventListener('change', function() {
             if (this.value === 'credit') {
@@ -110,9 +147,105 @@ document.addEventListener('DOMContentLoaded', function() {
                 creditDateGroup.style.display = 'none';
                 if (paymentMethodSection) paymentMethodSection.style.display = 'block';
             }
+            updateClientRequirement(this.value);
         });
     });
-    
+
+    // Raccourci d'ajout rapide de client (popup) depuis le sélecteur
+    function clearAddClientErrors() {
+        if (addClientNonFieldErrors) {
+            addClientNonFieldErrors.style.display = 'none';
+            addClientNonFieldErrors.innerHTML = '';
+        }
+        if (addClientForm) {
+            addClientForm.querySelectorAll('.field-error').forEach(el => {
+                el.style.display = 'none';
+                el.textContent = '';
+            });
+        }
+    }
+
+    function openAddClientModal() {
+        if (!addClientModal) return;
+        if (addClientForm) addClientForm.reset();
+        clearAddClientErrors();
+        addClientModal.classList.add('active');
+    }
+
+    function closeAddClientModal() {
+        if (addClientModal) addClientModal.classList.remove('active');
+    }
+
+    if (addClientBtn) addClientBtn.addEventListener('click', openAddClientModal);
+    if (addClientModalClose) addClientModalClose.addEventListener('click', closeAddClientModal);
+    if (addClientCancelBtn) addClientCancelBtn.addEventListener('click', closeAddClientModal);
+    if (addClientModal) {
+        addClientModal.addEventListener('click', function(e) {
+            if (e.target === addClientModal) closeAddClientModal();
+        });
+    }
+
+    if (addClientForm) {
+        addClientForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            clearAddClientErrors();
+
+            const url = addClientForm.dataset.addClientUrl;
+            const formData = new FormData(addClientForm);
+
+            addClientSubmitBtn.disabled = true;
+            addClientSubmitBtn.classList.add('loading');
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (ok && data.success) {
+                    const option = document.createElement('option');
+                    option.value = data.id;
+                    option.textContent = data.name;
+                    option.selected = true;
+                    clientSelect.appendChild(option);
+                    clientSelect.value = String(data.id);
+                    clientSelect.dispatchEvent(new Event('change'));
+                    closeAddClientModal();
+                    showNotification(gettext('Client créé avec succès.'), 'success');
+                } else if (data.errors || data.non_field_errors) {
+                    Object.keys(data.errors || {}).forEach(field => {
+                        const errorEl = addClientForm.querySelector(`.field-error[data-field="${field}"]`);
+                        if (errorEl) {
+                            errorEl.textContent = data.errors[field].join(' ');
+                            errorEl.style.display = 'block';
+                        }
+                    });
+                    if (data.non_field_errors && data.non_field_errors.length && addClientNonFieldErrors) {
+                        addClientNonFieldErrors.textContent = data.non_field_errors.join(' ');
+                        addClientNonFieldErrors.style.display = 'block';
+                    }
+                } else if (addClientNonFieldErrors) {
+                    addClientNonFieldErrors.textContent = gettext('Une erreur est survenue.');
+                    addClientNonFieldErrors.style.display = 'block';
+                }
+            })
+            .catch(() => {
+                if (addClientNonFieldErrors) {
+                    addClientNonFieldErrors.textContent = gettext('Une erreur est survenue.');
+                    addClientNonFieldErrors.style.display = 'block';
+                }
+            })
+            .finally(() => {
+                addClientSubmitBtn.disabled = false;
+                addClientSubmitBtn.classList.remove('loading');
+            });
+        });
+    }
+
     // Recherche de produits
     let searchTimeout;
     if (productSearch) {
@@ -522,6 +655,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const dueDate = document.getElementById('dueDate').value;
 
             // Validation pour vente à crédit
+            if (saleType === 'credit' && !clientId) {
+                setClientInvalid(true);
+                showNotification(gettext('Veuillez sélectionner un client pour une vente à crédit.'), 'error');
+                if (clientSelect) clientSelect.focus();
+                return;
+            }
             if (saleType === 'credit' && !dueDate) {
                 showNotification(gettext('Veuillez sélectionner une date d\'échéance pour la vente à crédit.'), 'error');
                 return;

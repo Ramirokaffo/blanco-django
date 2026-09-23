@@ -171,7 +171,10 @@
 
                     <!-- Type de dépense -->
                     <div class="form-group">
-                        <label class="form-label" for="id_expense_type">{{ form.expense_type.label }} <span class="required">*</span></label>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                            <label class="form-label" for="id_expense_type">{{ form.expense_type.label }} <span class="required">*</span></label>
+                            <a href="{% url 'accounting_references' %}?tab=types-depense" class="btn btn-secondary btn-sm">{% trans "Gérer" %}</a>
+                        </div>
                         {{ form.expense_type }}
                         {% if form.expense_type.errors %}
                         <div class="field-error">{{ form.expense_type.errors.0 }}</div>
@@ -218,6 +221,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const qtyInput = document.getElementById('id_quantity');
     const purchaseCostInput = document.getElementById('id_purchase_cost');
     const sellingPriceInput = document.getElementById('id_selling_price');
+    const supplierSelect = document.getElementById('id_supplier');
+    const paymentMethodSelect = document.getElementById('id_payment_method');
+    const isCreditCheckbox = document.getElementById('id_is_credit');
     const taxRateSelect = document.getElementById('id_tax_rate');
     const taxRateGroup = document.getElementById('taxRateGroup');
     const summary = document.getElementById('supplySummary');
@@ -314,6 +320,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (force) {
                 purchaseCostInput.value = '';
                 sellingPriceInput.value = '';
+                supplierSelect.value = '';
+                isCreditCheckbox.checked = false;
             }
             updateSummary();
             return;
@@ -325,6 +333,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (force || !sellingPriceInput.value) {
             sellingPriceInput.value = productMeta.selling_price || '';
+        }
+
+        if (force || !supplierSelect.value) {
+            supplierSelect.value = productMeta.last_supplier_id ? String(productMeta.last_supplier_id) : '';
+        }
+
+        if ((force || !paymentMethodSelect.value) && productMeta.last_payment_method) {
+            paymentMethodSelect.value = productMeta.last_payment_method;
+        }
+
+        if (force || !isCreditCheckbox.checked) {
+            isCreditCheckbox.checked = Boolean(productMeta.last_is_credit);
         }
 
         updateSummary();
@@ -367,12 +387,33 @@ document.addEventListener('DOMContentLoaded', function() {
     purchaseCostInput.addEventListener('input', updateSummary);
     taxRateSelect.addEventListener('change', updateSummary);
 
+    // Présélectionne le taux de TVA : la seule valeur disponible s'il n'y en
+    // a qu'une, sinon celui marqué "par défaut" (attribut data-is-default,
+    // voir TaxRateSelect côté serveur).
+    function selectDefaultTaxRate() {
+        const options = Array.from(taxRateSelect.options).filter((option) => option.value);
+        if (!options.length) {
+            return;
+        }
+        if (options.length === 1) {
+            taxRateSelect.value = options[0].value;
+            return;
+        }
+        const defaultOption = options.find((option) => option.dataset.isDefault === 'true');
+        if (defaultOption) {
+            taxRateSelect.value = defaultOption.value;
+        }
+    }
+
     // Gérer l'affichage du champ TVA selon le produit sélectionné
-    function updateTaxRateVisibility() {
+    function updateTaxRateVisibility(force = false) {
         const productMeta = productMetaMap[productSelect.value] || null;
         const hasVat = Boolean(productMeta && productMeta.has_vat);
         if (hasVat) {
             taxRateGroup.style.display = 'flex';
+            if (force || !taxRateSelect.value) {
+                selectDefaultTaxRate();
+            }
         } else {
             taxRateGroup.style.display = 'none';
             taxRateSelect.value = '';  // Réinitialiser si masqué
@@ -390,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
     productSelect.addEventListener('change', function() {
         clearFormErrors();
         applyProductDefaults(true);
-        updateTaxRateVisibility();
+        updateTaxRateVisibility(true);
     });
 
     applyProductDefaults(false);

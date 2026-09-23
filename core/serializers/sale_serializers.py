@@ -132,6 +132,10 @@ class SaleCreateSerializer(serializers.Serializer):
 
         if not items:
             raise serializers.ValidationError({'items': gettext("Au moins un article requis.")})
+        if data.get('is_credit') and not data.get('client_id'):
+            raise serializers.ValidationError({
+                'client_id': gettext("Un client doit être sélectionné pour une vente à crédit.")
+            })
         if data.get('is_credit') and not data.get('due_date'):
             raise serializers.ValidationError({
                 'due_date': gettext("Date d'échéance obligatoire pour une vente à crédit.")

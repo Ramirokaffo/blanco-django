@@ -3,12 +3,14 @@ from decimal import Decimal
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from core.models import (
     AppModule,
+    Category,
     CreditSale,
     CreditSupply,
     Client,
@@ -17,11 +19,15 @@ from core.models import (
     DailyRecipe,
     Exercise,
     ExpenseType,
+    Gamme,
+    GrammageType,
     Invoice,
     JournalEntry,
     Product,
     Payment,
     PaymentSchedule,
+    PurchaseOrder,
+    Rayon,
     Refund,
     RecipeType,
     Sale,
@@ -38,6 +44,7 @@ from core.models import (
 from core.services.accounting_service import AccountingService
 from core.services.sale_service import SaleService
 from core.services.supply_service import SupplyService
+from core.serializers.sale_serializers import SaleCreateSerializer
 
 
 @override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
@@ -463,6 +470,42 @@ class SalesCancellationTests(TestCase):
         self.assertEqual(entry.lines.count(), 2)
         self.assertEqual(entry.lines.get(account__code='701').debit, Decimal('1925.00'))
         self.assertEqual(entry.lines.get(account__code='4431').credit, Decimal('1925.00'))
+
+    def test_record_sale_applies_vat_only_to_taxable_lines(self):
+        """Un panier mixte (produit exonéré + produit taxable) ne doit taxer que la part taxable."""
+        taxable_product = self._create_product(code='PRD-TAXABLE', name='Savon taxable', has_vat=True)
+        exempt_product = self._create_product(code='PRD-EXEMPT', name='Pain exonéré', has_vat=False)
+
+        taxable_amount = Decimal('11925')
+        exempt_amount = Decimal('5000')
+        total = taxable_amount + exempt_amount
+
+        sale = Sale.objects.create(
+            client=self.customer,
+            staff=self.user,
+            daily=self.daily,
+            total=total,
+            is_credit=False,
+            is_paid=True,
+            has_vat=True,
+        )
+        SaleProduct.objects.create(sale=sale, product=taxable_product, quantity=1, unit_price=taxable_amount)
+        SaleProduct.objects.create(sale=sale, product=exempt_product, quantity=1, unit_price=exempt_amount)
+
+        entry = AccountingService.record_sale(
+            sale=sale,
+            daily=self.daily,
+            exercise=self.exercise,
+            payment_method='CASH',
+            apply_tax=True,
+        )
+
+        self.assertIsNotNone(entry)
+        self.assertTrue(entry.is_balanced())
+        # TVA calculée uniquement sur la part taxable (11925 TTC à 19.25% -> 1925 de TVA)
+        self.assertEqual(entry.lines.get(account__code='4431').credit, Decimal('1925'))
+        self.assertEqual(entry.lines.get(account__code='701').credit, total - Decimal('1925'))
+        self.assertEqual(entry.lines.get(account__code='571').debit, total)
 
     def test_cancel_cash_sale_restores_stock_creates_refund_and_cancels_invoice(self):
         product = self._create_product(code='PRD-CASH', name='Savon comptant')
@@ -1297,3 +1340,804 @@ class InternationalizationTests(TestCase):
         out = StringIO()
         call_command('translations', 'check', stdout=out)
         self.assertIn('Toutes les traductions sont complètes', out.getvalue(), out.getvalue())
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class SettingsPageTests(TestCase):
+    """La page Paramètres doit permettre d'éditer le singleton SystemSettings depuis le web."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-settings',
+            email='admin-settings@example.com',
+            password='password123',
+        )
+        self.user.firstname = 'Admin'
+        self.user.lastname = 'Réglages'
+        self.user.role = 'Administrateur'
+        self.user.gender = 'M'
+        self.user.save()
+        self.client.force_login(self.user)
+
+    def test_get_settings_page_shows_current_values(self):
+        settings_obj = SystemSettings.get_settings()
+        settings_obj.company_name = 'Boutique Test'
+        settings_obj.save()
+
+        response = self.client.get(reverse('settings'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Boutique Test')
+
+    def test_post_settings_page_updates_singleton(self):
+        response = self.client.post(reverse('settings'), {
+            'company_name': 'Nouvelle Boutique',
+            'company_address': 'Douala',
+            'company_phone': '699000000',
+            'company_email': 'contact@example.com',
+            'company_website': '',
+            'tax_id': 'NIF-123',
+            'trade_register': 'RC-456',
+            'currency_symbol': 'FCFA',
+            'currency_code': 'XAF',
+            'receipt_header': '',
+            'receipt_footer': 'Merci !',
+            'low_stock_threshold': 5,
+            'tva_accounting_mode': 'IMMEDIATE',
+        })
+
+        self.assertRedirects(response, reverse('settings'))
+        settings_obj = SystemSettings.get_settings()
+        self.assertEqual(settings_obj.company_name, 'Nouvelle Boutique')
+        self.assertEqual(settings_obj.low_stock_threshold, 5)
+        self.assertFalse(settings_obj.enable_tva_accounting)  # case à cocher absente du POST
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class ProductCrudPagesTests(TestCase):
+    """CRUD produit et données de référence (catégories/gammes/rayons/grammages) depuis le web."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-products',
+            email='admin-products@example.com',
+            password='password123',
+        )
+        self.user.firstname = 'Admin'
+        self.user.lastname = 'Produits'
+        self.user.role = 'Administrateur'
+        self.user.gender = 'M'
+        self.user.save()
+        self.client.force_login(self.user)
+        self.category = Category.objects.create(name='Boissons')
+
+    def test_add_product_creates_product_and_initial_supply(self):
+        response = self.client.post(reverse('add_product'), {
+            'code': 'PRD-NEW-001',
+            'name': 'Jus de mangue',
+            'description': '',
+            'brand': 'Blanco',
+            'color': '',
+            'stock': 20,
+            'stock_limit': 5,
+            'max_salable_price': '2000',
+            'last_purchase_price': '1200',
+            'actual_price': '1500',
+            'exp_alert_period': '',
+            'grammage': '',
+            'category': self.category.pk,
+        })
+
+        product = Product.objects.get(code='PRD-NEW-001')
+        self.assertRedirects(response, reverse('product_detail', kwargs={'pk': product.pk}))
+        self.assertEqual(product.stock, 20)
+        self.assertTrue(Supply.objects.filter(product=product).exists())
+
+    def test_add_product_rejects_duplicate_code(self):
+        Product.objects.create(code='PRD-DUP', name='Existant', stock=1)
+
+        response = self.client.post(reverse('add_product'), {
+            'code': 'PRD-DUP',
+            'name': 'Doublon',
+            'stock': 0,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Ce code produit est déjà utilisé.')
+
+    def test_edit_product_does_not_change_stock(self):
+        product = Product.objects.create(code='PRD-EDIT', name='Ancien nom', stock=7, actual_price=1000)
+
+        response = self.client.post(reverse('edit_product', kwargs={'pk': product.pk}), {
+            'code': 'PRD-EDIT',
+            'name': 'Nouveau nom',
+            'description': '',
+            'brand': '',
+            'color': '',
+            'stock_limit': '',
+            'max_salable_price': '',
+            'last_purchase_price': '',
+            'actual_price': '1200',
+            'exp_alert_period': '',
+            'grammage': '',
+        })
+
+        self.assertRedirects(response, reverse('product_detail', kwargs={'pk': product.pk}))
+        product.refresh_from_db()
+        self.assertEqual(product.name, 'Nouveau nom')
+        self.assertEqual(product.stock, 7)  # inchangé : le stock ne passe pas par ce formulaire
+        self.assertEqual(product.actual_price, Decimal('1200'))
+
+    def test_edit_product_rejects_min_price_above_selling_price(self):
+        product = Product.objects.create(code='PRD-MIN', name='Produit', stock=1, actual_price=1000)
+
+        response = self.client.post(reverse('edit_product', kwargs={'pk': product.pk}), {
+            'code': 'PRD-MIN',
+            'name': 'Produit',
+            'description': '',
+            'brand': '',
+            'color': '',
+            'stock_limit': '',
+            'min_salable_price': '1000',
+            'max_salable_price': '',
+            'last_purchase_price': '',
+            'actual_price': '1000',
+            'exp_alert_period': '',
+            'grammage': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Le prix minimum doit être inférieur au prix de vente du produit.')
+        product.refresh_from_db()
+        self.assertIsNone(product.min_salable_price)
+
+    def test_edit_product_rejects_max_price_below_selling_price(self):
+        product = Product.objects.create(code='PRD-MAX', name='Produit', stock=1, actual_price=1000)
+
+        response = self.client.post(reverse('edit_product', kwargs={'pk': product.pk}), {
+            'code': 'PRD-MAX',
+            'name': 'Produit',
+            'description': '',
+            'brand': '',
+            'color': '',
+            'stock_limit': '',
+            'min_salable_price': '',
+            'max_salable_price': '900',
+            'last_purchase_price': '',
+            'actual_price': '1000',
+            'exp_alert_period': '',
+            'grammage': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Le prix maximum doit être supérieur au prix de vente du produit.')
+        product.refresh_from_db()
+        self.assertIsNone(product.max_salable_price)
+
+    def test_edit_product_accepts_valid_min_and_max_price(self):
+        product = Product.objects.create(code='PRD-VALID', name='Produit', stock=1, actual_price=1000)
+
+        response = self.client.post(reverse('edit_product', kwargs={'pk': product.pk}), {
+            'code': 'PRD-VALID',
+            'name': 'Produit',
+            'description': '',
+            'brand': '',
+            'color': '',
+            'stock_limit': '',
+            'min_salable_price': '800',
+            'max_salable_price': '1200',
+            'last_purchase_price': '',
+            'actual_price': '1000',
+            'exp_alert_period': '',
+            'grammage': '',
+        })
+
+        self.assertRedirects(response, reverse('product_detail', kwargs={'pk': product.pk}))
+        product.refresh_from_db()
+        self.assertEqual(product.min_salable_price, Decimal('800'))
+        self.assertEqual(product.max_salable_price, Decimal('1200'))
+
+    def test_delete_product_soft_deletes(self):
+        product = Product.objects.create(code='PRD-DEL', name='À désactiver', stock=3)
+
+        response = self.client.post(reverse('delete_product', kwargs={'pk': product.pk}))
+
+        self.assertRedirects(response, reverse('products'))
+        product.refresh_from_db()
+        self.assertIsNotNone(product.delete_at)
+
+    def test_category_crud_via_web(self):
+        # Création
+        response = self.client.post(reverse('add_reference', kwargs={'kind': 'categories'}), {
+            'name': 'Épicerie',
+            'description': 'Produits secs',
+        })
+        category = Category.objects.get(name='Épicerie')
+        self.assertRedirects(response, reverse('product_references') + '?tab=categories')
+
+        # Modification
+        response = self.client.post(reverse('edit_reference', kwargs={'kind': 'categories', 'pk': category.pk}), {
+            'name': 'Épicerie salée',
+            'description': '',
+        })
+        category.refresh_from_db()
+        self.assertEqual(category.name, 'Épicerie salée')
+
+        # Désactivation (soft-delete)
+        response = self.client.post(reverse('delete_reference', kwargs={'kind': 'categories', 'pk': category.pk}))
+        category.refresh_from_db()
+        self.assertIsNotNone(category.delete_at)
+
+    def test_reference_delete_blocked_when_products_attached(self):
+        gamme = Gamme.objects.create(name='Gamme liée')
+        Product.objects.create(code='PRD-GAMME', name='Produit lié', stock=1, gamme=gamme)
+
+        self.client.post(reverse('delete_reference', kwargs={'kind': 'gammes', 'pk': gamme.pk}))
+
+        gamme.refresh_from_db()
+        self.assertIsNone(gamme.delete_at)
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class StaffManagementPagesTests(TestCase):
+    """Gestion du personnel depuis le web : création, modification, statut, mot de passe."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.sales_module = AppModule.objects.get(code='sales')
+        self.admin = get_user_model().objects.create_superuser(
+            username='admin-staff',
+            email='admin-staff@example.com',
+            password='password123',
+        )
+        self.admin.firstname = 'Admin'
+        self.admin.lastname = 'Personnel'
+        self.admin.role = 'Administrateur'
+        self.admin.gender = 'M'
+        self.admin.save()
+        self.client.force_login(self.admin)
+
+    def _base_payload(self, **overrides):
+        payload = {
+            'username': 'caissiere1',
+            'firstname': 'Marie',
+            'lastname': 'Kaffo',
+            'email': 'marie@example.com',
+            'phone_number': '699000000',
+            'role': 'Caissière',
+            'gender': 'F',
+            'allowed_modules': [self.sales_module.pk],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_add_staff_creates_active_account_with_modules(self):
+        response = self.client.post(reverse('add_staff'), self._base_payload(
+            password1='MotDePasse!2026',
+            password2='MotDePasse!2026',
+        ))
+
+        self.assertRedirects(response, reverse('contacts') + '?tab=staff')
+        user = get_user_model().objects.get(username='caissiere1')
+        self.assertTrue(user.check_password('MotDePasse!2026'))
+        self.assertTrue(user.is_active)
+        self.assertFalse(user.is_superuser)
+        self.assertIn(self.sales_module, user.allowed_modules.all())
+
+    def test_add_staff_rejects_mismatched_passwords(self):
+        response = self.client.post(reverse('add_staff'), self._base_payload(
+            password1='MotDePasse!2026',
+            password2='Autre!2026',
+        ))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(get_user_model().objects.filter(username='caissiere1').exists())
+
+    def test_add_staff_forbidden_for_non_superuser(self):
+        simple_user = get_user_model().objects.create_user(
+            username='simple', email='simple@example.com', password='password123',
+        )
+        simple_user.allowed_modules.add(AppModule.objects.get(code='contacts'))
+        self.client.force_login(simple_user)
+
+        response = self.client.get(reverse('add_staff'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_edit_staff_updates_role_and_modules(self):
+        staff_member = get_user_model().objects.create_user(
+            username='caissiere2', email='c2@example.com', password='password123',
+            firstname='Awa', lastname='Nkeng', role='Caissière',
+        )
+
+        response = self.client.post(reverse('edit_staff', kwargs={'pk': staff_member.pk}), self._base_payload(
+            username='caissiere2', role='Superviseuse',
+        ))
+
+        self.assertRedirects(response, reverse('contacts') + '?tab=staff')
+        staff_member.refresh_from_db()
+        self.assertEqual(staff_member.role, 'Superviseuse')
+        self.assertIn(self.sales_module, staff_member.allowed_modules.all())
+
+    def test_edit_staff_cannot_strip_last_superuser(self):
+        response = self.client.post(reverse('edit_staff', kwargs={'pk': self.admin.pk}), self._base_payload(
+            username='admin-staff',
+        ))  # is_superuser/is_active absents du payload -> tentative de retrait
+
+        self.assertEqual(response.status_code, 200)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_superuser)
+        self.assertTrue(self.admin.is_active)
+
+    def test_toggle_staff_active_deactivates_and_reactivates(self):
+        staff_member = get_user_model().objects.create_user(
+            username='caissiere3', email='c3@example.com', password='password123',
+        )
+
+        self.client.post(reverse('toggle_staff_active', kwargs={'pk': staff_member.pk}))
+        staff_member.refresh_from_db()
+        self.assertFalse(staff_member.is_active)
+
+        self.client.post(reverse('toggle_staff_active', kwargs={'pk': staff_member.pk}))
+        staff_member.refresh_from_db()
+        self.assertTrue(staff_member.is_active)
+
+    def test_toggle_staff_active_blocks_last_superuser(self):
+        response = self.client.post(reverse('toggle_staff_active', kwargs={'pk': self.admin.pk}))
+
+        self.assertRedirects(response, reverse('contacts') + '?tab=staff')
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+
+    def test_reset_staff_password_sets_new_password_and_revokes_tokens(self):
+        from rest_framework.authtoken.models import Token
+
+        staff_member = get_user_model().objects.create_user(
+            username='caissiere4', email='c4@example.com', password='ancien-mdp',
+        )
+        Token.objects.create(user=staff_member)
+
+        response = self.client.post(
+            reverse('reset_staff_password', kwargs={'pk': staff_member.pk}),
+            {'new_password1': 'NouveauMdp!2026', 'new_password2': 'NouveauMdp!2026'},
+        )
+
+        self.assertRedirects(response, reverse('contacts') + '?tab=staff')
+        staff_member.refresh_from_db()
+        self.assertTrue(staff_member.check_password('NouveauMdp!2026'))
+        self.assertFalse(Token.objects.filter(user=staff_member).exists())
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class ClientSupplierDeactivationTests(TestCase):
+    """Désactivation (soft-delete) de clients et fournisseurs, bloquée sur créance/dette en cours."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-contacts',
+            email='admin-contacts@example.com',
+            password='password123',
+        )
+        self.user.firstname = 'Admin'
+        self.user.lastname = 'Contacts'
+        self.user.gender = 'M'
+        self.user.save()
+        self.client.force_login(self.user)
+        now = timezone.now()
+        self.exercise = Exercise.objects.create(start_date=now)
+        self.daily = Daily.objects.create(start_date=now, exercise=self.exercise)
+
+    def test_delete_client_without_credit_deactivates(self):
+        customer = Client.objects.create(firstname='Awa', lastname='Nkeng', phone_number='690000000')
+
+        response = self.client.post(reverse('delete_client', kwargs={'pk': customer.pk}))
+
+        self.assertRedirects(response, reverse('contacts') + '?tab=clients')
+        customer.refresh_from_db()
+        self.assertIsNotNone(customer.delete_at)
+
+    def test_delete_client_blocked_with_outstanding_credit(self):
+        customer = Client.objects.create(firstname='Fatou', lastname='Bello', phone_number='690000001')
+        sale = Sale.objects.create(daily=self.daily, client=customer, total=Decimal('5000'), is_credit=True)
+        CreditSale.objects.create(sale=sale, amount_paid=Decimal('0'), amount_remaining=Decimal('5000'), is_fully_paid=False)
+
+        response = self.client.post(reverse('delete_client', kwargs={'pk': customer.pk}))
+
+        self.assertRedirects(response, reverse('contacts') + '?tab=clients')
+        customer.refresh_from_db()
+        self.assertIsNone(customer.delete_at)
+
+    def test_delete_supplier_without_debt_deactivates(self):
+        supplier = Supplier.objects.create(name='Fournisseur Test')
+
+        response = self.client.post(reverse('delete_supplier', kwargs={'pk': supplier.pk}))
+
+        self.assertRedirects(response, reverse('suppliers'))
+        supplier.refresh_from_db()
+        self.assertIsNotNone(supplier.delete_at)
+
+    def test_delete_supplier_blocked_with_outstanding_debt(self):
+        supplier = Supplier.objects.create(name='Fournisseur Endetté')
+        product = Product.objects.create(code='PRD-CRED-SUP', name='Produit crédit fournisseur', stock=5)
+        supply = Supply.objects.create(
+            product=product, supplier=supplier, daily=self.daily,
+            quantity=5, purchase_cost=Decimal('1000'), total_price=Decimal('5000'), is_credit=True, is_paid=False,
+        )
+        CreditSupply.objects.create(supply=supply, amount_paid=Decimal('0'), amount_remaining=Decimal('5000'), is_fully_paid=False)
+
+        response = self.client.post(reverse('delete_supplier', kwargs={'pk': supplier.pk}))
+
+        self.assertRedirects(response, reverse('suppliers'))
+        supplier.refresh_from_db()
+        self.assertIsNone(supplier.delete_at)
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class AlertsBadgeTests(TestCase):
+    """Cloche de notifications : compteurs de stock bas et d'échéances en retard."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-alerts',
+            email='admin-alerts@example.com',
+            password='password123',
+        )
+        self.user.gender = 'M'
+        self.user.save()
+        self.client.force_login(self.user)
+
+    def test_dashboard_shows_no_badge_without_alerts(self):
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.context['alert_total_count'], 0)
+        self.assertNotContains(response, 'alerts-badge')
+
+    def test_dashboard_shows_low_stock_badge(self):
+        Product.objects.create(code='PRD-LOW', name='Stock bas', stock=1, stock_limit=5)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.context['alert_low_stock_count'], 1)
+        self.assertContains(response, 'alerts-badge')
+
+    def test_dashboard_shows_overdue_payment_badge(self):
+        now = timezone.now()
+        exercise = Exercise.objects.create(start_date=now)
+        daily = Daily.objects.create(start_date=now, exercise=exercise)
+        customer = Client.objects.create(firstname='Awa', lastname='Nkeng')
+        sale = Sale.objects.create(daily=daily, client=customer, total=Decimal('1000'), is_credit=True)
+        credit_sale = CreditSale.objects.create(sale=sale, amount_paid=Decimal('0'), amount_remaining=Decimal('1000'))
+        PaymentSchedule.objects.create(
+            schedule_type='CLIENT', credit_sale=credit_sale,
+            due_date=timezone.localdate() - timedelta(days=3),
+            amount_due=Decimal('1000'), status='PENDING',
+        )
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.context['alert_overdue_payments_count'], 1)
+        self.assertContains(response, 'alerts-badge')
+
+    def test_alerts_hidden_for_user_without_module_access(self):
+        simple_user = get_user_model().objects.create_user(
+            username='caisse-alerts', email='caisse-alerts@example.com', password='password123',
+        )
+        simple_user.allowed_modules.add(AppModule.objects.get(code='dashboard'))
+        Product.objects.create(code='PRD-LOW2', name='Stock bas 2', stock=1, stock_limit=5)
+        self.client.force_login(simple_user)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.context['alert_low_stock_count'], 0)
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class ProductBulkImportExportTests(TestCase):
+    """Export CSV du catalogue et mise à jour de prix en masse par réimport."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-bulk',
+            email='admin-bulk@example.com',
+            password='password123',
+        )
+        self.user.gender = 'M'
+        self.user.save()
+        self.client.force_login(self.user)
+
+    def test_export_contains_product_rows(self):
+        Product.objects.create(code='PRD-EXP', name='Produit export', stock=3, actual_price=Decimal('1000'))
+
+        response = self.client.get(reverse('export_products_csv'))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8-sig')
+        self.assertIn('PRD-EXP', content)
+
+    def test_import_updates_price_by_code_without_touching_stock(self):
+        product = Product.objects.create(
+            code='PRD-IMP', name='Produit import', stock=7,
+            actual_price=Decimal('1000'), max_salable_price=Decimal('1500'),
+        )
+        csv_content = (
+            "Code;Nom;Catégorie;Gamme;Rayon;Type de grammage;Stock;Seuil de stock;"
+            "Prix actuel;Prix maximum;Prix d'achat;TVA applicable;Prix réductible\r\n"
+            "PRD-IMP;Produit import;;;;;7;5;1200;1800;900;Oui;Non\r\n"
+        ).encode('utf-8-sig')
+        upload = SimpleUploadedFile('catalogue.csv', csv_content, content_type='text/csv')
+
+        response = self.client.post(reverse('import_products_csv'), {'file': upload})
+
+        self.assertRedirects(response, reverse('products'))
+        product.refresh_from_db()
+        self.assertEqual(product.stock, 7)  # inchangé : le stock n'est jamais importé
+        self.assertEqual(product.actual_price, Decimal('1200'))
+        self.assertEqual(product.max_salable_price, Decimal('1800'))
+        self.assertEqual(product.stock_limit, 5)
+        self.assertFalse(product.is_price_reducible)
+
+    def test_import_reports_unknown_code_without_creating_product(self):
+        csv_content = (
+            "Code;Nom;Catégorie;Gamme;Rayon;Type de grammage;Stock;Seuil de stock;"
+            "Prix actuel;Prix maximum;Prix d'achat;TVA applicable;Prix réductible\r\n"
+            "PRD-INCONNU;X;;;;;0;;1000;;;;\r\n"
+        ).encode('utf-8-sig')
+        upload = SimpleUploadedFile('catalogue.csv', csv_content, content_type='text/csv')
+
+        response = self.client.post(reverse('import_products_csv'), {'file': upload})
+
+        self.assertRedirects(response, reverse('products'))
+        self.assertFalse(Product.objects.filter(code='PRD-INCONNU').exists())
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class PurchaseOrderWorkflowTests(TestCase):
+    """
+    Commande fournisseur (PurchaseOrder) distincte de la réception (Supply) :
+    la commande ne doit avoir aucun effet sur le stock ni la comptabilité
+    tant qu'elle n'est pas réceptionnée.
+    """
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-po',
+            email='admin-po@example.com',
+            password='password123',
+        )
+        self.user.gender = 'M'
+        self.user.save()
+        self.client.force_login(self.user)
+
+        AccountingService.init_chart_of_accounts()
+        self.supplier = Supplier.objects.create(name='Fournisseur PO')
+        self.product = Product.objects.create(
+            code='PRD-PO', name='Produit commandé', stock=5, has_vat=False,
+        )
+
+    def test_create_purchase_order_has_no_stock_or_accounting_effect(self):
+        self.assertEqual(self.client.get(reverse('add_purchase_order')).status_code, 200)
+        self.assertEqual(self.client.get(reverse('purchase_orders')).status_code, 200)
+
+        response = self.client.post(reverse('add_purchase_order'), {
+            'product': self.product.pk,
+            'supplier': self.supplier.pk,
+            'quantity': 20,
+            'purchase_cost': '1000',
+        })
+
+        self.assertRedirects(response, reverse('purchase_orders'))
+        order = PurchaseOrder.objects.get(product=self.product)
+        self.assertEqual(order.status, 'ORDERED')
+        self.assertEqual(order.quantity, 20)
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 5)  # inchangé : rien n'est reçu
+        self.assertFalse(Supply.objects.filter(product=self.product).exists())
+        self.assertFalse(JournalEntry.objects.exists())
+
+    def test_receive_purchase_order_creates_supply_updates_stock_and_accounting(self):
+        order = PurchaseOrder.objects.create(
+            product=self.product, supplier=self.supplier, staff=self.user,
+            daily=Daily.objects.create(start_date=timezone.now(), exercise=Exercise.objects.create(start_date=timezone.now())),
+            quantity=10, estimated_purchase_cost=Decimal('900'), status='ORDERED',
+        )
+
+        self.assertEqual(self.client.get(reverse('receive_purchase_order', kwargs={'pk': order.pk})).status_code, 200)
+
+        response = self.client.post(reverse('receive_purchase_order', kwargs={'pk': order.pk}), {
+            'purchase_cost': '950',
+            'payment_method': 'CASH',
+        })
+
+        self.assertRedirects(response, reverse('supplies'))
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'RECEIVED')
+        self.assertIsNotNone(order.supply)
+
+        supply = order.supply
+        self.assertEqual(supply.quantity, 10)
+        self.assertEqual(supply.purchase_cost, Decimal('950'))
+        self.assertEqual(supply.total_price, Decimal('9500'))
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 15)  # 5 initial + 10 reçus
+        self.assertEqual(self.product.last_purchase_price, Decimal('950'))
+        self.assertTrue(JournalEntry.objects.filter(supply=supply).exists())
+
+    def test_cancel_purchase_order_before_receipt_has_no_stock_effect(self):
+        order = PurchaseOrder.objects.create(
+            product=self.product, supplier=self.supplier, staff=self.user,
+            daily=Daily.objects.create(start_date=timezone.now(), exercise=Exercise.objects.create(start_date=timezone.now())),
+            quantity=10, estimated_purchase_cost=Decimal('900'), status='ORDERED',
+        )
+
+        response = self.client.post(reverse('cancel_purchase_order', kwargs={'pk': order.pk}))
+
+        self.assertRedirects(response, reverse('purchase_orders'))
+        order.refresh_from_db()
+        self.assertIsNotNone(order.delete_at)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 5)
+
+    def test_cannot_receive_a_cancelled_order(self):
+        order = PurchaseOrder.objects.create(
+            product=self.product, supplier=self.supplier, staff=self.user,
+            daily=Daily.objects.create(start_date=timezone.now(), exercise=Exercise.objects.create(start_date=timezone.now())),
+            quantity=10, estimated_purchase_cost=Decimal('900'), status='ORDERED',
+        )
+        SupplyService.cancel_purchase_order(order)
+
+        response = self.client.get(reverse('receive_purchase_order', kwargs={'pk': order.pk}))
+
+        self.assertEqual(response.status_code, 404)
+
+
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
+class InvoicePdfTests(TestCase):
+    """Téléchargement de facture au format PDF."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-invoices',
+            email='admin-invoices@example.com',
+            password='password123',
+        )
+        self.user.gender = 'M'
+        self.user.save()
+        self.client.force_login(self.user)
+
+        now = timezone.now()
+        exercise = Exercise.objects.create(start_date=now)
+        daily = Daily.objects.create(start_date=now, exercise=exercise)
+        customer = Client.objects.create(firstname='Awa', lastname='Nkeng', phone_number='690000000')
+        product = Product.objects.create(code='PRD-PDF', name='Produit facturé', stock=5, actual_price=Decimal('2000'))
+        self.sale = Sale.objects.create(daily=daily, client=customer, total=Decimal('2000'), is_paid=True)
+        SaleProduct.objects.create(sale=self.sale, product=product, quantity=1, unit_price=Decimal('2000'))
+        self.invoice = Invoice.objects.create(
+            sale=self.sale,
+            invoice_number='FAC-TEST-PDF-001',
+            invoice_date=timezone.localdate(),
+            status='PAID',
+        )
+
+    def test_invoice_pdf_downloads_valid_pdf(self):
+        response = self.client.get(reverse('invoice_pdf', kwargs={'pk': self.invoice.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertIn('FAC-TEST-PDF-001', response['Content-Disposition'])
+        self.assertTrue(response.content.startswith(b'%PDF'))
+
+
+class CreditSaleRequiresClientTests(TestCase):
+    """Une vente à crédit doit être rattachée à un client identifié."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-credit-client',
+            email='admin-credit-client@example.com',
+            password='password123',
+        )
+        self.user.gender = 'M'
+        self.user.save()
+
+        now = timezone.now()
+        exercise = Exercise.objects.create(start_date=now)
+        Daily.objects.create(start_date=now, exercise=exercise)
+        self.product = Product.objects.create(
+            code='PRD-CREDIT-NOCLIENT', name='Produit', stock=5, actual_price=Decimal('1000'),
+        )
+        self.customer = Client.objects.create(firstname='Fatou', lastname='Bello', phone_number='690000222')
+
+    def test_create_sale_rejects_credit_without_client(self):
+        with self.assertRaises(ValueError):
+            SaleService.create_sale(
+                validated_data={
+                    'is_credit': True,
+                    'due_date': timezone.localdate() + timedelta(days=7),
+                    'items': [{'product_id': self.product.id, 'quantity': 1, 'unit_price': Decimal('1000')}],
+                },
+                staff=self.user,
+            )
+        self.assertEqual(Sale.objects.count(), 0)
+
+    def test_create_sale_accepts_credit_with_client(self):
+        sale = SaleService.create_sale(
+            validated_data={
+                'client_id': self.customer.id,
+                'is_credit': True,
+                'due_date': timezone.localdate() + timedelta(days=7),
+                'items': [{'product_id': self.product.id, 'quantity': 1, 'unit_price': Decimal('1000')}],
+            },
+            staff=self.user,
+        )
+        self.assertEqual(sale.client_id, self.customer.id)
+        self.assertTrue(sale.is_credit)
+
+    def test_serializer_rejects_credit_without_client_id(self):
+        serializer = SaleCreateSerializer(data={
+            'is_credit': True,
+            'due_date': str(timezone.localdate() + timedelta(days=7)),
+            'items': [{'product_id': self.product.id, 'quantity': 1, 'unit_price': '1000'}],
+        })
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('client_id', serializer.errors)
+
+
+class AddClientAjaxPopupTests(TestCase):
+    """Raccourci « + » d'ajout de client (popup) depuis la page Ventes."""
+
+    def setUp(self):
+        AppModule.init_default_modules()
+        self.user = get_user_model().objects.create_superuser(
+            username='admin-add-client-ajax',
+            email='admin-add-client-ajax@example.com',
+            password='password123',
+        )
+        self.user.gender = 'M'
+        self.user.save()
+        self.client.force_login(self.user)
+
+    def test_ajax_creates_client_and_returns_json(self):
+        response = self.client.post(
+            reverse('add_client'),
+            {'firstname': 'Aïcha', 'lastname': 'Mballa', 'phone_number': '690000333'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        client = Client.objects.get(pk=data['id'])
+        self.assertEqual(data['name'], str(client))
+        self.assertEqual(client.firstname, 'Aïcha')
+
+    def test_ajax_returns_field_errors_without_creating_client(self):
+        response = self.client.post(
+            reverse('add_client'),
+            {'firstname': '', 'lastname': 'Mballa'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('firstname', data['errors'])
+        self.assertFalse(Client.objects.filter(lastname='Mballa').exists())
+
+    def test_non_ajax_post_still_redirects_to_contacts(self):
+        response = self.client.post(
+            reverse('add_client'),
+            {'firstname': 'Paul', 'lastname': 'Eto'},
+        )
+
+        self.assertRedirects(response, reverse('contacts'))
+        self.assertTrue(Client.objects.filter(firstname='Paul', lastname='Eto').exists())

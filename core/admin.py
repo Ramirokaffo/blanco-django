@@ -4,6 +4,7 @@ Django admin configuration for core models.
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from .models import (
     # User models
@@ -13,7 +14,7 @@ from .models import (
     # Sale models
     Sale, SaleProduct, CreditSale, Refund,
     # Inventory models
-    Supply, Inventory, InventorySnapshot, DailyInventory,
+    Supply, PurchaseOrder, Inventory, InventorySnapshot, DailyInventory,
     # Accounting models
     Exercise, Daily, ExpenseType, RecipeType, DailyExpense, DailyRecipe, ProductExpense,
     # Comptabilité (nouveaux modèles)
@@ -59,6 +60,36 @@ class FinancialRecordAdmin(admin.ModelAdmin):
         actions = super().get_actions(request)
         actions.pop('delete_selected', None)
         return actions
+
+
+class SoftDeleteAdmin(admin.ModelAdmin):
+    """
+    Base pour les données de référence (produits, catégories, gammes, rayons,
+    types de grammage) : ces lignes sont référencées par des pièces
+    financières en ``CASCADE`` (ventes, approvisionnements, dépenses), donc
+    une suppression physique depuis l'admin détruirait silencieusement leur
+    historique. On désactive la suppression physique et on la remplace par
+    une action de désactivation (``delete_at``), cohérente avec
+    ``SoftDeleteModel`` utilisé partout ailleurs dans l'application.
+    """
+
+    actions = ['soft_delete_selected']
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop('delete_selected', None)
+        return actions
+
+    @admin.action(description=_("Désactiver la sélection (suppression douce)"))
+    def soft_delete_selected(self, request, queryset):
+        updated = queryset.filter(delete_at__isnull=True).update(delete_at=timezone.now())
+        self.message_user(
+            request,
+            _("%(count)s élément(s) désactivé(s).") % {'count': updated},
+        )
 
 
 # Le token DRF ne doit pas être lisible en clair dans l'admin
@@ -139,7 +170,7 @@ class SupplierAdmin(admin.ModelAdmin):
 
 # Product Models Admin
 @admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
+class CategoryAdmin(SoftDeleteAdmin):
     list_display = ('name', 'description', 'create_at')
     search_fields = ('name', 'description')
     ordering = ('name',)
@@ -147,7 +178,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(Gamme)
-class GammeAdmin(admin.ModelAdmin):
+class GammeAdmin(SoftDeleteAdmin):
     list_display = ('name', 'description', 'create_at')
     search_fields = ('name', 'description')
     ordering = ('name',)
@@ -155,7 +186,7 @@ class GammeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Rayon)
-class RayonAdmin(admin.ModelAdmin):
+class RayonAdmin(SoftDeleteAdmin):
     list_display = ('name', 'description', 'create_at')
     search_fields = ('name', 'description')
     ordering = ('name',)
@@ -163,7 +194,7 @@ class RayonAdmin(admin.ModelAdmin):
 
 
 @admin.register(GrammageType)
-class GrammageTypeAdmin(admin.ModelAdmin):
+class GrammageTypeAdmin(SoftDeleteAdmin):
     list_display = ('name', 'description', 'create_at')
     search_fields = ('name', 'description')
     ordering = ('name',)
@@ -171,7 +202,7 @@ class GrammageTypeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(SoftDeleteAdmin):
     list_display = ('id', 'code', 'name', 'category', 'stock', 'stock_limit', "actual_price", "last_purchase_price", 'is_price_reducible')
     list_filter = ('category', 'gamme', 'rayon', 'is_price_reducible', 'create_at')
     search_fields = ('code', 'name', 'description', 'brand')
@@ -238,6 +269,18 @@ class SupplyAdmin(FinancialRecordAdmin):
     ordering = ('-create_at',)
     readonly_fields = ('create_at', 'delete_at',)
     protected_fields = ('product', 'quantity', 'purchase_cost', 'total_price', 'is_credit', 'daily', 'delete_at')
+
+
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+    list_display = ('product', 'supplier', 'quantity', 'estimated_purchase_cost', 'status', 'create_at')
+    list_filter = ('status', 'create_at')
+    search_fields = ('product__name', 'supplier__name')
+    ordering = ('-create_at',)
+    readonly_fields = ('create_at', 'delete_at', 'supply')
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Inventory)

@@ -58,7 +58,7 @@ python manage.py init_accounts           # creates missing OHADA accounts
 ```bash
 python manage.py runserver 0.0.0.0:8000   # bind to 0.0.0.0 so the mobile app on the LAN can reach it
 DJANGO_SUPERUSER_PASSWORD='...' python create_superuser.py   # creates 'admin' if missing (random password printed once when the variable is absent)
-python manage.py replay_accounting          # re-runs the journal entry of sales flagged accounting_pending
+python manage.py replay_accounting          # re-runs the journal entry of sales/expenses/recipes/supplier payments flagged accounting_pending
 python init_daily_session.py               # creates an open Exercise + Daily for testing
 ```
 
@@ -233,7 +233,7 @@ The API applies the same model through DRF permissions in `core/api_permissions.
 
 - Business invariants live in the services, not only in serializers/forms: `SaleService.create_sale` re-validates price > 0, price caps, stock and quantities under `select_for_update`; `SaleService`/`SupplyService` refuse cancellations and returns on a closed exercise; payments (`record_credit_payment`, `record_supply_payment` views) lock the credit row and cap the amount.
 - `AccountingService._create_entry(journal, **fields)` is the only way to create a `JournalEntry` (unique reference with retry). `get_account()` only returns active accounts; `record_expense`/`record_recipe` refuse accounts outside class 6/7; `treasury_account_code()` raises on unknown payment methods.
-- A failed sale journal entry no longer passes silently: the sale is flagged `accounting_pending` and `manage.py replay_accounting` retries it.
+- A failed journal entry no longer passes silently: `Sale`, `DailyExpense`, `DailyRecipe` and `SupplierPayment` each have an `accounting_pending` flag, set (with `logger.exception`) by `SaleService.record_sale_accounting` / `AccountingService.safe_record_expense` / `safe_record_recipe` / `safe_record_supplier_payment`, and cleared once `manage.py replay_accounting` retries it successfully.
 - `close_daily` (module `sales`) never creates a daily, validates amounts as `Decimal >= 0`, and generates deferred VAT before closing, in one transaction. Closing an inventory no longer closes the exercise; `close_exercise` + `open_new_exercise` run in one transaction and are idempotent.
 - Web login is rate limited per IP/username via the cache, `next` is validated with `url_has_allowed_host_and_scheme`, logout and invoice generation are POST-only. CSV exports go through `_SafeCsvWriter` (formula injection).
 - Front-end: never build HTML from API data without `escapeHtml()` (defined in `core/static/js/main.js`); use `data-*` attributes + `addEventListener` instead of inline `onclick` with strings.

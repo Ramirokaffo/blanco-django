@@ -253,6 +253,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Cloche de notifications (stock bas / échéances en retard)
+    const alertsToggle = document.getElementById('alertsToggle');
+    const alertsDropdown = document.getElementById('alertsDropdown');
+    if (alertsToggle && alertsDropdown) {
+        alertsToggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            alertsDropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', function () {
+            alertsDropdown.classList.remove('open');
+        });
+    }
+
     // ── QR Code Modal ────────────────────────────────────────────
     const qrToggle = document.getElementById('qrToggle');
     const qrModal = document.getElementById('qrModal');

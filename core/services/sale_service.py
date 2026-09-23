@@ -126,6 +126,8 @@ class SaleService:
             client = Client.objects.filter(id=client_id, delete_at__isnull=True).first()
             if client is None:
                 raise ValueError(_("Client introuvable."))
+        if is_credit and not client:
+            raise ValueError(_("Un client doit être sélectionné pour une vente à crédit."))
         if is_credit and not due_date:
             raise ValueError(_("Date d'échéance obligatoire pour une vente à crédit."))
 

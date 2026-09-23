@@ -14,7 +14,14 @@
         <h1>{% trans "Détail du produit" %}</h1>
         <p class="text-secondary">{% blocktrans with name=product.name %}Consultez les informations complètes de <strong>{{ name }}</strong>.{% endblocktrans %}</p>
     </div>
-    <a href="{% url 'products' %}" class="btn btn-secondary btn-sm back-link-inline">← {% trans "Retour aux produits" %}</a>
+    <div style="display:flex; gap:8px; align-items:flex-start;">
+        <a href="{% url 'products' %}" class="btn btn-secondary btn-sm back-link-inline">← {% trans "Retour aux produits" %}</a>
+        <a href="{% url 'edit_product' product.id %}" class="btn btn-primary btn-sm">{% trans "Modifier" %}</a>
+        <form method="post" action="{% url 'delete_product' product.id %}" onsubmit="return confirm('{% trans "Désactiver ce produit ? Il ne sera plus vendable mais son historique est conservé." %}');" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">{% trans "Désactiver" %}</button>
+        </form>
+    </div>
 </div>
 
 <div class="product-detail-layout">

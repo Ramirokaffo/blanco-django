@@ -31,6 +31,34 @@
         </div>
         
         <div class="header-right">
+            <!-- Cloche de notifications : stock bas / échéances en retard -->
+            <div class="alerts-menu">
+                <button class="alerts-toggle" id="alertsToggle" aria-label="{% trans "Alertes" %}" title="{% trans "Alertes" %}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    {% if alert_total_count %}
+                    <span class="alerts-badge">{{ alert_total_count }}</span>
+                    {% endif %}
+                </button>
+                <div class="user-dropdown" id="alertsDropdown">
+                    {% if alert_low_stock_count %}
+                    <a href="{% url 'products' %}?stock_status=low" class="user-dropdown-item">
+                        {% blocktrans count counter=alert_low_stock_count %}{{ counter }} produit en stock bas{% plural %}{{ counter }} produits en stock bas{% endblocktrans %}
+                    </a>
+                    {% endif %}
+                    {% if alert_overdue_payments_count %}
+                    <a href="{% url 'aged_balance' %}" class="user-dropdown-item">
+                        {% blocktrans count counter=alert_overdue_payments_count %}{{ counter }} échéance en retard{% plural %}{{ counter }} échéances en retard{% endblocktrans %}
+                    </a>
+                    {% endif %}
+                    {% if not alert_total_count %}
+                    <div class="alerts-dropdown-empty">{% trans "Aucune alerte" %}</div>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Bouton QR Code serveur -->
             <button class="qr-toggle" id="qrToggle" aria-label="{% trans "Afficher le QR Code serveur" %}" title="{% trans "QR Code serveur" %}">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -72,9 +100,9 @@
                     <span class="user-name">{{ user.username }}</span>
                 </button>
                 <div class="user-dropdown" id="userDropdown">
-                    {# En mode plateforme, l'administration Django n'est pas montée sur
+                    <!-- {# En mode plateforme, l'administration Django n'est pas montée sur
                        l'espace d'un client : le lien planterait, et il ne doit de toute
-                       façon pas exister là-bas (il donnerait accès au plan de contrôle). #}
+                       façon pas exister là-bas (il donnerait accès au plan de contrôle). #} -->
                     {% if user.is_superuser and not is_saas %}
                     <a href="{% url 'admin:index' %}" class="user-dropdown-item">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

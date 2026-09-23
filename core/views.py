@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib import messages
@@ -13,7 +14,7 @@ from django.utils.dateparse import parse_date
 from django.utils.formats import date_format
 from django.utils.translation import gettext as _, pgettext
 from django.views.decorators.http import require_POST
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from core.models.sale_models import Sale, SaleProduct, CreditSale
 from core.models.user_models import Client, Supplier, CustomUser
 from core.models.accounting_models import (
@@ -21,7 +22,7 @@ from core.models.accounting_models import (
     Account, Payment, RecipeType, SupplierPayment, Invoice,
     TaxRate, BankStatement, ExerciseClosing, PAYMENT_METHOD_CHOICES,
 )
-from core.models.product_models import Product, Category, Gamme, Rayon
+from core.models.product_models import Product, Category, Gamme, Rayon, GrammageType
 from core.models.inventory_models import Supply, Inventory, InventorySnapshot, DailyInventory, CreditSupply, PaymentSchedule
 from core.services.daily_service import DailyService
 from core.forms import (
@@ -29,12 +30,14 @@ from core.forms import (
     DataMigrationForm, PaymentForm, SupplierPaymentForm,
     SaleCancellationForm, SalePartialReturnForm,
     SupplyCancellationForm, SupplyPartialReturnForm,
+    SystemSettingsForm, ReferenceDataForm, ProductForm,
+    StaffForm, StaffPasswordResetForm, TaxRateForm,
 )
 from core.services.excercise_service import ExerciseService
 from core.services.accounting_service import AccountingService
 from core.services.sale_service import SaleService
 from core.services.supply_service import SupplyService
-from core.decorators import module_required
+from core.decorators import module_required, superuser_required
 
 import csv
 import logging
@@ -2709,6 +2712,7 @@ def sales(request):
         'sales': sales_list,
         'sale_products': sale_products_list,
         'clients': clients_list,
+        'client_form': ClientForm(),
         'current_daily': current_daily,
         'total_revenue': total_revenue,
         'view_mode': view_mode,
@@ -3157,6 +3161,563 @@ def product_detail(request, pk):
     return render(request, 'core/product_detail.html', context)
 
 
+@login_required
+@module_required('products')
+def add_product(request):
+    """Créer un produit depuis le back-office web (passe par ProductService)."""
+    from core.services.product_service import ProductService
+
+    if request.method == 'POST':
+        form = ProductForm(request.POST, editing=False)
+        if form.is_valid():
+            validated_data = dict(form.cleaned_data)
+            images = request.FILES.getlist('images')
+            daily = DailyService.get_or_create_active_daily()
+            try:
+                product = ProductService.create_product(
+                    validated_data=validated_data,
+                    images=images,
+                    staff=request.user,
+                    daily=daily,
+                )
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, _('Produit "%(name)s" créé avec succès.') % {'name': product.name})
+                return redirect('product_detail', pk=product.pk)
+    else:
+        form = ProductForm(editing=False)
+
+    context = {
+        'page_title': _('Nouveau produit'),
+        'form': form,
+        'form_title': _('Nouveau produit'),
+        'form_subtitle': _('Créer un nouveau produit'),
+        'back_url': 'products',
+    }
+    return render(request, 'core/product_form.html', context)
+
+
+@login_required
+@module_required('products')
+def edit_product(request, pk):
+    """Modifier un produit existant (le stock ne se modifie pas ici)."""
+    from core.services.product_service import ProductService
+
+    product = get_object_or_404(Product, pk=pk, delete_at__isnull=True)
+
+    if request.method == 'POST':
+        form = ProductForm(request.POST, instance=product, editing=True)
+        if form.is_valid():
+            images = request.FILES.getlist('images')
+            ProductService.update_product(product, dict(form.cleaned_data), images=images)
+            messages.success(request, _('Produit "%(name)s" modifié avec succès.') % {'name': product.name})
+            return redirect('product_detail', pk=product.pk)
+    else:
+        form = ProductForm(instance=product, editing=True)
+
+    context = {
+        'page_title': _('Modifier %(name)s') % {'name': product.name},
+        'form': form,
+        'form_title': _('Modifier le produit'),
+        'form_subtitle': _('Modifier les informations de %(name)s') % {'name': product.name},
+        'back_url': 'product_detail',
+        'back_pk': product.pk,
+        'product_images': product.images.filter(delete_at__isnull=True).order_by('-is_primary', 'id'),
+    }
+    return render(request, 'core/product_form.html', context)
+
+
+@login_required
+@module_required('products')
+@require_http_methods(['POST'])
+def delete_product(request, pk):
+    """Désactive (soft-delete) un produit ; l'historique de ventes/appro est conservé."""
+    product = get_object_or_404(Product, pk=pk, delete_at__isnull=True)
+    product.delete_at = timezone.now()
+    product.save(update_fields=['delete_at'])
+    messages.success(request, _('Produit "%(name)s" désactivé.') % {'name': product.name})
+    return redirect('products')
+
+
+PRODUCT_IMPORT_MAX_BYTES = 1 * 1024 * 1024   # 1 Mo
+PRODUCT_IMPORT_MAX_ROWS = 5000
+
+
+@login_required
+@module_required('products')
+def export_products_csv(request):
+    """Export du catalogue produit en CSV, support d'une mise à jour de prix en masse."""
+    import csv
+
+    products = Product.objects.filter(delete_at__isnull=True).select_related(
+        'category', 'gamme', 'rayon', 'grammage_type',
+    ).order_by('name')
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response.write('﻿')  # BOM UTF-8 pour Excel
+    response['Content-Disposition'] = 'attachment; filename="catalogue_produits.csv"'
+    writer = _SafeCsvWriter(csv.writer(response, delimiter=';'))
+    writer.writerow([
+        _('Code'), _('Nom'), _('Catégorie'), _('Gamme'), _('Rayon'), _('Type de grammage'),
+        _('Stock (lecture seule)'), _('Seuil de stock'), _('Prix actuel'), _('Prix maximum'),
+        _("Prix d'achat"), _('TVA applicable'), _('Prix réductible'),
+    ])
+    for product in products:
+        writer.writerow([
+            product.code,
+            product.name,
+            product.category.name if product.category else '',
+            product.gamme.name if product.gamme else '',
+            product.rayon.name if product.rayon else '',
+            product.grammage_type.name if product.grammage_type else '',
+            product.stock,
+            product.stock_limit if product.stock_limit is not None else '',
+            product.actual_price if product.actual_price is not None else '',
+            product.max_salable_price if product.max_salable_price is not None else '',
+            product.last_purchase_price if product.last_purchase_price is not None else '',
+            'Oui' if product.has_vat else 'Non',
+            'Oui' if product.is_price_reducible else 'Non',
+        ])
+    return response
+
+
+@login_required
+@module_required('products')
+@require_http_methods(['POST'])
+def import_products_csv(request):
+    """
+    Mise à jour en masse des prix/seuils du catalogue depuis un CSV exporté
+    par ``export_products_csv``.
+
+    Ne crée jamais de produit et ne touche jamais au stock : comme partout
+    ailleurs (``ProductService.update_product``, API mobile), le stock ne
+    change que par approvisionnement ou inventaire, jamais par une édition
+    directe du produit.
+    """
+    import csv
+    import io
+    from decimal import Decimal, InvalidOperation
+
+    file = request.FILES.get('file')
+    if not file:
+        messages.error(request, _("Aucun fichier sélectionné."))
+        return redirect('products')
+    if not file.name.lower().endswith('.csv'):
+        messages.error(request, _("Le fichier doit être au format CSV."))
+        return redirect('products')
+    if file.size > PRODUCT_IMPORT_MAX_BYTES:
+        messages.error(request, _("Fichier trop volumineux (1 Mo maximum)."))
+        return redirect('products')
+
+    try:
+        decoded = file.read(PRODUCT_IMPORT_MAX_BYTES + 1).decode('utf-8-sig')
+    except UnicodeDecodeError:
+        messages.error(request, _("Le fichier doit être encodé en UTF-8."))
+        return redirect('products')
+
+    reader = csv.reader(io.StringIO(decoded), delimiter=';')
+    next(reader, None)  # en-tête
+
+    def parse_decimal(value):
+        value = (value or '').strip().replace(',', '.')
+        if not value:
+            return None
+        try:
+            return Decimal(value)
+        except InvalidOperation:
+            return None
+
+    def parse_int(value):
+        value = (value or '').strip()
+        if not value:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    updated = 0
+    errors = []
+
+    try:
+        with transaction.atomic():
+            for row_num, row in enumerate(reader, start=2):
+                if row_num - 1 > PRODUCT_IMPORT_MAX_ROWS:
+                    raise ValueError(_("Trop de lignes (maximum %(max)s).") % {'max': PRODUCT_IMPORT_MAX_ROWS})
+                if not row or not row[0].strip():
+                    continue
+
+                code = row[0].strip()
+                product = Product.objects.filter(
+                    code=code, delete_at__isnull=True,
+                ).select_for_update().first()
+                if product is None:
+                    errors.append(
+                        _("Ligne %(row)s: produit « %(code)s » introuvable (import ignoré, aucune création).") % {
+                            'row': row_num, 'code': code,
+                        }
+                    )
+                    continue
+
+                has_vat_raw = row[11].strip() if len(row) > 11 else ''
+                reducible_raw = row[12].strip() if len(row) > 12 else ''
+
+                product.stock_limit = parse_int(row[7]) if len(row) > 7 else None
+                product.actual_price = parse_decimal(row[8]) if len(row) > 8 else None
+                product.max_salable_price = parse_decimal(row[9]) if len(row) > 9 else None
+                product.last_purchase_price = parse_decimal(row[10]) if len(row) > 10 else None
+                if has_vat_raw:
+                    product.has_vat = has_vat_raw.lower() != 'non'
+                if reducible_raw:
+                    product.is_price_reducible = reducible_raw.lower() != 'non'
+
+                product.save(update_fields=[
+                    'stock_limit', 'actual_price', 'max_salable_price',
+                    'last_purchase_price', 'has_vat', 'is_price_reducible',
+                ])
+                updated += 1
+    except ValueError as exc:
+        messages.error(request, _("Import annulé : %(error)s") % {'error': exc})
+        return redirect('products')
+    except Exception:
+        logger.exception("Erreur lors de l'import du catalogue produit")
+        messages.error(request, _("Import annulé : erreur interne. Aucune modification n'a été enregistrée."))
+        return redirect('products')
+
+    if updated:
+        messages.success(request, _("%(count)s produit(s) mis à jour.") % {'count': updated})
+    if errors:
+        for error in errors[:10]:
+            messages.warning(request, error)
+        if len(errors) > 10:
+            messages.warning(request, _("... et %(count)s erreur(s) supplémentaire(s).") % {'count': len(errors) - 10})
+    if not updated and not errors:
+        messages.warning(request, _("Aucune ligne exploitable dans le fichier."))
+
+    return redirect('products')
+
+
+# ── Données de référence produit (catégories, gammes, rayons, grammages) ──
+
+REFERENCE_MODELS = {
+    'categories': Category,
+    'gammes': Gamme,
+    'rayons': Rayon,
+    'grammage-types': GrammageType,
+}
+
+
+def _reference_labels():
+    """Construit les libellés à l'appel pour que gettext utilise la langue active."""
+    return {
+        'categories': (_('Catégories'), _('Catégorie')),
+        'gammes': (_('Gammes'), _('Gamme')),
+        'rayons': (_('Rayons'), _('Rayon')),
+        'grammage-types': (_('Types de grammage'), _('Type de grammage')),
+    }
+
+
+@login_required
+@module_required('products')
+def product_references(request):
+    """Gestion des catégories / gammes / rayons / types de grammage."""
+    labels = _reference_labels()
+    kind = request.GET.get('tab', 'categories')
+    model = REFERENCE_MODELS.get(kind)
+    if model is None:
+        kind = 'categories'
+        model = Category
+
+    search = request.GET.get('search', '').strip()
+    page_number = request.GET.get('page', 1)
+
+    queryset = model.objects.filter(delete_at__isnull=True)
+    if search:
+        queryset = queryset.filter(Q(name__icontains=search) | Q(description__icontains=search))
+
+    paginator = Paginator(queryset.order_by('name'), 20)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': _('Catégories, gammes, rayons et grammages'),
+        'current_tab': kind,
+        'current_search': search,
+        'page_obj': page_obj,
+        'items': page_obj.object_list,
+        'total_count': paginator.count,
+        'reference_tabs': [(key, plural) for key, (plural, singular) in labels.items()],
+        'current_label_plural': labels[kind][0],
+        'current_label_singular': labels[kind][1],
+    }
+    return render(request, 'core/product_references.html', context)
+
+
+@login_required
+@module_required('products')
+def add_reference(request, kind):
+    """Créer une catégorie/gamme/rayon/type de grammage."""
+    model = REFERENCE_MODELS.get(kind)
+    if model is None:
+        raise Http404
+    labels = _reference_labels()
+    plural, singular = labels[kind]
+
+    if request.method == 'POST':
+        form = ReferenceDataForm(request.POST)
+        if form.is_valid():
+            model.objects.create(
+                name=form.cleaned_data['name'],
+                description=form.cleaned_data['description'],
+            )
+            messages.success(request, _('"%(name)s" créé avec succès.') % {'name': form.cleaned_data['name']})
+            return redirect(f"{reverse('product_references')}?tab={kind}")
+    else:
+        form = ReferenceDataForm()
+
+    context = {
+        'page_title': _('Nouveau : %(label)s') % {'label': singular},
+        'form': form,
+        'form_title': _('Nouveau : %(label)s') % {'label': singular},
+        'form_subtitle': _('Créer un nouvel élément dans « %(label)s »') % {'label': plural},
+        'back_url': 'product_references',
+        'back_tab': kind,
+    }
+    return render(request, 'core/reference_form.html', context)
+
+
+@login_required
+@module_required('products')
+def edit_reference(request, kind, pk):
+    """Modifier une catégorie/gamme/rayon/type de grammage."""
+    model = REFERENCE_MODELS.get(kind)
+    if model is None:
+        raise Http404
+    labels = _reference_labels()
+    plural, singular = labels[kind]
+    instance = get_object_or_404(model, pk=pk, delete_at__isnull=True)
+
+    if request.method == 'POST':
+        form = ReferenceDataForm(request.POST)
+        if form.is_valid():
+            instance.name = form.cleaned_data['name']
+            instance.description = form.cleaned_data['description']
+            instance.save(update_fields=['name', 'description'])
+            messages.success(request, _('"%(name)s" modifié avec succès.') % {'name': instance.name})
+            return redirect(f"{reverse('product_references')}?tab={kind}")
+    else:
+        form = ReferenceDataForm(initial={'name': instance.name, 'description': instance.description})
+
+    context = {
+        'page_title': _('Modifier : %(name)s') % {'name': instance.name},
+        'form': form,
+        'form_title': _('Modifier : %(label)s') % {'label': singular},
+        'form_subtitle': _('Modifier les informations de %(name)s') % {'name': instance.name},
+        'back_url': 'product_references',
+        'back_tab': kind,
+    }
+    return render(request, 'core/reference_form.html', context)
+
+
+@login_required
+@module_required('products')
+@require_http_methods(['POST'])
+def delete_reference(request, kind, pk):
+    """Désactive (soft-delete) une catégorie/gamme/rayon/type de grammage."""
+    model = REFERENCE_MODELS.get(kind)
+    if model is None:
+        raise Http404
+    instance = get_object_or_404(model, pk=pk, delete_at__isnull=True)
+    if instance.products.filter(delete_at__isnull=True).exists():
+        messages.error(
+            request,
+            _("Impossible de désactiver « %(name)s » : des produits actifs y sont encore rattachés.") % {'name': instance.name},
+        )
+    else:
+        instance.delete_at = timezone.now()
+        instance.save(update_fields=['delete_at'])
+        messages.success(request, _('"%(name)s" désactivé.') % {'name': instance.name})
+    return redirect(f"{reverse('product_references')}?tab={kind}")
+
+
+# ── Données de référence comptables (taux de TVA, types de recette/dépense) ──
+
+ACCOUNTING_REFERENCE_MODELS = {
+    'taux-tva': TaxRate,
+    'types-recette': RecipeType,
+    'types-depense': ExpenseType,
+}
+
+
+def _accounting_reference_labels():
+    """Construit les libellés à l'appel pour que gettext utilise la langue active."""
+    return {
+        'taux-tva': (_('Taux de TVA'), _('Taux de TVA')),
+        'types-recette': (_('Types de recette'), _('Type de recette')),
+        'types-depense': (_('Types de dépense'), _('Type de dépense')),
+    }
+
+
+def _accounting_reference_form_class(kind):
+    return TaxRateForm if kind == 'taux-tva' else ReferenceDataForm
+
+
+def _accounting_reference_in_use(instance, kind):
+    """Un taux/type encore rattaché à des enregistrements actifs ne peut pas être désactivé."""
+    if kind == 'taux-tva':
+        return instance.supplies.filter(delete_at__isnull=True).exists()
+    if kind == 'types-recette':
+        return instance.daily_recipes.filter(delete_at__isnull=True).exists()
+    if kind == 'types-depense':
+        return (
+            instance.daily_expenses.filter(delete_at__isnull=True).exists()
+            or instance.supplies.filter(delete_at__isnull=True).exists()
+        )
+    return False
+
+
+@login_required
+@module_required('accounting')
+def accounting_references(request):
+    """Gestion des taux de TVA, types de recette et types de dépense."""
+    labels = _accounting_reference_labels()
+    kind = request.GET.get('tab', 'taux-tva')
+    model = ACCOUNTING_REFERENCE_MODELS.get(kind)
+    if model is None:
+        kind = 'taux-tva'
+        model = TaxRate
+
+    search = request.GET.get('search', '').strip()
+    page_number = request.GET.get('page', 1)
+
+    queryset = model.objects.filter(delete_at__isnull=True)
+    if search:
+        queryset = queryset.filter(Q(name__icontains=search) | Q(description__icontains=search))
+
+    order_by = 'rate' if kind == 'taux-tva' else 'name'
+    paginator = Paginator(queryset.order_by(order_by), 20)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': _('Taux de TVA, types de recette et de dépense'),
+        'current_tab': kind,
+        'current_search': search,
+        'page_obj': page_obj,
+        'items': page_obj.object_list,
+        'total_count': paginator.count,
+        'reference_tabs': [(key, plural) for key, (plural, singular) in labels.items()],
+        'current_label_plural': labels[kind][0],
+        'current_label_singular': labels[kind][1],
+    }
+    return render(request, 'core/accounting_references.html', context)
+
+
+@login_required
+@module_required('accounting')
+def add_accounting_reference(request, kind):
+    """Créer un taux de TVA / type de recette / type de dépense."""
+    model = ACCOUNTING_REFERENCE_MODELS.get(kind)
+    if model is None:
+        raise Http404
+    labels = _accounting_reference_labels()
+    plural, singular = labels[kind]
+    form_class = _accounting_reference_form_class(kind)
+
+    if request.method == 'POST':
+        form = form_class(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                if kind == 'taux-tva':
+                    instance = form.save(commit=False)
+                    if instance.is_default:
+                        TaxRate.objects.filter(is_default=True).update(is_default=False)
+                    instance.save()
+                else:
+                    instance = model.objects.create(
+                        name=form.cleaned_data['name'],
+                        description=form.cleaned_data['description'],
+                    )
+            messages.success(request, _('"%(name)s" créé avec succès.') % {'name': instance.name})
+            return redirect(f"{reverse('accounting_references')}?tab={kind}")
+    else:
+        form = form_class()
+
+    context = {
+        'page_title': _('Nouveau : %(label)s') % {'label': singular},
+        'form': form,
+        'form_title': _('Nouveau : %(label)s') % {'label': singular},
+        'form_subtitle': _('Créer un nouvel élément dans « %(label)s »') % {'label': plural},
+        'back_url': 'accounting_references',
+        'back_tab': kind,
+    }
+    return render(request, 'core/reference_form.html', context)
+
+
+@login_required
+@module_required('accounting')
+def edit_accounting_reference(request, kind, pk):
+    """Modifier un taux de TVA / type de recette / type de dépense."""
+    model = ACCOUNTING_REFERENCE_MODELS.get(kind)
+    if model is None:
+        raise Http404
+    labels = _accounting_reference_labels()
+    plural, singular = labels[kind]
+    instance = get_object_or_404(model, pk=pk, delete_at__isnull=True)
+    form_class = _accounting_reference_form_class(kind)
+
+    if request.method == 'POST':
+        form = form_class(request.POST, instance=instance) if kind == 'taux-tva' else form_class(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                if kind == 'taux-tva':
+                    instance = form.save(commit=False)
+                    if instance.is_default:
+                        TaxRate.objects.filter(is_default=True).exclude(pk=instance.pk).update(is_default=False)
+                    instance.save()
+                else:
+                    instance.name = form.cleaned_data['name']
+                    instance.description = form.cleaned_data['description']
+                    instance.save(update_fields=['name', 'description'])
+            messages.success(request, _('"%(name)s" modifié avec succès.') % {'name': instance.name})
+            return redirect(f"{reverse('accounting_references')}?tab={kind}")
+    else:
+        if kind == 'taux-tva':
+            form = form_class(instance=instance)
+        else:
+            form = form_class(initial={'name': instance.name, 'description': instance.description})
+
+    context = {
+        'page_title': _('Modifier : %(name)s') % {'name': instance.name},
+        'form': form,
+        'form_title': _('Modifier : %(label)s') % {'label': singular},
+        'form_subtitle': _('Modifier les informations de %(name)s') % {'name': instance.name},
+        'back_url': 'accounting_references',
+        'back_tab': kind,
+    }
+    return render(request, 'core/reference_form.html', context)
+
+
+@login_required
+@module_required('accounting')
+@require_http_methods(['POST'])
+def delete_accounting_reference(request, kind, pk):
+    """Désactive (soft-delete) un taux de TVA / type de recette / type de dépense."""
+    model = ACCOUNTING_REFERENCE_MODELS.get(kind)
+    if model is None:
+        raise Http404
+    instance = get_object_or_404(model, pk=pk, delete_at__isnull=True)
+    if _accounting_reference_in_use(instance, kind):
+        messages.error(
+            request,
+            _("Impossible de désactiver « %(name)s » : des enregistrements actifs y sont encore rattachés.") % {'name': instance.name},
+        )
+    else:
+        instance.delete_at = timezone.now()
+        instance.save(update_fields=['delete_at'])
+        messages.success(request, _('"%(name)s" désactivé.') % {'name': instance.name})
+    return redirect(f"{reverse('accounting_references')}?tab={kind}")
+
+
 INVENTORY_PER_PAGE_CHOICES = [10, 25, 50, 100]
 
 
@@ -3455,7 +4016,7 @@ def contacts(request):
     page_number = request.GET.get('page', 1)
 
     if tab == 'staff':
-        queryset = CustomUser.objects.filter(delete_at__isnull=True, is_active=True)
+        queryset = CustomUser.objects.filter(delete_at__isnull=True)
         if search:
             queryset = queryset.filter(
                 Q(firstname__icontains=search) | Q(lastname__icontains=search) | Q(username__icontains=search)
@@ -3482,6 +4043,121 @@ def contacts(request):
         'total_count': paginator.count,
     }
     return render(request, 'core/contacts.html', context)
+
+
+@login_required
+@superuser_required
+def add_staff(request):
+    """Créer un membre du personnel (réservé aux administrateurs)."""
+    if request.method == 'POST':
+        form = StaffForm(request.POST, editing=False)
+        if form.is_valid():
+            user = form.save()
+            messages.success(request, _('Compte "%(name)s" créé avec succès.') % {'name': user.username})
+            return redirect(f"{reverse('contacts')}?tab=staff")
+    else:
+        form = StaffForm(editing=False)
+
+    context = {
+        'page_title': _('Nouveau membre du personnel'),
+        'form': form,
+        'form_title': _('Nouveau membre du personnel'),
+        'form_subtitle': _('Créer un compte et lui attribuer des modules'),
+        'back_url': 'contacts',
+        'back_tab': 'staff',
+    }
+    return render(request, 'core/staff_form.html', context)
+
+
+@login_required
+@superuser_required
+def edit_staff(request, pk):
+    """Modifier un membre du personnel (rôle, modules, statut)."""
+    from core.services.staff_service import StaffService
+
+    staff_member = get_object_or_404(CustomUser, pk=pk, delete_at__isnull=True)
+    previous_state = CustomUser.objects.get(pk=staff_member.pk)
+
+    if request.method == 'POST':
+        form = StaffForm(request.POST, instance=staff_member, editing=True)
+        if form.is_valid():
+            loses_admin_rights = previous_state.is_superuser and (
+                not form.instance.is_superuser or not form.instance.is_active
+            )
+            try:
+                if loses_admin_rights:
+                    StaffService.ensure_not_last_superuser(previous_state)
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                form.save()
+                messages.success(request, _('Compte "%(name)s" modifié avec succès.') % {'name': staff_member.username})
+                return redirect(f"{reverse('contacts')}?tab=staff")
+    else:
+        form = StaffForm(instance=staff_member, editing=True)
+
+    context = {
+        'page_title': _('Modifier %(name)s') % {'name': staff_member.get_full_name()},
+        'form': form,
+        'form_title': _('Modifier le membre du personnel'),
+        'form_subtitle': _('Modifier le compte de %(name)s') % {'name': staff_member.get_full_name()},
+        'back_url': 'contacts',
+        'back_tab': 'staff',
+        'staff_member': staff_member,
+    }
+    return render(request, 'core/staff_form.html', context)
+
+
+@login_required
+@superuser_required
+@require_http_methods(['POST'])
+def toggle_staff_active(request, pk):
+    """Active/désactive un compte du personnel en un clic."""
+    from core.services.staff_service import StaffService
+
+    staff_member = get_object_or_404(CustomUser, pk=pk, delete_at__isnull=True)
+    try:
+        if staff_member.is_active:
+            StaffService.ensure_not_last_superuser(staff_member)
+            staff_member.is_active = False
+            message = _('Compte "%(name)s" désactivé.') % {'name': staff_member.username}
+        else:
+            staff_member.is_active = True
+            message = _('Compte "%(name)s" réactivé.') % {'name': staff_member.username}
+        staff_member.save(update_fields=['is_active'])
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, message)
+    return redirect(f"{reverse('contacts')}?tab=staff")
+
+
+@login_required
+@superuser_required
+def reset_staff_password(request, pk):
+    """Réinitialise le mot de passe d'un membre du personnel."""
+    staff_member = get_object_or_404(CustomUser, pk=pk, delete_at__isnull=True)
+
+    if request.method == 'POST':
+        form = StaffPasswordResetForm(request.POST)
+        if form.is_valid():
+            staff_member.set_password(form.cleaned_data['new_password1'])
+            staff_member.save(update_fields=['password'])
+            staff_member.revoke_api_tokens()
+            messages.success(request, _('Mot de passe de "%(name)s" réinitialisé.') % {'name': staff_member.username})
+            return redirect(f"{reverse('contacts')}?tab=staff")
+    else:
+        form = StaffPasswordResetForm()
+
+    context = {
+        'page_title': _('Réinitialiser le mot de passe'),
+        'form': form,
+        'form_title': _('Réinitialiser le mot de passe'),
+        'form_subtitle': _('Nouveau mot de passe pour %(name)s') % {'name': staff_member.get_full_name()},
+        'back_url': 'contacts',
+        'back_tab': 'staff',
+    }
+    return render(request, 'core/staff_password_form.html', context)
 
 
 @login_required
@@ -3514,13 +4190,39 @@ def suppliers_list(request):
 @login_required
 @module_required('contacts')
 def add_client(request):
-    """Vue pour ajouter un nouveau client"""
+    """Vue pour ajouter un nouveau client.
+
+    Aussi utilisée en AJAX par le raccourci « + » de la page Ventes (choix
+    d'un client pour une vente à crédit), à la manière d'un popup Django
+    admin : la même vue répond en JSON quand elle reçoit l'en-tête
+    ``X-Requested-With``, sans dupliquer la logique de création.
+    """
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if request.method == 'POST':
         form = ClientForm(request.POST)
         if form.is_valid():
-            form.save()
+            client = form.save()
+            if is_ajax:
+                return JsonResponse({
+                    'success': True,
+                    'id': client.id,
+                    'name': str(client),
+                })
             messages.success(request, _('Client "%(name)s" créé avec succès.') % {'name': form.cleaned_data['firstname']})
             return redirect('contacts')
+        elif is_ajax:
+            form_errors = form.errors.get_json_data()
+            return JsonResponse({
+                'success': False,
+                'errors': {
+                    field: [error['message'] for error in errors]
+                    for field, errors in form_errors.items()
+                    if field != '__all__'
+                },
+                'non_field_errors': [
+                    error['message'] for error in form_errors.get('__all__', [])
+                ],
+            }, status=400)
     else:
         form = ClientForm()
 
@@ -3559,6 +4261,27 @@ def edit_client(request, pk):
         'back_tab': 'clients',
     }
     return render(request, 'core/contacts_form.html', context)
+
+
+@login_required
+@module_required('contacts')
+@require_http_methods(['POST'])
+def delete_client(request, pk):
+    """Désactive (soft-delete) un client, sauf s'il a une créance en cours."""
+    client = get_object_or_404(Client, pk=pk, delete_at__isnull=True)
+    has_outstanding_credit = CreditSale.objects.filter(
+        sale__client=client, is_fully_paid=False, delete_at__isnull=True,
+    ).exists()
+    if has_outstanding_credit:
+        messages.error(
+            request,
+            _("Impossible de désactiver « %(name)s » : une créance est encore en cours.") % {'name': client.get_full_name()},
+        )
+    else:
+        client.delete_at = timezone.now()
+        client.save(update_fields=['delete_at'])
+        messages.success(request, _('Client "%(name)s" désactivé.') % {'name': client.get_full_name()})
+    return redirect(f"{reverse('contacts')}?tab=clients")
 
 
 @login_required
@@ -3607,6 +4330,27 @@ def edit_supplier(request, pk):
         'back_url': 'suppliers',
     }
     return render(request, 'core/supplier_form.html', context)
+
+
+@login_required
+@module_required('suppliers')
+@require_http_methods(['POST'])
+def delete_supplier(request, pk):
+    """Désactive (soft-delete) un fournisseur, sauf s'il a une dette en cours."""
+    supplier = get_object_or_404(Supplier, pk=pk, delete_at__isnull=True)
+    has_outstanding_credit = CreditSupply.objects.filter(
+        supply__supplier=supplier, is_fully_paid=False, delete_at__isnull=True,
+    ).exists()
+    if has_outstanding_credit:
+        messages.error(
+            request,
+            _("Impossible de désactiver « %(name)s » : une dette fournisseur est encore en cours.") % {'name': supplier.name},
+        )
+    else:
+        supplier.delete_at = timezone.now()
+        supplier.save(update_fields=['delete_at'])
+        messages.success(request, _('Fournisseur "%(name)s" désactivé.') % {'name': supplier.name})
+    return redirect('suppliers')
 
 
 @login_required
@@ -3673,7 +4417,8 @@ def add_supply(request):
             supply.is_credit = is_credit_purchase
             supply.selling_price = form.cleaned_data.get('selling_price') or supply.product.actual_price or 0
             supply.is_paid = not is_credit_purchase
-            
+            supply.payment_method = form.cleaned_data.get('payment_method', 'CASH')
+
             # Calculer le montant de la TVA
             tax_rate = form.cleaned_data.get('tax_rate')
             if tax_rate:
@@ -3696,13 +4441,12 @@ def add_supply(request):
             supply.save()
 
             # Enregistrer l'écriture comptable
-            payment_method = form.cleaned_data.get('payment_method', 'CASH')
             try:
                 AccountingService.record_supply(
                     supply=supply,
                     daily=supply.daily,
                     exercise=supply.daily.exercise,
-                    payment_method=payment_method,
+                    payment_method=supply.payment_method,
                     is_credit=is_credit_purchase,
                     tax_rate=supply.tax_rate,  # Passer le taux de TVA depuis l'approvisionnement
                 )
@@ -3758,7 +4502,7 @@ def add_supply(request):
                     'total_price': float(supply.total_price),
                     'vat_amount': float(supply.vat_amount) if supply.vat_amount else 0,
                     'expense_type_id': supply.expense_type_id if supply.expense_type else None,
-                    'payment_method': payment_method,
+                    'payment_method': supply.payment_method,
                 })
 
             messages.success(request, _('Approvisionnement de %(quantity)s x "%(product)s" enregistré avec succès.') % {
@@ -3793,6 +4537,136 @@ def add_supply(request):
         'form': form,
     }
     return render(request, 'core/supplies_add.html', context)
+
+
+# ── Commandes fournisseurs (statut ORDERED, distinct de la réception) ──
+
+@login_required
+@module_required('supplies')
+def purchase_orders(request):
+    """Liste des commandes fournisseurs en attente de réception."""
+    from core.models.inventory_models import PurchaseOrder
+
+    search = request.GET.get('search', '').strip()
+    page_number = request.GET.get('page', 1)
+
+    queryset = PurchaseOrder.objects.filter(
+        status='ORDERED', delete_at__isnull=True,
+    ).select_related('product', 'supplier', 'staff')
+
+    if search:
+        queryset = queryset.filter(
+            Q(product__name__icontains=search) | Q(product__code__icontains=search) | Q(supplier__name__icontains=search)
+        )
+    queryset = queryset.order_by('-create_at')
+
+    paginator = Paginator(queryset, 20)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_title': _('Commandes fournisseurs'),
+        'page_obj': page_obj,
+        'orders': page_obj.object_list,
+        'current_search': search,
+        'total_count': paginator.count,
+    }
+    return render(request, 'core/purchase_orders.html', context)
+
+
+@login_required
+@module_required('supplies')
+def add_purchase_order(request):
+    """Passe une commande fournisseur : aucun effet sur le stock ni la comptabilité."""
+    from core.forms import PurchaseOrderForm
+    from core.services.supply_service import SupplyService
+
+    if request.method == 'POST':
+        form = PurchaseOrderForm(request.POST)
+        if form.is_valid():
+            order = SupplyService.create_purchase_order(
+                product=form.cleaned_data['product'],
+                supplier=form.cleaned_data.get('supplier'),
+                quantity=form.cleaned_data['quantity'],
+                purchase_cost=form.cleaned_data['purchase_cost'],
+                staff=request.user,
+                daily=DailyService.get_or_create_active_daily(),
+            )
+            messages.success(request, _('Commande de %(quantity)s x "%(product)s" enregistrée.') % {
+                'quantity': order.quantity, 'product': order.product.name,
+            })
+            return redirect('purchase_orders')
+    else:
+        form = PurchaseOrderForm()
+
+    context = {
+        'page_title': _('Nouvelle commande fournisseur'),
+        'form': form,
+    }
+    return render(request, 'core/purchase_order_form.html', context)
+
+
+@login_required
+@module_required('supplies')
+def receive_purchase_order(request, pk):
+    """Réceptionne une commande fournisseur : applique le stock et l'écriture comptable."""
+    from core.forms import ReceiveSupplyForm
+    from core.models.inventory_models import PurchaseOrder
+    from core.services.supply_service import SupplyService
+
+    order = get_object_or_404(PurchaseOrder, pk=pk, status='ORDERED', delete_at__isnull=True)
+
+    if request.method == 'POST':
+        form = ReceiveSupplyForm(request.POST, product=order.product)
+        if form.is_valid():
+            try:
+                SupplyService.receive_purchase_order(
+                    order,
+                    purchase_cost=form.cleaned_data['purchase_cost'],
+                    selling_price=form.cleaned_data.get('selling_price'),
+                    payment_method=form.cleaned_data.get('payment_method', 'CASH'),
+                    is_credit=form.cleaned_data.get('is_credit', False),
+                    due_date=form.cleaned_data.get('due_date'),
+                    tax_rate=form.cleaned_data.get('tax_rate'),
+                    expense_type=form.cleaned_data.get('expense_type'),
+                    can_update_selling_price=request.user.has_module_access('products'),
+                )
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                messages.success(request, _('Commande de "%(product)s" réceptionnée : stock mis à jour.') % {
+                    'product': order.product.name,
+                })
+                return redirect('supplies')
+    else:
+        form = ReceiveSupplyForm(product=order.product, initial={
+            'purchase_cost': order.estimated_purchase_cost,
+            'selling_price': order.product.actual_price,
+        })
+
+    context = {
+        'page_title': _('Réceptionner la commande – %(product)s') % {'product': order.product.name},
+        'form': form,
+        'order': order,
+    }
+    return render(request, 'core/receive_purchase_order.html', context)
+
+
+@login_required
+@module_required('supplies')
+@require_http_methods(['POST'])
+def cancel_purchase_order(request, pk):
+    """Annule une commande fournisseur non encore réceptionnée."""
+    from core.models.inventory_models import PurchaseOrder
+    from core.services.supply_service import SupplyService
+
+    order = get_object_or_404(PurchaseOrder, pk=pk, delete_at__isnull=True)
+    try:
+        SupplyService.cancel_purchase_order(order)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, _('Commande de "%(product)s" annulée.') % {'product': order.product.name})
+    return redirect('purchase_orders')
 
 
 @login_required
@@ -3901,17 +4775,17 @@ def add_expense(request):
             expense.exercise = daily.exercise
             expense.save()
 
-            # Enregistrer l'écriture comptable
+            # Enregistrer l'écriture comptable. Une erreur ne bloque pas la
+            # dépense (continuité de service en caisse) mais n'est plus
+            # silencieuse : elle est journalisée et la dépense est marquée
+            # « à rejouer » (``manage.py replay_accounting``).
             payment_method = form.cleaned_data.get('payment_method', 'CASH')
-            try:
-                AccountingService.record_expense(
-                    expense=expense,
-                    daily=daily,
-                    exercise=daily.exercise,
-                    payment_method=payment_method,
-                )
-            except Exception:
-                pass  # Ne pas bloquer la dépense si la comptabilité échoue
+            AccountingService.safe_record_expense(
+                expense=expense,
+                daily=daily,
+                exercise=daily.exercise,
+                payment_method=payment_method,
+            )
 
             messages.success(request, _('Dépense de %(amount)s FCFA enregistrée avec succès.') % {'amount': f'{expense.amount:,.0f}'})
             return redirect('expenses')
@@ -3961,17 +4835,15 @@ def add_expense_ajax(request):
             expense.exercise = daily.exercise
             expense.save()
 
-            # Enregistrer l'écriture comptable
+            # Enregistrer l'écriture comptable (voir add_expense : plus de
+            # perte silencieuse, marquage accounting_pending sur échec).
             payment_method = form.cleaned_data.get('payment_method', 'CASH')
-            try:
-                AccountingService.record_expense(
-                    expense=expense,
-                    daily=daily,
-                    exercise=daily.exercise,
-                    payment_method=payment_method,
-                )
-            except Exception:
-                logger.exception("Écriture comptable impossible pour la dépense #%s", expense.pk)
+            AccountingService.safe_record_expense(
+                expense=expense,
+                daily=daily,
+                exercise=daily.exercise,
+                payment_method=payment_method,
+            )
 
             return JsonResponse({
                 'success': True,
@@ -4010,17 +4882,17 @@ def add_recipe(request):
             recipe.exercise = daily.exercise
             recipe.save()
 
-            # Enregistrer l'écriture comptable
+            # Enregistrer l'écriture comptable. Une erreur ne bloque pas la
+            # recette (continuité de service en caisse) mais n'est plus
+            # silencieuse : elle est journalisée et la recette est marquée
+            # « à rejouer » (``manage.py replay_accounting``).
             payment_method = form.cleaned_data.get('payment_method', 'CASH')
-            try:
-                AccountingService.record_recipe(
-                    recipe=recipe,
-                    daily=daily,
-                    exercise=daily.exercise,
-                    payment_method=payment_method,
-                )
-            except Exception:
-                pass  # Ne pas bloquer la recette si la comptabilité échoue
+            AccountingService.safe_record_recipe(
+                recipe=recipe,
+                daily=daily,
+                exercise=daily.exercise,
+                payment_method=payment_method,
+            )
 
             messages.success(request, _('Recette de %(amount)s FCFA enregistrée avec succès.') % {'amount': f'{recipe.amount:,.0f}'})
             return redirect('expenses')
@@ -4192,9 +5064,23 @@ def close_daily(request):
 @login_required
 @module_required('settings')
 def settings(request):
-    """Vue de la page des paramètres"""
+    """Vue de la page des paramètres système (instance singleton)."""
+    from core.models.settings_models import SystemSettings
+
+    settings_obj = SystemSettings.get_settings()
+
+    if request.method == 'POST':
+        form = SystemSettingsForm(request.POST, request.FILES, instance=settings_obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _('Paramètres enregistrés avec succès.'))
+            return redirect('settings')
+    else:
+        form = SystemSettingsForm(instance=settings_obj)
+
     context = {
-        'page_title': _('Paramètres')
+        'page_title': _('Paramètres'),
+        'form': form,
     }
     return render(request, 'core/settings.html', context)
 
@@ -4921,16 +5807,15 @@ def add_supplier_payment(request):
             payment.daily = daily
             payment.save()
 
-            # Écriture comptable
-            try:
-                exercise = daily.exercise if daily else ExerciseService.get_or_create_current_exercise()
-                AccountingService.record_supplier_payment(
-                    supplier_payment=payment,
-                    daily=daily,
-                    exercise=exercise,
-                )
-            except Exception:
-                pass
+            # Écriture comptable. Une erreur ne bloque pas le paiement mais
+            # n'est plus silencieuse : elle est journalisée et le paiement
+            # est marqué « à rejouer » (``manage.py replay_accounting``).
+            exercise = daily.exercise if daily else ExerciseService.get_or_create_current_exercise()
+            AccountingService.safe_record_supplier_payment(
+                supplier_payment=payment,
+                daily=daily,
+                exercise=exercise,
+            )
 
             messages.success(
                 request,
@@ -5137,6 +6022,25 @@ def generate_invoice(request, sale_id):
 
     messages.success(request, _('Facture %(number)s générée avec succès.') % {'number': invoice.invoice_number})
     return redirect('invoices')
+
+
+@login_required
+@module_required('treasury')
+def invoice_pdf(request, pk):
+    """Télécharge une facture au format PDF."""
+    from core.models.settings_models import SystemSettings
+    from core.services.invoice_pdf_service import InvoicePdfService
+
+    invoice = get_object_or_404(
+        Invoice.objects.select_related('sale', 'sale__client').filter(delete_at__isnull=True),
+        pk=pk,
+    )
+    settings_obj = SystemSettings.get_settings()
+    pdf_bytes = InvoicePdfService.build_pdf(invoice, settings_obj)
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{invoice.invoice_number}.pdf"'
+    return response
 
 
 @login_required

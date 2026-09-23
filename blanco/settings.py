@@ -66,7 +66,23 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=lambda v: [s.strip() for s in v.spl
 if IS_SAAS:
     # Domaine racine de la plateforme : sert à distinguer le site public et le
     # back-office des espaces clients (voir saas.middleware.TenantMiddleware).
-    BLANCO_PLATFORM_DOMAIN = config("BLANCO_PLATFORM_DOMAIN")
+    # Obligatoire en production SaaS (voir la levée d'erreur plus bas, même
+    # exemption que REDIS_URL/EMAIL_HOST). Sous ``manage.py test``, on retombe
+    # sur "blanco.test" : c'est la valeur que la suite de tests utilise pour
+    # ses requêtes (``HOTE_PLATEFORME`` dans saas/tests/test_public_views.py,
+    # ``parametres_saas()`` dans saas/tests/base.py qui la répète via
+    # ``override_settings``). ALLOWED_HOSTS n'est calculé qu'une fois, au
+    # chargement de ce module — un ``override_settings`` de test ne peut plus
+    # le corriger après coup — donc la valeur doit être correcte dès ici.
+    BLANCO_PLATFORM_DOMAIN = config(
+        "BLANCO_PLATFORM_DOMAIN", default="blanco.test" if "test" in sys.argv else "",
+    )
+    if not BLANCO_PLATFORM_DOMAIN and "test" not in sys.argv:
+        raise ImproperlyConfigured(
+            "BLANCO_MODE=saas exige BLANCO_PLATFORM_DOMAIN : c'est le domaine "
+            "racine qui distingue le site public et le back-office des "
+            "espaces clients (voir saas.middleware.TenantMiddleware)."
+        )
     # Joker natif de Django : autorise tous les sous-domaines de la plateforme.
     # Les domaines PROPRES des clients ne peuvent pas figurer dans une liste
     # statique ; ils sont validés par TenantMiddleware contre la table Domain,
@@ -152,6 +168,7 @@ TEMPLATES = [
                 "core.context_processors.system_settings_context",
                 "core.context_processors.user_modules_context",
                 "core.context_processors.deployment_mode_context",
+                "core.context_processors.alerts_context",
             ],
         },
     },

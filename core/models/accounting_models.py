@@ -254,7 +254,15 @@ class DailyExpense(SoftDeleteModel):
         'Account', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='expenses', verbose_name=_("Compte comptable")
     )
-    
+    accounting_pending = models.BooleanField(
+        default=False,
+        verbose_name=_("Écriture comptable en attente"),
+        help_text=_(
+            "Vrai si l'écriture comptable de la dépense a échoué et doit être "
+            "rejouée (commande replay_accounting)."
+        ),
+    )
+
     class Meta:
         db_table = 'daily_expense'
         # managed = False
@@ -280,7 +288,15 @@ class DailyRecipe(SoftDeleteModel):
         'Account', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='recipes', verbose_name=_("Compte comptable")
     )
-    
+    accounting_pending = models.BooleanField(
+        default=False,
+        verbose_name=_("Écriture comptable en attente"),
+        help_text=_(
+            "Vrai si l'écriture comptable de la recette a échoué et doit être "
+            "rejouée (commande replay_accounting)."
+        ),
+    )
+
     class Meta:
         db_table = 'daily_recipe'
         # managed = False
@@ -404,6 +420,14 @@ class SupplierPayment(SoftDeleteModel):
     daily = models.ForeignKey(
         'Daily', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='supplier_payments', verbose_name=_("Journée")
+    )
+    accounting_pending = models.BooleanField(
+        default=False,
+        verbose_name=_("Écriture comptable en attente"),
+        help_text=_(
+            "Vrai si l'écriture comptable du paiement a échoué et doit être "
+            "rejouée (commande replay_accounting)."
+        ),
     )
 
     class Meta:

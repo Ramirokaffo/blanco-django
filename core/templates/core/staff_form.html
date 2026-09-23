@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{{ form_title }} - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/contacts.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>{{ form_title }}</h1>
+            <p class="text-secondary">{{ form_subtitle }}</p>
+        </div>
+        <a href="{% url back_url %}?tab={{ back_tab }}" class="btn btn-secondary btn-sm">{% trans "Retour à la liste" %}</a>
+    </div>
+</div>
+
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" class="contact-form">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="form-errors">
+        {% for error in form.non_field_errors %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Identification" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.username.id_for_label }}">{{ form.username.label }} <span class="required">*</span></label>
+                    {{ form.username }}
+                    {% if form.username.errors %}<div class="field-error">{{ form.username.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.firstname.id_for_label }}">{{ form.firstname.label }}</label>
+                    {{ form.firstname }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.lastname.id_for_label }}">{{ form.lastname.label }}</label>
+                    {{ form.lastname }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<div class="field-error">{{ form.email.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.phone_number.id_for_label }}">{{ form.phone_number.label }}</label>
+                    {{ form.phone_number }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.gender.id_for_label }}">{{ form.gender.label }}</label>
+                    {{ form.gender }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.role.id_for_label }}">{{ form.role.label }}</label>
+                    {{ form.role }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if form.password1 %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Mot de passe" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.password1.id_for_label }}">{{ form.password1.label }} <span class="required">*</span></label>
+                    {{ form.password1 }}
+                    {% if form.password1.errors %}<div class="field-error">{{ form.password1.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.password2.id_for_label }}">{{ form.password2.label }} <span class="required">*</span></label>
+                    {{ form.password2 }}
+                    {% if form.password2.errors %}<div class="field-error">{{ form.password2.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Mot de passe" %}</h3>
+        </div>
+        <div class="card-body">
+            <a href="{% url 'reset_staff_password' staff_member.pk %}" class="btn btn-secondary btn-sm">{% trans "Réinitialiser le mot de passe" %}</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Rôle et statut" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+                    {{ form.is_superuser }}
+                    <label class="form-label" for="{{ form.is_superuser.id_for_label }}" style="margin:0;">{{ form.is_superuser.label }}</label>
+                </div>
+                {% if form.is_active %}
+                <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+                    {{ form.is_active }}
+                    <label class="form-label" for="{{ form.is_active.id_for_label }}" style="margin:0;">{{ form.is_active.label }}</label>
+                </div>
+                {% endif %}
+            </div>
+            {% if form.non_field_errors %}{% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{{ form.allowed_modules.label }}</h3>
+        </div>
+        <div class="card-body">
+            <p class="text-secondary" style="margin-top:0;">{{ form.allowed_modules.help_text }}</p>
+            <div class="form-grid">
+                {% for choice in form.allowed_modules %}
+                <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+                    {{ choice.tag }}
+                    <label class="form-label" for="{{ choice.id_for_label }}" style="margin:0;">{{ choice.choice_label }}</label>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{% trans "Enregistrer" %}</button>
+        <a href="{% url back_url %}?tab={{ back_tab }}" class="btn btn-secondary">{% trans "Annuler" %}</a>
+    </div>
+</form>
+{% endblock %}

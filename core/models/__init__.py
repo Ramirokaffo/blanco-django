@@ -40,6 +40,7 @@ __all__ = [
     # Inventory models
     'Supply',
     'SupplyReturn',
+    'PurchaseOrder',
     'Inventory',
     'InventorySnapshot',
     'DailyInventory',

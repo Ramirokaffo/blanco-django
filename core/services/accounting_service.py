@@ -144,6 +144,37 @@ class AccountingService:
                 last_error = exc
         raise last_error
 
+    @staticmethod
+    def _safe_record(record_fn, instance, log_fmt, **kwargs):
+        """
+        Exécute ``record_fn(instance, **kwargs)`` dans un savepoint dédié.
+        Sur échec : journalise (jamais de perte silencieuse) et marque
+        ``instance.accounting_pending = True`` pour un rejeu ultérieur via
+        ``manage.py replay_accounting``. Sur succès, efface le drapeau s'il
+        était posé. Retourne True/False selon le résultat.
+
+        Mutualise le pattern déjà utilisé pour ``Sale``
+        (``SaleService.record_sale_accounting``) pour les dépenses, recettes
+        et paiements fournisseurs, qui avalaient auparavant l'exception sans
+        aucune trace.
+        """
+        model = type(instance)
+        try:
+            with transaction.atomic():
+                record_fn(instance, **kwargs)
+        except Exception:
+            logger.exception(
+                ("Écriture comptable impossible pour " + log_fmt + " (marquée à rejouer)"),
+                instance.pk,
+            )
+            model.objects.filter(pk=instance.pk).update(accounting_pending=True)
+            instance.accounting_pending = True
+            return False
+        if getattr(instance, 'accounting_pending', False):
+            model.objects.filter(pk=instance.pk).update(accounting_pending=False)
+            instance.accounting_pending = False
+        return True
+
     # ── Helpers pour récupérer un compte ──────────────────────────────
 
     @staticmethod
@@ -186,6 +217,34 @@ class AccountingService:
         ht = (amount_ttc / (1 + rate)).quantize(Decimal('1'))
         tva = amount_ttc - ht
         return ht, tva
+
+    @staticmethod
+    def taxable_amount(sale):
+        """
+        Part du total TTC d'une vente correspondant à des produits soumis à
+        la TVA (``Product.has_vat``), à partir des lignes actives.
+
+        Un panier mixte (un produit exonéré + un produit taxable) ne doit
+        soumettre à la TVA que la part taxable, pas le total de la vente.
+        Retourne None si la vente n'a aucune ligne active exploitable (cas
+        d'une vente construite sans ``SaleProduct``, ex. anciens tests) : le
+        montant TTC complet est alors traité comme taxable, comme avant.
+        """
+        lines = sale.sale_products.filter(
+            delete_at__isnull=True, quantity__gt=0,
+        ).select_related('product')
+        taxable = Decimal('0')
+        total = Decimal('0')
+        has_lines = False
+        for line in lines:
+            has_lines = True
+            subtotal = Decimal(str(line.get_subtotal()))
+            total += subtotal
+            if getattr(line.product, 'has_vat', False):
+                taxable += subtotal
+        if not has_lines or total <= 0:
+            return None
+        return taxable
 
     @classmethod
     def record_sale_cancellation(
@@ -626,9 +685,19 @@ class AccountingService:
 
         is_credit = getattr(sale, 'is_credit', False)
 
-        # Calcul TVA si activée
+        # Calcul TVA si activée, sur la seule part taxable du panier (les
+        # lignes dont le produit a has_vat=False restent hors TVA même si
+        # d'autres lignes de la même vente sont taxables).
         tax_rate = cls.get_default_tax_rate() if apply_tax else None
-        ht, tva = cls.compute_tax(amount, tax_rate)
+        taxable = cls.taxable_amount(sale)
+        if taxable is None:
+            taxable = amount
+        ht_taxable, tva = cls.compute_tax(taxable, tax_rate)
+        # HT total = part exonérée (déjà HT) + HT de la part taxable, mais on
+        # dérive HT de amount - tva pour garantir que l'écriture reste
+        # équilibrée même si sale.total diverge légèrement de la somme des
+        # lignes actives.
+        ht = amount - tva
 
         if is_credit and tax_rate:
             description = _("Vente #%(id)s (crédit) TVA %(rate)s%%") % {
@@ -729,9 +798,12 @@ class AccountingService:
                     amount = Decimal(str(sale.total or 0))
                     if amount <= 0:
                         continue
-                        
-                    ht, tva = cls.compute_tax(amount, tax_rate)
-                    
+
+                    taxable = cls.taxable_amount(sale)
+                    if taxable is None:
+                        taxable = amount
+                    _ht, tva = cls.compute_tax(taxable, tax_rate)
+
                     if tva <= 0:
                         continue
                     
@@ -923,6 +995,19 @@ class AccountingService:
             ])
         return entry
 
+    @classmethod
+    def safe_record_expense(cls, expense, daily, exercise, payment_method='CASH'):
+        """
+        Enveloppe ``record_expense`` : une erreur ne bloque pas la dépense
+        (continuité de service en caisse) mais n'est plus silencieuse. Elle
+        est journalisée et la dépense est marquée ``accounting_pending``
+        (rejouable via ``manage.py replay_accounting``).
+        Retourne True si l'écriture a été créée, False sinon.
+        """
+        return cls._safe_record(cls.record_expense, expense,
+                                 "la dépense #%s", daily=daily, exercise=exercise,
+                                 payment_method=payment_method)
+
     # ── Écriture pour une RECETTE ───────────────────────────────────────
 
     @classmethod
@@ -978,6 +1063,16 @@ class AccountingService:
                 ),
             ])
         return entry
+
+    @classmethod
+    def safe_record_recipe(cls, recipe, daily, exercise, payment_method='CASH'):
+        """
+        Enveloppe ``record_recipe`` : voir ``safe_record_expense``.
+        Retourne True si l'écriture a été créée, False sinon.
+        """
+        return cls._safe_record(cls.record_recipe, recipe,
+                                 "la recette #%s", daily=daily, exercise=exercise,
+                                 payment_method=payment_method)
 
     # ── Écriture pour un PAIEMENT CRÉDIT CLIENT ────────────────────────
 
@@ -1061,6 +1156,15 @@ class AccountingService:
                 ),
             ])
         return entry
+
+    @classmethod
+    def safe_record_supplier_payment(cls, supplier_payment, daily, exercise):
+        """
+        Enveloppe ``record_supplier_payment`` : voir ``safe_record_expense``.
+        Retourne True si l'écriture a été créée, False sinon.
+        """
+        return cls._safe_record(cls.record_supplier_payment, supplier_payment,
+                                 "le paiement fournisseur #%s", daily=daily, exercise=exercise)
 
     # ── Utilitaires pour les rapports ─────────────────────────────────
 

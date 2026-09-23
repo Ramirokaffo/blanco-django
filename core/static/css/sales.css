@@ -264,6 +264,29 @@
     padding-right: 40px;
 }
 
+.client-select-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.client-select-row .form-control {
+    flex: 1;
+}
+
+.client-select-row .btn-icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.form-group.client-select-invalid .form-control {
+    border-color: var(--danger-color);
+}
+
 /* Radio buttons - Design moderne */
 .radio-group {
     display: flex;

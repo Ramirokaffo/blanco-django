@@ -67,6 +67,7 @@
                         <th class="text-right">{% trans "Montant" %}</th>
                         <th>{% trans "Échéance" %}</th>
                         <th>{% trans "Statut" %}</th>
+                        <th class="text-center">{% trans "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -88,10 +89,17 @@
                             <span class="badge badge-danger">{% trans "Annulée" %}</span>
                             {% endif %}
                         </td>
+                        <td class="text-center">
+                            <a href="{% url 'invoice_pdf' inv.pk %}" class="btn-icon" title="{% trans "Télécharger le PDF" %}">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </a>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center">{% trans "Aucune facture trouvée" %}</td>
+                        <td colspan="7" class="text-center">{% trans "Aucune facture trouvée" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

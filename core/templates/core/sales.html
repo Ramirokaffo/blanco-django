@@ -111,12 +111,18 @@
                                 <h4>{% trans "Informations client" %}</h4>
                                 <div class="form-group">
                                     <label class="form-label">{% trans "Client" %}</label>
-                                    <select class="form-control" id="clientSelect">
-                                        <option value="">{% trans "Client de passage" %}</option>
-                                        {% for client in clients %}
-                                        <option value="{{ client.id }}">{{ client.firstname }} {{ client.lastname }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    <div class="client-select-row">
+                                        <select class="form-control" id="clientSelect">
+                                            <option value="">{% trans "Client de passage" %}</option>
+                                            {% for client in clients %}
+                                            <option value="{{ client.id }}">{{ client.firstname }} {{ client.lastname }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="button" class="btn btn-secondary btn-icon" id="addClientBtn" title="{% trans "Ajouter un client" %}">+</button>
+                                    </div>
+                                    <p class="field-error" id="clientRequiredHint" style="display:none; margin-top:4px;">
+                                        {% trans "Un client doit être sélectionné pour une vente à crédit." %}
+                                    </p>
                                 </div>
                             </div>
 
@@ -435,6 +441,52 @@
         </div>
         <div class="modal-body" id="saleDetailsContent">
             <!-- Contenu chargé dynamiquement -->
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'ajout rapide de client (raccourci depuis le sélecteur client) -->
+<div class="modal" id="addClientModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>{% trans "Nouveau client" %}</h3>
+            <button class="modal-close" id="addClientModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="addClientForm" data-add-client-url="{% url 'add_client' %}">
+                <div class="form-errors" id="addClientNonFieldErrors" style="display:none;"></div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ client_form.firstname.id_for_label }}">{{ client_form.firstname.label }} <span class="required">*</span></label>
+                        {{ client_form.firstname }}
+                        <div class="field-error" data-field="firstname" style="display:none;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ client_form.lastname.id_for_label }}">{{ client_form.lastname.label }}</label>
+                        {{ client_form.lastname }}
+                        <div class="field-error" data-field="lastname" style="display:none;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ client_form.phone_number.id_for_label }}">{{ client_form.phone_number.label }}</label>
+                        {{ client_form.phone_number }}
+                        <div class="field-error" data-field="phone_number" style="display:none;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ client_form.email.id_for_label }}">{{ client_form.email.label }}</label>
+                        {{ client_form.email }}
+                        <div class="field-error" data-field="email" style="display:none;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ client_form.gender.id_for_label }}">{{ client_form.gender.label }}</label>
+                        {{ client_form.gender }}
+                        <div class="field-error" data-field="gender" style="display:none;"></div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="addClientSubmitBtn">{% trans "Enregistrer" %}</button>
+                    <button type="button" class="btn btn-secondary" id="addClientCancelBtn">{% trans "Annuler" %}</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

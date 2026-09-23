@@ -87,6 +87,7 @@ class Product(SoftDeleteModel):
     stock = models.IntegerField(default=0, verbose_name=_("Stock"), help_text=_("Stock actuel du produit"))
     stock_limit = models.IntegerField(null=True, blank=True, verbose_name=_("Seuil d'alerte de stock"), help_text=_("Seuil d'alerte de stock"))
     max_salable_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_("Prix maximum autorisé pour la vente"), help_text=_("Prix maximum autorisé pour la vente"))
+    min_salable_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_("Prix minimum autorisé pour la vente"), help_text=_("Prix minimum autorisé pour la vente"))
     last_purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_("Prix d'achat"), help_text=_("Dernier prix d'achat du produit"))
     actual_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_("Prix actuel du produit"), help_text=_("Prix actuel du produit"))
     exp_alert_period = models.IntegerField(null=True, blank=True, verbose_name=_("Période d'alerte d'expiration (jours)"), help_text=_("Période d'alerte d'expiration (jours)"))

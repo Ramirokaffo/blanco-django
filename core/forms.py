@@ -4,15 +4,39 @@ Formulaires Django pour l'application core.
 
 import json
 from django import forms
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext, gettext_lazy as _
 from core.models.inventory_models import Supply, Inventory
 from core.models.product_models import Product
-from core.models.user_models import Supplier
+from core.models.user_models import Supplier, CustomUser
 from core.models.accounting_models import (
     DailyExpense, DailyRecipe, ExpenseType, Payment, SupplierPayment,
     PAYMENT_METHOD_CHOICES, Account, RecipeType, TaxRate
 )
 from core.models.user_models import Client
+from core.models.settings_models import SystemSettings, AppModule
+
+
+class TaxRateSelect(forms.Select):
+    """
+    Select de taux de TVA qui expose ``rate``/``is_default`` sur chaque
+    <option> (data-rate / data-is-default), pour le calcul de la TVA et la
+    présélection automatique côté JS (core/templates/core/supplies_add.html).
+    """
+
+    def __init__(self, *args, rates_by_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rates_by_id = rates_by_id or {}
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+        rate_info = self.rates_by_id.get(str(value))
+        if rate_info:
+            option['attrs']['data-rate'] = rate_info['rate']
+            if rate_info['is_default']:
+                option['attrs']['data-is-default'] = 'true'
+        return option
 
 
 class SupplyForm(forms.ModelForm):
@@ -96,7 +120,7 @@ class SupplyForm(forms.ModelForm):
         label=_('Taux de TVA'),
         required=False,
         empty_label=_('-- Sans TVA --'),
-        widget=forms.Select(attrs={'class': 'form-control'}),
+        widget=TaxRateSelect(attrs={'class': 'form-control'}),
     )
 
     expense_type = forms.ModelChoiceField(
@@ -126,18 +150,41 @@ class SupplyForm(forms.ModelForm):
         if settings.default_supply_expense_type:
             self.initial['expense_type'] = settings.default_supply_expense_type
 
+        # Exposer le taux (et le caractère "par défaut") de chaque taux de
+        # TVA sur son <option>, pour le calcul et la présélection côté JS.
+        self.fields['tax_rate'].widget.rates_by_id = {
+            str(tax_rate.pk): {
+                'rate': self._format_decimal_for_input(tax_rate.rate),
+                'is_default': tax_rate.is_default,
+            }
+            for tax_rate in self.fields['tax_rate'].queryset
+        }
+
+        # Dernier fournisseur / mode de paiement / statut crédit utilisés par
+        # produit, pour le préremplissage (un seul passage sur les
+        # approvisionnements actifs, le plus récent par produit gagne).
+        last_supply_by_product = {}
+        for row in Supply.objects.filter(delete_at__isnull=True).order_by('-create_at', '-id').values(
+            'product_id', 'supplier_id', 'payment_method', 'is_credit'
+        ):
+            last_supply_by_product.setdefault(row['product_id'], row)
+
         # Ajouter les métadonnées du produit pour le préremplissage et la TVA.
         active_products = Product.objects.filter(delete_at__isnull=True).only(
             'id', 'has_vat', 'actual_price', 'last_purchase_price'
         )
-        self.fields['product'].widget.attrs['data-product-meta-map'] = json.dumps({
-            str(product.id): {
+        product_meta_map = {}
+        for product in active_products:
+            last_supply = last_supply_by_product.get(product.id)
+            product_meta_map[str(product.id)] = {
                 'has_vat': product.has_vat,
                 'selling_price': self._format_decimal_for_input(product.actual_price),
                 'purchase_cost': self._format_decimal_for_input(product.last_purchase_price),
+                'last_supplier_id': last_supply['supplier_id'] if last_supply else None,
+                'last_payment_method': last_supply['payment_method'] if last_supply else None,
+                'last_is_credit': last_supply['is_credit'] if last_supply else False,
             }
-            for product in active_products
-        })
+        self.fields['product'].widget.attrs['data-product-meta-map'] = json.dumps(product_meta_map)
 
     class Meta:
         model = Supply
@@ -164,6 +211,131 @@ class SupplyForm(forms.ModelForm):
 
         # Vérifier que la TVA est fournie si le produit y est sujet
         if product and product.has_vat and not tax_rate:
+            self.add_error('tax_rate', gettext('Ce produit est soumis à la TVA. Veuillez sélectionner un taux de TVA.'))
+
+        return cleaned_data
+
+
+class PurchaseOrderForm(forms.Form):
+    """
+    Formulaire de commande fournisseur.
+
+    Volontairement plus court que ``SupplyForm`` : à la commande, ni le
+    stock ni l'écriture comptable ne sont touchés (voir
+    ``SupplyService.receive_purchase_order``), donc le mode de paiement, la
+    TVA et le type de dépense — qui ne concernent que la réception — n'ont
+    pas leur place ici. Formulaire simple (non lié à un modèle) : la création
+    passe systématiquement par ``SupplyService.create_purchase_order``.
+    """
+
+    product = forms.ModelChoiceField(
+        queryset=Product.objects.filter(delete_at__isnull=True).order_by('name'),
+        label=_('Produit'),
+        empty_label=_('-- Sélectionner un produit --'),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    supplier = forms.ModelChoiceField(
+        queryset=Supplier.objects.filter(delete_at__isnull=True).order_by('name'),
+        label=_('Fournisseur'),
+        required=False,
+        empty_label=_('-- Aucun fournisseur --'),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    quantity = forms.IntegerField(
+        label=_('Quantité commandée'),
+        min_value=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': _('Ex: 50')}),
+    )
+
+    purchase_cost = forms.DecimalField(
+        label=_("Prix d'achat unitaire estimé (FCFA)"),
+        min_value=0,
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '1'}),
+        help_text=_("Pourra être ajusté au montant réel à la réception."),
+    )
+
+
+class ReceiveSupplyForm(forms.Form):
+    """
+    Formulaire de réception d'une commande fournisseur : les décisions liées
+    au paiement (mode, crédit, TVA, type de dépense) sont prises maintenant,
+    au moment où la marchandise et la facture arrivent réellement.
+    """
+
+    purchase_cost = forms.DecimalField(
+        label=_("Prix d'achat unitaire réel (FCFA)"),
+        min_value=0,
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '1'}),
+    )
+
+    selling_price = forms.DecimalField(
+        label=_('Prix de vente unitaire (FCFA)'),
+        min_value=0,
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '1'}),
+    )
+
+    payment_method = forms.ChoiceField(
+        label=_('Mode de paiement'),
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='CASH',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    is_credit = forms.BooleanField(
+        label=_('Achat à crédit'),
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+    due_date = forms.DateField(
+        label=_("Date d'échéance (pour achat à crédit)"),
+        required=False,
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+    )
+
+    tax_rate = forms.ModelChoiceField(
+        queryset=TaxRate.objects.filter(delete_at__isnull=True, is_active=True).order_by('name'),
+        label=_('Taux de TVA'),
+        required=False,
+        empty_label=_('-- Sans TVA --'),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    expense_type = forms.ModelChoiceField(
+        queryset=ExpenseType.objects.filter(delete_at__isnull=True).order_by('name'),
+        label=_('Type de dépense (approvisionnement)'),
+        required=False,
+        empty_label=_('-- Sélectionner un type --'),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    def __init__(self, *args, product=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._product = product
+        from core.models.settings_models import SystemSettings
+        settings = SystemSettings.get_settings()
+        if settings.default_supply_expense_type:
+            self.initial['expense_type'] = settings.default_supply_expense_type
+
+    def clean(self):
+        cleaned_data = super().clean()
+        purchase_cost = cleaned_data.get('purchase_cost')
+        selling_price = cleaned_data.get('selling_price')
+        tax_rate = cleaned_data.get('tax_rate')
+
+        if selling_price is not None and purchase_cost is not None and selling_price <= purchase_cost:
+            self.add_error('selling_price', gettext("Le prix de vente doit être supérieur au prix d'achat."))
+
+        if self._product is not None and self._product.has_vat and not tax_rate:
             self.add_error('tax_rate', gettext('Ce produit est soumis à la TVA. Veuillez sélectionner un taux de TVA.'))
 
         return cleaned_data
@@ -311,6 +483,130 @@ class ClientForm(forms.ModelForm):
     class Meta:
         model = Client
         fields = ['firstname', 'lastname', 'phone_number', 'email', 'gender']
+
+
+class StaffForm(forms.ModelForm):
+    """
+    Formulaire de création/modification d'un membre du personnel.
+
+    À la création (``editing=False``), un mot de passe est requis. En
+    modification, les champs de mot de passe sont retirés : la
+    réinitialisation passe par un formulaire dédié (``StaffPasswordResetForm``)
+    pour ne pas mélanger les deux actions dans un même écran.
+    """
+
+    password1 = forms.CharField(
+        label=_('Mot de passe'),
+        required=False,
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+    )
+    password2 = forms.CharField(
+        label=_('Confirmer le mot de passe'),
+        required=False,
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+    )
+    allowed_modules = forms.ModelMultipleChoiceField(
+        queryset=AppModule.objects.all().order_by('order'),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label=_('Modules autorisés'),
+        help_text=_("Sans effet pour un administrateur : il a accès à tout."),
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            'username', 'firstname', 'lastname', 'email', 'phone_number',
+            'role', 'gender', 'is_superuser', 'is_active', 'allowed_modules',
+        ]
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'firstname': forms.TextInput(attrs={'class': 'form-control'}),
+            'lastname': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'role': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Ex: Caissière, Gérant...')}),
+            'gender': forms.Select(choices=GENDER_CHOICES, attrs={'class': 'form-control'}),
+            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'is_superuser': _('Administrateur (accès total)'),
+            'is_active': _('Compte actif'),
+        }
+
+    def __init__(self, *args, editing=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.editing = editing
+        if editing:
+            del self.fields['password1']
+            del self.fields['password2']
+        else:
+            self.fields['password1'].required = True
+            self.fields['password2'].required = True
+            # Toujours actif à la création : la désactivation est une action
+            # dédiée (case à cocher non soumise = False, ce qui créerait un
+            # compte inutilisable par défaut si le champ restait ici).
+            del self.fields['is_active']
+
+    def clean_username(self):
+        username = self.cleaned_data['username']
+        qs = CustomUser.objects.filter(username=username)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(_("Ce nom d'utilisateur est déjà utilisé."))
+        return username
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not self.editing:
+            password1 = cleaned_data.get('password1')
+            password2 = cleaned_data.get('password2')
+            if password1 and password2 and password1 != password2:
+                self.add_error('password2', _('Les mots de passe ne correspondent pas.'))
+            elif password1:
+                try:
+                    validate_password(password1)
+                except DjangoValidationError as exc:
+                    self.add_error('password1', exc)
+        return cleaned_data
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        if not self.editing:
+            user.set_password(self.cleaned_data['password1'])
+            user.is_active = True
+        if commit:
+            user.save()
+            self.save_m2m()
+        return user
+
+
+class StaffPasswordResetForm(forms.Form):
+    """Réinitialisation du mot de passe d'un membre du personnel par un administrateur."""
+
+    new_password1 = forms.CharField(
+        label=_('Nouveau mot de passe'),
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+    )
+    new_password2 = forms.CharField(
+        label=_('Confirmer le nouveau mot de passe'),
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get('new_password1')
+        password2 = cleaned_data.get('new_password2')
+        if password1 and password2 and password1 != password2:
+            self.add_error('new_password2', _('Les mots de passe ne correspondent pas.'))
+        elif password1:
+            try:
+                validate_password(password1)
+            except DjangoValidationError as exc:
+                self.add_error('new_password1', exc)
+        return cleaned_data
 
 
 class InventoryForm(forms.ModelForm):
@@ -922,3 +1218,170 @@ class JournalEntryLineForm(forms.Form):
             'placeholder': _('Libellé (optionnel)')
         }),
     )
+
+
+class ProductForm(forms.ModelForm):
+    """
+    Formulaire produit pour le back-office web.
+
+    Le stock ne peut être saisi qu'à la création (``editing=False``) : il
+    génère un approvisionnement initial via ``ProductService.create_product``.
+    En modification, le champ est retiré du formulaire — le stock ne doit
+    changer que via un approvisionnement ou un inventaire (traçabilité
+    stock / comptabilité), jamais par une édition directe du produit.
+    """
+
+    class Meta:
+        model = Product
+        fields = [
+            'code', 'name', 'description', 'brand', 'color', 'stock',
+            'stock_limit', 'min_salable_price', 'max_salable_price', 'last_purchase_price', 'actual_price',
+            'exp_alert_period', 'grammage', 'is_price_reducible', 'has_vat',
+            'category', 'gamme', 'grammage_type', 'rayon',
+        ]
+        widgets = {
+            'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Ex: 6171100130059')}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'brand': forms.TextInput(attrs={'class': 'form-control'}),
+            'color': forms.TextInput(attrs={'class': 'form-control'}),
+            'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'stock_limit': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'min_salable_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'max_salable_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'last_purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'actual_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'exp_alert_period': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'grammage': forms.NumberInput(attrs={'class': 'form-control', 'step': 'any'}),
+            'is_price_reducible': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'has_vat': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'category': forms.Select(attrs={'class': 'form-control'}),
+            'gamme': forms.Select(attrs={'class': 'form-control'}),
+            'grammage_type': forms.Select(attrs={'class': 'form-control'}),
+            'rayon': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, editing=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ('category', 'gamme', 'grammage_type', 'rayon'):
+            field = self.fields[field_name]
+            field.queryset = field.queryset.filter(delete_at__isnull=True).order_by('name')
+            field.empty_label = _('-- Aucun(e) --')
+        if editing:
+            del self.fields['stock']
+        else:
+            self.fields['stock'].required = False
+            self.fields['stock'].help_text = _(
+                "Génère un approvisionnement initial si supérieur à zéro."
+            )
+
+    def clean_stock(self):
+        return self.cleaned_data.get('stock') or 0
+
+    def clean_code(self):
+        code = self.cleaned_data['code']
+        qs = Product.objects.filter(code=code, delete_at__isnull=True)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(_('Ce code produit est déjà utilisé.'))
+        return code
+
+    def clean(self):
+        cleaned_data = super().clean()
+        actual_price = cleaned_data.get('actual_price')
+        min_salable_price = cleaned_data.get('min_salable_price')
+        max_salable_price = cleaned_data.get('max_salable_price')
+
+        if actual_price is not None and min_salable_price is not None and min_salable_price >= actual_price:
+            self.add_error(
+                'min_salable_price',
+                _('Le prix minimum doit être inférieur au prix de vente du produit.'),
+            )
+        if actual_price is not None and max_salable_price is not None and max_salable_price <= actual_price:
+            self.add_error(
+                'max_salable_price',
+                _('Le prix maximum doit être supérieur au prix de vente du produit.'),
+            )
+        return cleaned_data
+
+
+class ReferenceDataForm(forms.Form):
+    """
+    Formulaire générique pour les données de référence produit (catégorie,
+    gamme, rayon, type de grammage), qui partagent toutes les mêmes champs
+    ``name``/``description``.
+    """
+
+    name = forms.CharField(
+        label=_('Nom'),
+        max_length=255,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+
+    description = forms.CharField(
+        label=_('Description'),
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+    )
+
+
+class TaxRateForm(forms.ModelForm):
+    """Formulaire de gestion des taux de TVA configurables (menu Comptabilité)."""
+
+    class Meta:
+        model = TaxRate
+        fields = ['name', 'rate', 'is_default', 'is_active', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'is_default': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+class SystemSettingsForm(forms.ModelForm):
+    """Formulaire d'édition des paramètres système (instance singleton, pk=1)."""
+
+    default_supply_expense_type = forms.ModelChoiceField(
+        queryset=ExpenseType.objects.filter(delete_at__isnull=True).order_by('name'),
+        label=_('Type de dépense par défaut pour les approvisionnements'),
+        required=False,
+        empty_label=_('-- Aucun --'),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        help_text=_("Type de dépense proposé automatiquement sur la page d'ajout d'approvisionnement."),
+    )
+
+    class Meta:
+        model = SystemSettings
+        fields = [
+            'company_name', 'company_address', 'company_phone', 'company_email',
+            'company_website', 'company_logo',
+            'tax_id', 'trade_register',
+            'currency_symbol', 'currency_code',
+            'receipt_header', 'receipt_footer',
+            'low_stock_threshold',
+            'enable_tva_accounting', 'tva_accounting_mode',
+            'default_supply_expense_type',
+        ]
+        widgets = {
+            'company_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _("Nom de l'entreprise")}),
+            'company_address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': _("Adresse de l'entreprise")}),
+            'company_phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Ex: 6XXXXXXXX')}),
+            'company_email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': _('email@exemple.com')}),
+            'company_website': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://...'}),
+            'company_logo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'tax_id': forms.TextInput(attrs={'class': 'form-control'}),
+            'trade_register': forms.TextInput(attrs={'class': 'form-control'}),
+            'currency_symbol': forms.TextInput(attrs={'class': 'form-control'}),
+            'currency_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'receipt_header': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': _('Texte affiché en haut des reçus/tickets')}),
+            'receipt_footer': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': _('Texte affiché en bas des reçus/tickets')}),
+            'low_stock_threshold': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'enable_tva_accounting': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'tva_accounting_mode': forms.Select(attrs={'class': 'form-control'}),
+        }
+        labels = {
+            'enable_tva_accounting': _('Activer la comptabilité TVA'),
+        }

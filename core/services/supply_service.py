@@ -1,13 +1,16 @@
+import logging
 from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from core.models import Product, Supply, SupplyReturn
+from core.models import Product, Supply, SupplyReturn, PurchaseOrder
 from core.models.inventory_models import CreditSupply, PaymentSchedule
 from core.services.accounting_service import AccountingService
 from core.services.daily_service import DailyService
+
+logger = logging.getLogger(__name__)
 
 
 class SupplyService:
@@ -200,3 +203,132 @@ class SupplyService:
         )
 
         return supply_return, refund_amount
+
+    # ── Commande fournisseur (PurchaseOrder -> Supply à la réception) ──
+    #
+    # Une commande fournisseur est une table séparée de Supply : tant
+    # qu'elle n'est pas réceptionnée, elle n'a aucune existence pour le
+    # stock ou la comptabilité. La réception crée le Supply réel — avec les
+    # mêmes effets que la création immédiate historique (vue add_supply) —
+    # ce qui évite de faire apparaître une commande non reçue dans les
+    # nombreux totaux/rapports qui parcourent Supply.objects en confiance.
+
+    @staticmethod
+    @transaction.atomic
+    def create_purchase_order(*, product, supplier, quantity, purchase_cost, staff, daily):
+        """Crée une commande fournisseur : aucun effet sur le stock ni la comptabilité."""
+        return PurchaseOrder.objects.create(
+            product=product,
+            supplier=supplier,
+            staff=staff,
+            daily=daily,
+            quantity=quantity,
+            estimated_purchase_cost=Decimal(str(purchase_cost)),
+            status='ORDERED',
+        )
+
+    @staticmethod
+    @transaction.atomic
+    def cancel_purchase_order(order):
+        """Annule une commande non encore réceptionnée (aucun effet à contrepasser)."""
+        order = PurchaseOrder.objects.select_for_update().get(id=order.id)
+        if order.delete_at is not None:
+            raise ValueError(_("Cette commande est déjà annulée."))
+        if order.status != 'ORDERED':
+            raise ValueError(_(
+                "Cette commande a déjà été réceptionnée : utilisez l'annulation "
+                "d'approvisionnement pour la contrepasser."
+            ))
+        order.delete_at = timezone.now()
+        order.save(update_fields=['delete_at'])
+        return order
+
+    @staticmethod
+    @transaction.atomic
+    def receive_purchase_order(
+        order, *, purchase_cost, selling_price=None, payment_method='CASH',
+        is_credit=False, due_date=None, tax_rate=None, expense_type=None,
+        can_update_selling_price=False,
+    ):
+        """
+        Réceptionne une commande fournisseur : crée le Supply réel — c'est
+        ici, et seulement ici, que le stock augmente et que l'écriture
+        comptable est posée, jamais à la commande.
+        """
+        order = PurchaseOrder.objects.select_for_update().select_related(
+            'product', 'supplier', 'staff', 'daily', 'daily__exercise',
+        ).get(id=order.id)
+
+        if order.delete_at is not None:
+            raise ValueError(_("Cette commande a été annulée."))
+        if order.status != 'ORDERED':
+            raise ValueError(_("Cette commande a déjà été réceptionnée."))
+
+        purchase_cost = Decimal(str(purchase_cost))
+        total_price = purchase_cost * order.quantity
+        vat_amount = (total_price * (tax_rate.rate / Decimal('100'))) if tax_rate else Decimal('0')
+
+        daily = DailyService.get_or_create_active_daily() or order.daily
+        exercise = daily.exercise if daily else order.daily.exercise
+
+        supply = Supply.objects.create(
+            product=order.product,
+            supplier=order.supplier,
+            staff=order.staff,
+            daily=daily,
+            quantity=order.quantity,
+            purchase_cost=purchase_cost,
+            selling_price=selling_price,
+            total_price=total_price,
+            is_credit=is_credit,
+            is_paid=not is_credit,
+            tax_rate=tax_rate,
+            vat_amount=vat_amount,
+            expense_type=expense_type,
+        )
+
+        try:
+            AccountingService.record_supply(
+                supply=supply,
+                daily=daily,
+                exercise=exercise,
+                payment_method=payment_method,
+                is_credit=is_credit,
+                tax_rate=tax_rate,
+            )
+        except Exception:
+            logger.exception(
+                "Écriture comptable impossible pour la réception de la commande #%s", order.pk,
+            )
+
+        if is_credit:
+            credit_supply = CreditSupply.objects.create(
+                supply=supply,
+                amount_paid=0,
+                amount_remaining=total_price,
+                due_date=due_date,
+                is_fully_paid=False,
+            )
+            if due_date:
+                PaymentSchedule.objects.create(
+                    schedule_type='SUPPLIER',
+                    credit_supply=credit_supply,
+                    due_date=due_date,
+                    amount_due=total_price,
+                    status='PENDING',
+                )
+
+        product = Product.objects.select_for_update().get(pk=order.product_id)
+        product.stock = (product.stock or 0) + order.quantity
+        product.last_purchase_price = purchase_cost
+        update_fields = ['stock', 'last_purchase_price']
+        if selling_price and can_update_selling_price:
+            product.actual_price = selling_price
+            update_fields.append('actual_price')
+        product.save(update_fields=update_fields)
+
+        order.status = 'RECEIVED'
+        order.supply = supply
+        order.save(update_fields=['status', 'supply'])
+
+        return supply

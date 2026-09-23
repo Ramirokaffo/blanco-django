@@ -41,3 +41,31 @@ def module_required(module_code):
         return _wrapped_view
     return decorator
 
+
+def superuser_required(view_func):
+    """
+    Decorator réservant une vue aux superusers.
+
+    Contrairement aux autres pages, la gestion du personnel (création de
+    compte, rôle, modules, mot de passe) n'a pas de granularité par module :
+    un utilisateur ayant simplement accès au module ``contacts`` (pour voir
+    la liste) ne doit pas pouvoir créer d'autres comptes ou s'attribuer des
+    droits.
+    """
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        return HttpResponseForbidden(
+            "<h1>%(title)s</h1><p>%(message)s</p><a href='/'>%(back)s</a>" % {
+                'title': _("Accès refusé"),
+                'message': _(
+                    "Seul un administrateur peut gérer les comptes du personnel."
+                ),
+                'back': _("Retour au tableau de bord"),
+            }
+        )
+    return _wrapped_view
+

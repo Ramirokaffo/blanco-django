@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{{ page_title }} - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/contacts.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>{{ page_title }}</h1>
+            <p class="text-secondary">
+                {% blocktrans with quantity=order.quantity %}Quantité commandée : {{ quantity }}{% endblocktrans %}
+                — {% trans "cette action met à jour le stock et enregistre l'écriture comptable." %}
+            </p>
+        </div>
+        <a href="{% url 'purchase_orders' %}" class="btn btn-secondary btn-sm">{% trans "Retour à la liste" %}</a>
+    </div>
+</div>
+
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">{% trans "Réception" %}</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" class="contact-form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="form-errors">
+                {% for error in form.non_field_errors %}
+                <div class="alert alert-error">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.purchase_cost.id_for_label }}">{{ form.purchase_cost.label }} <span class="required">*</span></label>
+                    {{ form.purchase_cost }}
+                    {% if form.purchase_cost.errors %}<div class="field-error">{{ form.purchase_cost.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.selling_price.id_for_label }}">{{ form.selling_price.label }}</label>
+                    {{ form.selling_price }}
+                    {% if form.selling_price.errors %}<div class="field-error">{{ form.selling_price.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.tax_rate.id_for_label }}">{{ form.tax_rate.label }}</label>
+                    {{ form.tax_rate }}
+                    {% if form.tax_rate.errors %}<div class="field-error">{{ form.tax_rate.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.expense_type.id_for_label }}">{{ form.expense_type.label }}</label>
+                    {{ form.expense_type }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.payment_method.id_for_label }}">{{ form.payment_method.label }}</label>
+                    {{ form.payment_method }}
+                </div>
+                <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                    {{ form.is_credit }}
+                    <label class="form-label" for="{{ form.is_credit.id_for_label }}" style="margin:0;">{{ form.is_credit.label }}</label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.due_date.id_for_label }}">{{ form.due_date.label }}</label>
+                    {{ form.due_date }}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{% trans "Réceptionner" %}</button>
+                <a href="{% url 'purchase_orders' %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

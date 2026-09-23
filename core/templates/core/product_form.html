@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{{ form_title }} - {{ system_settings.company_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/contacts.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <div>
+            <h1>{{ form_title }}</h1>
+            <p class="text-secondary">{{ form_subtitle }}</p>
+        </div>
+        {% if back_pk %}
+        <a href="{% url back_url back_pk %}" class="btn btn-secondary btn-sm">{% trans "Retour" %}</a>
+        {% else %}
+        <a href="{% url back_url %}" class="btn btn-secondary btn-sm">{% trans "Retour" %}</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="contact-form">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="form-errors">
+        {% for error in form.non_field_errors %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Identification" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.code.id_for_label }}">{{ form.code.label }} <span class="required">*</span></label>
+                    {{ form.code }}
+                    {% if form.code.errors %}<div class="field-error">{{ form.code.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.name.id_for_label }}">{{ form.name.label }} <span class="required">*</span></label>
+                    {{ form.name }}
+                    {% if form.name.errors %}<div class="field-error">{{ form.name.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.brand.id_for_label }}">{{ form.brand.label }}</label>
+                    {{ form.brand }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.color.id_for_label }}">{{ form.color.label }}</label>
+                    {{ form.color }}
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label class="form-label" for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                    {{ form.description }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Classement" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.category.id_for_label }}">{{ form.category.label }}</label>
+                    {{ form.category }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.gamme.id_for_label }}">{{ form.gamme.label }}</label>
+                    {{ form.gamme }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.rayon.id_for_label }}">{{ form.rayon.label }}</label>
+                    {{ form.rayon }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.grammage_type.id_for_label }}">{{ form.grammage_type.label }}</label>
+                    {{ form.grammage_type }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.grammage.id_for_label }}">{{ form.grammage.label }}</label>
+                    {{ form.grammage }}
+                </div>
+            </div>
+            <p class="text-secondary" style="margin-top:8px;">
+                <a href="{% url 'product_references' %}">{% trans "Gérer les catégories, gammes, rayons et grammages" %}</a>
+            </p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Prix et stock" %}</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-grid">
+                {% if form.stock %}
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.stock.id_for_label }}">{{ form.stock.label }}</label>
+                    {{ form.stock }}
+                    {% if form.stock.help_text %}<p class="text-secondary" style="margin:4px 0 0; font-size:12px;">{{ form.stock.help_text }}</p>{% endif %}
+                </div>
+                {% endif %}
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.stock_limit.id_for_label }}">{{ form.stock_limit.label }}</label>
+                    {{ form.stock_limit }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.actual_price.id_for_label }}">{{ form.actual_price.label }}</label>
+                    {{ form.actual_price }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.min_salable_price.id_for_label }}">{{ form.min_salable_price.label }}</label>
+                    {{ form.min_salable_price }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.max_salable_price.id_for_label }}">{{ form.max_salable_price.label }}</label>
+                    {{ form.max_salable_price }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.last_purchase_price.id_for_label }}">{{ form.last_purchase_price.label }}</label>
+                    {{ form.last_purchase_price }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.exp_alert_period.id_for_label }}">{{ form.exp_alert_period.label }}</label>
+                    {{ form.exp_alert_period }}
+                </div>
+                <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                    {{ form.is_price_reducible }}
+                    <label class="form-label" for="{{ form.is_price_reducible.id_for_label }}" style="margin:0;">{{ form.is_price_reducible.label }}</label>
+                </div>
+                <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                    {{ form.has_vat }}
+                    <label class="form-label" for="{{ form.has_vat.id_for_label }}" style="margin:0;">{{ form.has_vat.label }}</label>
+                </div>
+            </div>
+            {% for field in form %}
+                {% if field.errors and field.name != "code" and field.name != "name" %}
+                <div class="field-error">{{ field.label }} : {{ field.errors.0 }}</div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Images" %}</h3>
+        </div>
+        <div class="card-body">
+            {% if product_images %}
+            <div class="product-gallery" style="margin-bottom:12px;">
+                {% for image in product_images %}
+                <div class="product-gallery-item"><img src="{{ image.image.url }}" alt="{{ image }}" style="max-height:80px;"></div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <input type="file" name="images" multiple accept="image/*" class="form-control">
+            <p class="text-secondary" style="margin-top:4px; font-size:12px;">{% trans "Les nouvelles images s'ajoutent aux images existantes." %}</p>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{% trans "Enregistrer" %}</button>
+        {% if back_pk %}
+        <a href="{% url back_url back_pk %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
+        {% else %}
+        <a href="{% url back_url %}" class="btn btn-secondary">{% trans "Annuler" %}</a>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}
