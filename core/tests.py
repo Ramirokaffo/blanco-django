@@ -2092,6 +2092,7 @@ class CreditSaleRequiresClientTests(TestCase):
         self.assertIn('client_id', serializer.errors)
 
 
+@override_settings(STATICFILES_STORAGE='django.contrib.staticfiles.storage.StaticFilesStorage')
 class AddClientAjaxPopupTests(TestCase):
     """Raccourci « + » d'ajout de client (popup) depuis la page Ventes."""
 
