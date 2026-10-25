@@ -274,6 +274,18 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Liste par défaut de Django, plus le SHA-1 non salé de l'ancien serveur Flask
+# (comptes importés par `manage.py import_legacy_data`) : il ne sert qu'à
+# vérifier ces anciens hachages, re-hachés en PBKDF2 à la première connexion.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+    "django.contrib.auth.hashers.UnsaltedSHA1PasswordHasher",
+]
+
 
 # ──── Sécurité transport / cookies ──────────────────────────────────
 # L'application est servie en HTTP sur le LAN ; derrière un reverse proxy TLS,

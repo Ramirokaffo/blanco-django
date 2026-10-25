@@ -11,6 +11,9 @@ from core.models.product_models import (
     Product, ProductImage, Category, Gamme, Rayon, GrammageType
 )
 
+# Séquences d'échappement de mysqldump (les autres, \\ \' \", donnent le caractère lui-même)
+MYSQL_ESCAPES = {'n': '\n', 'r': '\r', 't': '\t', '0': '\0', 'Z': '\x1a'}
+
 
 def parse_sql_values(raw_text):
     """
@@ -57,7 +60,7 @@ def parse_sql_values(raw_text):
                 val_chars = []
                 while i < length:
                     if text[i] == '\\' and i + 1 < length:
-                        val_chars.append(text[i + 1])
+                        val_chars.append(MYSQL_ESCAPES.get(text[i + 1], text[i + 1]))
                         i += 2
                     elif text[i] == "'" and i + 1 < length and text[i + 1] == "'":
                         val_chars.append("'")
